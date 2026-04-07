@@ -51,14 +51,16 @@ def test_local_binary_returns_none_or_path():
 def test_screen_inspector_empty():
     from carbonyl_agent.screen_inspector import ScreenInspector
     si = ScreenInspector([])
-    assert si.rows == 0
+    assert si.row_count == 1   # max_row defaults to 1 for empty input
+    assert si.col_count == 0
 
 
 def test_screen_inspector_single_row():
     from carbonyl_agent.screen_inspector import ScreenInspector
-    si = ScreenInspector(["hello world"])
-    assert si.rows == 1
-    assert si.cols >= len("hello world")
+    si = ScreenInspector([{"row": 1, "text": "hello world"}])
+    assert si.row_count == 1
+    assert si.col_count >= len("hello world")
+    assert si.line(1) == "hello world"
 
 
 # ---------------------------------------------------------------------------
