@@ -5,28 +5,27 @@ These tests exercise the package imports and non-browser utilities without
 requiring a live Carbonyl binary (unit-level) or with one (integration-level,
 skipped if binary is absent).
 """
-import pytest
-from pathlib import Path
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Import smoke
 # ---------------------------------------------------------------------------
 
 def test_package_imports():
-    from carbonyl_agent import CarbonylBrowser, SessionManager, ScreenInspector
+    from carbonyl_agent import CarbonylBrowser, ScreenInspector, SessionManager
     assert CarbonylBrowser is not None
     assert SessionManager is not None
     assert ScreenInspector is not None
 
 
 def test_daemon_imports():
-    from carbonyl_agent.daemon import DaemonClient, start_daemon, stop_daemon
+    from carbonyl_agent.daemon import DaemonClient
     assert DaemonClient is not None
 
 
 def test_install_imports():
-    from carbonyl_agent.install import main, _platform_triple
+    from carbonyl_agent.install import _platform_triple
     triple = _platform_triple()
     assert "-" in triple  # e.g. x86_64-unknown-linux-gnu
 

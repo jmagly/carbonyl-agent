@@ -1,5 +1,8 @@
 # carbonyl-agent
 
+
+@AIWG.md
+
 Python automation SDK for the Carbonyl headless browser.
 
 ## Repository

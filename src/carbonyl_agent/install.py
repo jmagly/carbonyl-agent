@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import subprocess
 import sys
@@ -51,10 +52,87 @@ def _resolve_tag(tag: str) -> str:
         with urllib.request.urlopen(req, timeout=15) as resp:
             import json
             data = json.loads(resp.read())
-            return data["tag_name"]
+            result: str = data["tag_name"]
+            return result
     except Exception as exc:
         print(f"Warning: could not resolve latest tag: {exc}", file=sys.stderr)
         return tag
+
+
+def _sha256_file(path: Path) -> str:
+    """Compute hex SHA-256 digest of a file."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _fetch_sha256sums(tag: str, triple: str) -> str | None:
+    """Download SHA256SUMS from a release and return the expected hex digest
+    for ``{triple}.tgz``, or *None* if the file is missing (404)."""
+    url = f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/SHA256SUMS"
+    req = urllib.request.Request(url)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            text: str = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        raise
+    filename = f"{triple}.tgz"
+    for line in text.splitlines():
+        # Format: "<hex>  <filename>"
+        parts = line.strip().split(None, 1)
+        if len(parts) == 2 and parts[1].strip() == filename:
+            return parts[0].lower()
+    return None
+
+
+def _verify_checksum(
+    tarball: Path,
+    tag: str,
+    triple: str,
+    *,
+    pinned_checksum: str | None = None,
+    skip_verify: bool = False,
+) -> None:
+    """Verify the SHA-256 checksum of *tarball*.
+
+    Raises ``SystemExit`` on mismatch.  Prints a warning (but continues) when
+    the remote ``SHA256SUMS`` file is missing and no *pinned_checksum* was
+    supplied.
+    """
+    if skip_verify:
+        print("Warning: checksum verification skipped (--no-verify)", file=sys.stderr)
+        return
+
+    expected: str | None
+    if pinned_checksum:
+        expected = pinned_checksum.lower()
+        source = "--checksum flag"
+    else:
+        expected = _fetch_sha256sums(tag, triple)
+        source = "SHA256SUMS"
+        if expected is None:
+            print(
+                "Warning: SHA256SUMS not found for this release; "
+                "skipping checksum verification.",
+                file=sys.stderr,
+            )
+            return
+
+    actual = _sha256_file(tarball)
+    if actual != expected:
+        print(
+            f"\nERROR: SHA-256 mismatch!\n"
+            f"  Expected ({source}): {expected}\n"
+            f"  Got:                 {actual}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    print(f"Checksum OK ({source})")
 
 
 def cmd_install(args: argparse.Namespace) -> int:
@@ -90,6 +168,14 @@ def cmd_install(args: argparse.Namespace) -> int:
                     print(f"\r  {pct}% ({downloaded // 1024 // 1024} MB)", end="", flush=True)
         print()
 
+        _verify_checksum(
+            tmp_path,
+            tag,
+            triple,
+            pinned_checksum=getattr(args, "checksum", None),
+            skip_verify=getattr(args, "no_verify", False),
+        )
+
         print(f"Extracting to {install_dir} ...")
         with tarfile.open(tmp_path, "r:gz") as tar:
             # Strip the leading triple/ directory component from the tarball
@@ -116,7 +202,7 @@ def cmd_install(args: argparse.Namespace) -> int:
 
 
 def cmd_status(_args: argparse.Namespace) -> int:
-    from carbonyl_agent.browser import _local_binary, _platform_triple as _triple
+    from carbonyl_agent.browser import _local_binary
     binary = _local_binary()
     if binary:
         print(f"carbonyl binary: {binary}")
@@ -125,7 +211,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
             print(f"version: {result.stdout.strip()}")
     else:
         print("carbonyl binary: not found")
-        print(f"Run `carbonyl-agent install` to install it.")
+        print("Run `carbonyl-agent install` to install it.")
     return 0
 
 
@@ -151,6 +237,18 @@ def main() -> None:
         "--force",
         action="store_true",
         help="Reinstall even if binary already exists",
+    )
+    p_install.add_argument(
+        "--checksum",
+        default=None,
+        metavar="HEX",
+        help="Expected SHA-256 hex digest (skips SHA256SUMS download)",
+    )
+    p_install.add_argument(
+        "--no-verify",
+        action="store_true",
+        default=False,
+        help="Skip checksum verification entirely (not recommended)",
     )
 
     sub.add_parser("status", help="Show carbonyl binary location and version")

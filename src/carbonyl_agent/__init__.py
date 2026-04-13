@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 carbonyl-agent — Python automation SDK for the Carbonyl headless browser.
 
@@ -16,7 +18,7 @@ Quick start::
 """
 
 from carbonyl_agent.browser import CarbonylBrowser  # noqa: F401
-from carbonyl_agent.session import SessionManager  # noqa: F401
 from carbonyl_agent.screen_inspector import ScreenInspector  # noqa: F401
+from carbonyl_agent.session import SessionManager  # noqa: F401
 
 __all__ = ["CarbonylBrowser", "SessionManager", "ScreenInspector"]

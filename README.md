@@ -54,3 +54,7 @@ client.close()
 2. `~/.local/share/carbonyl/bin/<triple>/carbonyl` (installed by `carbonyl-agent install`)
 3. `carbonyl` on `$PATH`
 4. Docker fallback: `docker run fathyb/carbonyl`
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 """
 Carbonyl session management.
 
@@ -25,17 +26,15 @@ Usage:
 """
 
 import argparse
+import builtins
 import json
 import os
 import re
 import shutil
-import signal
 import sys
-import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
-
+from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -44,9 +43,8 @@ from typing import Optional
 _ENV_SESSION_DIR = "CARBONYL_SESSION_DIR"
 _DEFAULT_SESSION_DIR = Path.home() / ".local" / "share" / "carbonyl" / "sessions"
 
-# Valid session name: lowercase letters, digits, hyphens. No leading/trailing hyphens.
-# Consecutive hyphens (--) are allowed to support snapshot naming (<name>--snap--<tag>).
-_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*[a-z0-9]$|^[a-z0-9]$")
+# Valid session name: letters, digits, underscores, hyphens, dots. Max 64 chars.
+_SLUG_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 # Singleton lock file written by Chromium inside user-data-dir
 _SINGLETON_LOCK = "SingletonLock"
@@ -125,11 +123,19 @@ class SessionManager:
     def _slug_ok(name: str) -> bool:
         return bool(_SLUG_RE.match(name))
 
+    _MAX_NAME_LENGTH = 64
+
     def _require_slug(self, name: str) -> None:
+        # Defense-in-depth: reject path traversal and dangerous characters
+        # explicitly, BEFORE the regex check.
+        if not name or "\x00" in name or ".." in name or "/" in name or "\\" in name:
+            raise ValueError(
+                f"Invalid session name {name!r}: contains forbidden characters."
+            )
         if not self._slug_ok(name):
             raise ValueError(
                 f"Invalid session name {name!r}. "
-                "Use lowercase letters, digits, and hyphens only."
+                "Use letters, digits, underscores, hyphens, and dots (max 64 chars)."
             )
 
     def _singleton_lock(self, name: str) -> Path:
@@ -160,9 +166,9 @@ class SessionManager:
         p.mkdir(parents=True, exist_ok=True)
         return p
 
-    def list(self, *, include_snapshots: bool = True) -> list[dict]:
+    def list(self, *, include_snapshots: bool = True) -> list[dict[str, Any]]:
         """Return list of session metadata dicts sorted by created_at."""
-        results = []
+        results: list[dict[str, Any]] = []
         for d in sorted(self._root.iterdir()):
             if not d.is_dir():
                 continue
@@ -180,7 +186,7 @@ class SessionManager:
             results.append(data)
         return results
 
-    def create(self, name: str, *, tags: Optional[list[str]] = None) -> Path:
+    def create(self, name: str, *, tags: Optional[builtins.list[str]] = None) -> Path:
         """
         Create a new empty session. Returns the profile directory path.
         Raises if the session already exists.
@@ -188,7 +194,7 @@ class SessionManager:
         self._require_slug(name)
         if self.exists(name):
             raise FileExistsError(f"Session {name!r} already exists.")
-        session_dir = self._session_dir(name)
+        self._session_dir(name)
         profile = self._profile_dir(name)
         profile.mkdir(parents=True, exist_ok=True)
         meta = SessionMeta(

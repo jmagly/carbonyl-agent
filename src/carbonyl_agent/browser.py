@@ -15,6 +15,7 @@ Usage:
     python -m carbonyl_agent.browser search "search term"
     python -m carbonyl_agent.browser open https://example.com --wait 10
 """
+from __future__ import annotations
 
 import argparse
 import os
@@ -24,6 +25,7 @@ import sys
 import time
 import unicodedata
 from pathlib import Path
+from typing import Any
 
 import pexpect
 import pyte
@@ -34,6 +36,12 @@ ROWS = 50
 
 # Default install location used by `carbonyl-agent install`
 _DEFAULT_INSTALL_DIR = Path.home() / ".local" / "share" / "carbonyl" / "bin"
+
+# Docker fallback: require explicit opt-in and use a pinned digest.
+# To update the digest, pull the latest image and run:
+#   docker inspect --format='{{index .RepoDigests 0}}' fathyb/carbonyl
+_DOCKER_IMAGE_DIGEST = "fathyb/carbonyl@sha256:564733cd0e7c4ed82e3eb872df511092f84e848afd807f1c1db82e43c867aab0"
+_DOCKER_FALLBACK_ENV = "CARBONYL_ALLOW_DOCKER"
 
 # Chromium flags to suppress first-run noise, sync, and keychain prompts.
 # Applied to every Carbonyl launch regardless of session.
@@ -59,7 +67,7 @@ _HEADLESS_FLAGS = [
     "--disable-http2",
 ]
 
-def _session_manager():
+def _session_manager() -> Any:
     """Import and return a SessionManager."""
     from carbonyl_agent.session import SessionManager
     return SessionManager()
@@ -125,7 +133,7 @@ def _is_text_char(ch: str) -> bool:
     return cat[0] in ("L", "N", "P", "S", "Z") or ch == " "
 
 
-def extract_text(screen: pyte.Screen) -> str:
+def extract_text(screen: Any) -> str:
     """
     Pull readable text out of a pyte screen, filtering out the block/quad
     characters Carbonyl uses for graphical rendering.
@@ -143,7 +151,7 @@ def extract_text(screen: pyte.Screen) -> str:
         if text:
             lines.append(text)
     # Deduplicate consecutive identical lines (artifact of rendering)
-    deduped = []
+    deduped: list[str] = []
     for line in lines:
         if not deduped or line != deduped[-1]:
             deduped.append(line)
@@ -177,16 +185,16 @@ class CarbonylBrowser:
         self.cols = cols
         self.rows = rows
         self._session = session
-        self._screen = pyte.Screen(cols, rows)
-        self._stream = pyte.ByteStream(self._screen)
-        self._child: pexpect.spawn | None = None
-        self._daemon_client = None   # set when connected to a live daemon
+        self._screen: Any = pyte.Screen(cols, rows)
+        self._stream: Any = pyte.ByteStream(self._screen)
+        self._child: Any | None = None
+        self._daemon_client: Any | None = None
 
     def open(self, url: str) -> None:
         # If a daemon is already running for this session, reconnect to it
         # instead of spawning a new browser process.
         if self._session:
-            from carbonyl_agent.daemon import is_daemon_live, DaemonClient
+            from carbonyl_agent.daemon import DaemonClient, is_daemon_live
             if is_daemon_live(self._session):
                 log(f"reconnecting to live daemon for session {self._session!r}")
                 client = DaemonClient(self._session)
@@ -225,6 +233,11 @@ class CarbonylBrowser:
                 cwd=str(binary.parent),
             )
         else:
+            if os.environ.get(_DOCKER_FALLBACK_ENV) != "1":
+                raise RuntimeError(
+                    "No local Carbonyl binary found. Install one with `carbonyl-agent install`, "
+                    "or set CARBONYL_ALLOW_DOCKER=1 to allow Docker fallback."
+                )
             log("local binary not found, falling back to Docker image")
             # Docker: mount session profile if provided; ignore _HEADLESS_FLAGS
             # (they're already baked into the image entrypoint)
@@ -239,7 +252,7 @@ class CarbonylBrowser:
                 profile = sm.profile_dir(self._session)
                 vol = f"-v {profile}:/data/profile "
                 flag_str += " --user-data-dir=/data/profile"
-            cmd = f"docker run --rm -it {vol}fathyb/carbonyl {flag_str}"
+            cmd = f"docker run --rm -it {vol}{_DOCKER_IMAGE_DIGEST} {flag_str}"
             self._child = pexpect.spawn(
                 "bash", ["-c", cmd],
                 dimensions=(self.rows, self.cols),
@@ -252,6 +265,7 @@ class CarbonylBrowser:
         if self._daemon_client:
             self._daemon_client.drain(seconds)
             return
+        assert self._child is not None
         deadline = time.time() + seconds
         while time.time() < deadline:
             try:
@@ -267,6 +281,7 @@ class CarbonylBrowser:
         if self._daemon_client:
             self._daemon_client.send(text)
             return
+        assert self._child is not None
         self._child.send(text.encode("utf-8"))
 
     def mouse_move(self, col: int, row: int) -> None:
@@ -281,6 +296,7 @@ class CarbonylBrowser:
         if self._daemon_client:
             self._daemon_client.mouse_move(col, row)
             return
+        assert self._child is not None
         self._child.send(f"\x1b[<32;{col};{row}M".encode())
 
     def mouse_path(
@@ -305,6 +321,7 @@ class CarbonylBrowser:
         if self._daemon_client:
             self._daemon_client.click(col, row)
             return
+        assert self._child is not None
         press   = f"\x1b[<0;{col};{row}M".encode()
         release = f"\x1b[<0;{col};{row}m".encode()
         self._child.send(press)
@@ -337,7 +354,7 @@ class CarbonylBrowser:
     # click_text is the preferred name; click_on is kept for compatibility.
     click_text = click_on
 
-    def find_at_row(self, text: str, row: int) -> dict | None:
+    def find_at_row(self, text: str, row: int) -> dict[str, int] | None:
         """
         Find ``text`` on a specific row (1-indexed).
 
@@ -381,6 +398,7 @@ class CarbonylBrowser:
         seq = keys.get(key.lower())
         if seq is None:
             raise ValueError(f"Unknown key: {key!r}. Valid: {list(keys)}")
+        assert self._child is not None
         self._child.send(seq)
 
     def navigate(self, url: str) -> None:
@@ -401,6 +419,7 @@ class CarbonylBrowser:
         if self._daemon_client:
             self._daemon_client.navigate(url)
             return
+        assert self._child is not None
         # 1. Click at col=12 row=1 → Carbonyl x=11 → cursor pos 0 in URL field
         self.click(12, 1)
         # 2. Jump cursor to end of current URL (Down arrow = \x1b[B = 0x12 internally)
@@ -415,7 +434,8 @@ class CarbonylBrowser:
     def nav_bar_url(self) -> str:
         """Extract the URL shown in Carbonyl's navigation bar, if visible."""
         if self._daemon_client:
-            return self._daemon_client.nav_bar_url()
+            result: str = self._daemon_client.nav_bar_url()
+            return result
         text = self.page_text()
         m = re.search(r"https?://[^\s\]]+", text)
         return m.group(0) if m else ""
@@ -423,10 +443,11 @@ class CarbonylBrowser:
     def page_text(self) -> str:
         """Return current screen as clean readable text."""
         if self._daemon_client:
-            return self._daemon_client.page_text()
+            result: str = self._daemon_client.page_text()
+            return result
         return extract_text(self._screen)
 
-    def find_text(self, text: str) -> list[dict]:
+    def find_text(self, text: str) -> list[dict[str, int]]:
         """
         Find all occurrences of ``text`` in the raw terminal buffer.
 
@@ -443,8 +464,9 @@ class CarbonylBrowser:
         Works in both direct and daemon-connected modes.
         """
         if self._daemon_client:
-            return self._daemon_client.find_text(text)
-        results = []
+            result: list[dict[str, int]] = self._daemon_client.find_text(text)
+            return result
+        results: list[dict[str, int]] = []
         for row_idx in sorted(self._screen.buffer.keys()):
             row = self._screen.buffer[row_idx]
             line = "".join(c.data for c in row.values())
@@ -461,21 +483,22 @@ class CarbonylBrowser:
                 start = idx + 1
         return results
 
-    def raw_lines(self) -> list[dict]:
+    def raw_lines(self) -> list[dict[str, Any]]:
         """
         Return the raw screen buffer as ``[{"row": int, "text": str}, ...]``.
         Works in both direct and daemon-connected modes.
         """
         if self._daemon_client:
-            return self._daemon_client.raw_lines()
-        lines = []
+            result: list[dict[str, Any]] = self._daemon_client.raw_lines()
+            return result
+        lines: list[dict[str, Any]] = []
         for row_idx in sorted(self._screen.buffer.keys()):
             row = self._screen.buffer[row_idx]
             lines.append({"row": row_idx + 1,
                           "text": "".join(c.data for c in row.values())})
         return lines
 
-    def inspector(self):
+    def inspector(self) -> Any:
         """
         Return a ``ScreenInspector`` for the current screen state.
 
@@ -498,7 +521,10 @@ class CarbonylBrowser:
         Use this instead of ``open()`` when you want to observe the current
         browser state without changing the URL.
         """
-        return bool(self._session) and not not self.open("about:blank")  # triggers daemon check
+        if not self._session:
+            return False
+        self.open("about:blank")  # triggers daemon check
+        return self._daemon_client is not None
 
     def disconnect(self) -> None:
         """
@@ -561,7 +587,7 @@ def search_duckduckgo(
     """
     browser = CarbonylBrowser()
     try:
-        log(f"opening https://duckduckgo.com ...")
+        log("opening https://duckduckgo.com ...")
         browser.open("https://duckduckgo.com")
 
         log(f"waiting {wait_load}s for page load ...")

@@ -33,9 +33,8 @@ Usage:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Optional
-
+from dataclasses import dataclass
+from typing import Any, Optional
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -70,7 +69,7 @@ class ScreenInspector:
     Rows and cols are 1-indexed (matching pyte/terminal convention).
     """
 
-    def __init__(self, raw_lines: list[dict]) -> None:
+    def __init__(self, raw_lines: list[dict[str, Any]]) -> None:
         # Build a row→text dict; rows are 1-indexed
         self._lines: dict[int, str] = {entry["row"]: entry["text"] for entry in raw_lines}
         self._min_row = min(self._lines) if self._lines else 1
@@ -99,7 +98,7 @@ class ScreenInspector:
         c0 = col - 1  # convert to 0-indexed
         return line[c0:c0 + length] if 0 <= c0 < len(line) else ""
 
-    def find(self, text: str) -> list[dict]:
+    def find(self, text: str) -> list[dict[str, Any]]:
         """
         Search for text across all rows.
         Returns [{"col": N, "row": N, "end_col": N}, ...] (1-indexed).
@@ -194,7 +193,7 @@ class ScreenInspector:
 
         return "\n".join(lines)
 
-    def print_grid(self, **kwargs) -> None:
+    def print_grid(self, **kwargs: Any) -> None:
         """Print render_grid() output to stdout."""
         print(self.render_grid(**kwargs))
 
@@ -310,22 +309,22 @@ class ScreenInspector:
         row_start: int,
         col_end: int,
         row_end: int,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Return a dict describing a screen region: bounding box, text content,
         and detected interactive markers (forms, links, buttons).
         """
-        lines = []
+        lines: list[dict[str, Any]] = []
         for row in range(row_start, row_end + 1):
             raw = self.line(row)
             snippet = raw[col_start - 1:col_end]
             if snippet.strip():
                 lines.append({"row": row, "text": snippet})
 
-        full_text = "\n".join(e["text"] for e in lines)
+        full_text = "\n".join(str(e["text"]) for e in lines)
 
         # Heuristic: detect interactive elements from text patterns
-        indicators = []
+        indicators: list[str] = []
         if re.search(r"\[[ X]\]", full_text):
             indicators.append("checkbox")
         if re.search(r"<[^>]+>|▌|█|░", full_text):

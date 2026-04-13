@@ -32,13 +32,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import signal
 import socket
 import socketserver
 import sys
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Find project root and add to path
@@ -49,7 +49,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from carbonyl_agent.browser import CarbonylBrowser, log
-from carbonyl_agent.session import SessionManager, _DEFAULT_SESSION_DIR
+from carbonyl_agent.session import _DEFAULT_SESSION_DIR, SessionManager
 
 _SOCK_SUFFIX = ".sock"
 _PID_KEY = "daemon_pid"
@@ -107,7 +107,7 @@ class DaemonClient:
                 pass
             self._sock = None
 
-    def _rpc(self, payload: dict, timeout: float | None = None) -> dict:
+    def _rpc(self, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
         if not self._sock:
             raise RuntimeError("Not connected to daemon")
         # For drain commands, extend timeout beyond the drain duration
@@ -128,7 +128,7 @@ class DaemonClient:
                 break
         # Restore default timeout
         self._sock.settimeout(10.0)
-        resp = json.loads(resp_buf.split(b"\n")[0])
+        resp: dict[str, Any] = json.loads(resp_buf.split(b"\n")[0])
         if not resp.get("ok"):
             raise RuntimeError(f"Daemon error: {resp.get('error')}")
         return resp
@@ -153,18 +153,20 @@ class DaemonClient:
         self._rpc({"cmd": "navigate", "url": url})
 
     def page_text(self) -> str:
-        return self._rpc({"cmd": "page_text"})["result"]
+        result: str = self._rpc({"cmd": "page_text"})["result"]
+        return result
 
     def nav_bar_url(self) -> str:
-        return self._rpc({"cmd": "url"})["result"]
+        result: str = self._rpc({"cmd": "url"})["result"]
+        return result
 
-    def find_text(self, text: str) -> list[dict]:
+    def find_text(self, text: str) -> list[dict[str, int]]:
         """Return [{col, row, end_col}, ...] for all occurrences (all 1-indexed)."""
-        return self._rpc({"cmd": "find_text", "text": text})["result"]
+        return self._rpc({"cmd": "find_text", "text": text})["result"]  # type: ignore[no-any-return]
 
-    def raw_lines(self) -> list[dict]:
+    def raw_lines(self) -> list[dict[str, Any]]:
         """Return [{row, text}, ...] for the full raw screen buffer."""
-        return self._rpc({"cmd": "raw_lines"})["result"]
+        return self._rpc({"cmd": "raw_lines"})["result"]  # type: ignore[no-any-return]
 
     def close_daemon(self) -> None:
         """Send close command (shuts down daemon + browser)."""
@@ -182,7 +184,7 @@ class DaemonClient:
 class _BrowserHandler(socketserver.StreamRequestHandler):
     """Handle one client connection, dispatching JSON commands to the browser."""
 
-    def handle(self):
+    def handle(self) -> None:
         log(f"daemon: client connected from {self.client_address}")
         buf = b""
         try:
@@ -208,8 +210,8 @@ class _BrowserHandler(socketserver.StreamRequestHandler):
         except Exception as exc:
             log(f"daemon: handler error: {exc}")
 
-    def _dispatch(self, req: dict) -> dict:
-        browser: CarbonylBrowser = self.server.browser
+    def _dispatch(self, req: dict[str, Any]) -> dict[str, Any]:
+        browser: CarbonylBrowser = self.server.browser  # type: ignore[attr-defined]
         cmd = req.get("cmd")
         try:
             if cmd == "send":
@@ -258,7 +260,7 @@ class _BrowserHandler(socketserver.StreamRequestHandler):
                 return {"ok": True, "result": lines}
             elif cmd == "close":
                 # Signal main thread to shut down
-                self.server.shutdown_requested = True
+                self.server.shutdown_requested = True  # type: ignore[attr-defined]
                 return {"ok": True, "result": "closing"}
             else:
                 return {"ok": False, "error": f"Unknown command: {cmd!r}"}
@@ -270,7 +272,7 @@ class _BrowserHandler(socketserver.StreamRequestHandler):
 class _BrowserServer(socketserver.ThreadingUnixStreamServer):
     daemon_threads = True
 
-    def __init__(self, sock_path: str, browser: CarbonylBrowser):
+    def __init__(self, sock_path: str, browser: CarbonylBrowser) -> None:
         self.browser = browser
         self.shutdown_requested = False
         # Remove stale socket
@@ -278,7 +280,13 @@ class _BrowserServer(socketserver.ThreadingUnixStreamServer):
             os.unlink(sock_path)
         except FileNotFoundError:
             pass
+        # Ensure parent directory has restricted permissions
+        parent = Path(sock_path).parent
+        parent.mkdir(parents=True, exist_ok=True)
+        os.chmod(str(parent), 0o700)
         super().__init__(sock_path, _BrowserHandler)
+        # Restrict socket permissions
+        os.chmod(sock_path, 0o600)
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +332,7 @@ def _run_daemon(
         except Exception as exc:
             log(f"daemon: failed to update metadata: {exc}")
 
-    def _cleanup():
+    def _cleanup() -> None:
         log("daemon: cleaning up...")
         try:
             sock_path.unlink(missing_ok=True)
@@ -335,7 +343,7 @@ def _run_daemon(
     atexit.register(_cleanup)
 
     # Poll for shutdown request in a thread; serve_forever blocks otherwise
-    def _watch():
+    def _watch() -> None:
         while not server.shutdown_requested:
             time.sleep(0.5)
         log("daemon: shutdown requested")
@@ -414,7 +422,7 @@ def stop_daemon(
     log(f"Daemon for {session_name!r} stopped.")
 
 
-def daemon_status(session_dir: Path | None = None) -> list[dict]:
+def daemon_status(session_dir: Path | None = None) -> list[dict[str, Any]]:
     """Return status dicts for all sessions that have a live daemon."""
     sm = SessionManager(session_dir)
     results = []
@@ -430,7 +438,7 @@ def daemon_status(session_dir: Path | None = None) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def _cmd_start(args: argparse.Namespace) -> None:
-    url = args.url or "about:blank"
+    url: str = args.url or "about:blank"
     log(f"Starting daemon for session {args.session!r} → {url}")
     pid = start_daemon(args.session, url=url)
     print(f"Daemon started (PID {pid})")
@@ -441,7 +449,7 @@ def _cmd_stop(args: argparse.Namespace) -> None:
     stop_daemon(args.session)
 
 
-def _cmd_status(args: argparse.Namespace) -> None:
+def _cmd_status(args: argparse.Namespace) -> None:  # noqa: ARG001
     statuses = daemon_status()
     if not statuses:
         print("No sessions.")
