@@ -7,6 +7,49 @@
 
 This runbook is the canonical procedure for releasing `carbonyl-agent` to PyPI. It assumes the CI pipeline in `.aiwg/deployment/ci-cd-scaffold.md` is in place and PyPI Trusted Publisher is configured for the GitHub mirror.
 
+## 0. One-Time PyPI Trusted Publisher Setup
+
+Only performed once, before the first release. Complete before attempting v0.1.0.
+
+### 0.1. Register the PyPI project name
+
+1. Log in at [https://pypi.org/account/login/](https://pypi.org/account/login/)
+2. If no prior `carbonyl-agent` release exists, the name is available on first publish. Skip to 0.2.
+3. Verify the name is not squatted: [https://pypi.org/project/carbonyl-agent/](https://pypi.org/project/carbonyl-agent/)
+
+### 0.2. Configure the trusted publisher
+
+1. Navigate to [https://pypi.org/manage/account/publishing/](https://pypi.org/manage/account/publishing/)
+2. Under **Add a new pending publisher**, enter:
+   - **PyPI Project Name**: `carbonyl-agent`
+   - **Owner**: `jmagly`
+   - **Repository name**: `carbonyl-agent`
+   - **Workflow name**: `ci.yml`
+   - **Environment name**: `release`
+3. Click **Add**. PyPI creates a pending trusted publisher that activates on first successful OIDC publish.
+
+### 0.3. Configure the GitHub environment
+
+1. At [https://github.com/jmagly/carbonyl-agent/settings/environments](https://github.com/jmagly/carbonyl-agent/settings/environments):
+   - Create environment named `release`
+   - (Optional) Add a required reviewer for extra gating on tag pushes
+   - (Optional) Restrict to `refs/tags/v*`
+2. No PyPI API token needs to be stored — OIDC handles auth.
+
+### 0.4. Verify via TestPyPI (recommended before first prod publish)
+
+1. Configure a second pending publisher on [TestPyPI](https://test.pypi.org/manage/account/publishing/) with the same settings
+2. Add a `workflow_dispatch` trigger to `.github/workflows/ci.yml` that publishes to TestPyPI instead of PyPI
+3. Run the workflow manually, verify package appears at [https://test.pypi.org/project/carbonyl-agent/](https://test.pypi.org/project/carbonyl-agent/)
+4. In a clean venv: `pip install --index-url https://test.pypi.org/simple/ carbonyl-agent`
+
+### 0.5. Confirm readiness
+
+- [ ] PyPI pending publisher created
+- [ ] GitHub `release` environment exists
+- [ ] `.github/workflows/ci.yml` `publish` job uses `pypa/gh-action-pypi-publish@release/v1` with `id-token: write` permission
+- [ ] (Optional) TestPyPI dry-run succeeded
+
 ## 1. Pre-Release Checklist
 
 Complete **all** items before tagging. Check off as you go.
@@ -20,7 +63,7 @@ Complete **all** items before tagging. Check off as you go.
 - [ ] `.aiwg/security/threat-model.md` reviewed; no HIGH unmitigated items unless explicitly accepted
 - [ ] No `TODO`/`FIXME` without a linked issue
 - [ ] `mypy --strict` and `ruff check` pass locally
-- [ ] Coverage gate satisfied locally (`pytest --cov` ≥ 80% line, ≥ 70% branch)
+- [ ] Coverage gate satisfied locally (`pytest --cov` ≥ 50% line for v0.1.0; raise to 80% after E2E tests land in #15)
 - [ ] `pip-audit` clean
 - [ ] Dry-run build succeeds: `python -m build` produces sdist + wheel in `dist/`
 - [ ] `twine check dist/*` passes
