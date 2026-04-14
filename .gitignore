@@ -8,8 +8,16 @@ build/
 venv/
 *.egg
 
-# Pytest
+# Pytest / coverage / hypothesis
 .pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+
+# AIWG / Claude harness (installed per-machine, not committed)
+.claude/
 
 # Editor
 .idea/
