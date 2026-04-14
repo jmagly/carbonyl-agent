@@ -45,7 +45,7 @@ The architecture described here covers only the Python automation layer: the `ca
 | G4 | **Cross-platform runtime discovery** | Support Linux (glibc) and macOS triples with a deterministic search order (browser.py `_local_binary`, lines 79–107). |
 | G5 | **Zero binary modifications** | The SDK must drive the upstream Carbonyl binary as-is, without patches or rebuilds. Decouples SDK releases from Chromium release cycles. |
 | G6 | **Local-only execution boundary** | The daemon is strictly local; authentication relies on filesystem permissions of the Unix socket. |
-| G7 | **Supply-chain integrity** | Runtime binary is downloaded over HTTPS from Gitea releases (install.py line 24). SHA256 verification is a known follow-up (see §11). |
+| G7 | **Supply-chain integrity** | Runtime binary is downloaded over HTTPS from Gitea releases (install.py line 24). SHA256 checksum verification is enforced before extraction (install.py `_verify_checksum`). |
 | G8 | **Graceful fallback** | When no local binary is installed, fall back to Docker (`fathyb/carbonyl`) so first-time users can smoke-test without the installer (browser.py lines 227–248). |
 
 ---
@@ -125,11 +125,11 @@ flowchart TB
 
 | Module | File | LoC | Responsibility |
 |---|---|---|---|
-| CarbonylBrowser | `browser.py` | 624 | PTY lifecycle, pyte feed, text extraction, navigation, mouse/keyboard input, daemon passthrough |
-| SessionManager | `session.py` | 507 | Named user-data-dir CRUD, fork/snapshot/restore, SingletonLock liveness check |
-| DaemonClient + daemon server | `daemon.py` | 529 | Unix-socket RPC, fork daemon, JSON wire protocol |
-| ScreenInspector | `screen_inspector.py` | 365 | Raw-buffer coordinate visualisation, region summaries, crosshair/dot-map |
-| Installer | `install.py` | 170 | Tarball download from Gitea, tag resolution, extraction |
+| CarbonylBrowser | `browser.py` | ~650 | PTY lifecycle, pyte feed, text extraction, navigation, mouse/keyboard input, daemon passthrough |
+| SessionManager | `session.py` | ~513 | Named user-data-dir CRUD, fork/snapshot/restore, SingletonLock liveness check, name validation |
+| DaemonClient + daemon server | `daemon.py` | ~537 | Unix-socket RPC, fork daemon, JSON wire protocol, socket permission hardening |
+| ScreenInspector | `screen_inspector.py` | ~364 | Raw-buffer coordinate visualisation, region summaries, crosshair/dot-map |
+| Installer | `install.py` | ~268 | Tarball download from Gitea, SHA256 verification, tag resolution, extraction |
 | CLI entry | `__main__.py` | — | `carbonyl-agent install / status` dispatch |
 
 `CarbonylBrowser` acts as a polymorphic frontend: every public method checks `self._daemon_client` first and short-circuits to the RPC client when connected (e.g. browser.py lines 252–253, 267–269, 281–283). This lets callers use the same object regardless of whether the browser is in-process or behind a daemon.
@@ -215,7 +215,7 @@ The SingletonLock symlink inside a Chromium profile (`<profile>/SingletonLock`) 
 
 **Runtime discovery**: The four-step order (ADR-003) is applied uniformly in `_local_binary` (browser.py lines 79–107). The Docker fallback is invoked only if steps 1–3 return None.
 
-**Supply-chain trust**: HTTPS to Gitea (`GITEA_BASE` env-overridable at install.py line 24). The installer currently trusts the TLS chain and the Gitea server; it does **not** verify a SHA256 checksum against a signed manifest. Documented gap — see ADR-004 and §11.
+**Supply-chain trust**: HTTPS to Gitea (`GITEA_BASE` env-overridable at install.py line 24). The installer downloads `SHA256SUMS` from the release and verifies the tarball checksum before extraction (`_verify_checksum`). Manual checksum pinning is also supported via `--checksum <hex>`. Docker fallback requires explicit opt-in (`CARBONYL_ALLOW_DOCKER=1`) and uses a pinned image digest.
 
 **Signal handling and cleanup**: `CarbonylBrowser.close` (lines 514–550) sends SIGTERM to the Chromium process group when a session is in use (so Chromium can flush cookies), waits up to `graceful_timeout`, then SIGKILLs. The daemon registers an `atexit` hook (daemon.py line 335) to unlink the socket and close the browser even on abnormal termination.
 
@@ -243,7 +243,7 @@ The SingletonLock symlink inside a Chromium profile (`<profile>/SingletonLock`) 
 
 **Reliability** — Stale SingletonLock cleanup (`clean_stale_lock`, session.py lines 322–333) prevents the most common "session stuck live" failure after a crash. Daemon socket staleness is handled in `is_daemon_live` (daemon.py lines 68–81) by attempting a connect and unlinking on failure.
 
-**Security** — Threat model is local-user only. No authentication on the Unix socket; file-system permissions of `~/.local/share/carbonyl/sessions/` are the access boundary. Runtime download trusts HTTPS + Gitea; no checksum verification today.
+**Security** — Threat model is local-user only. Daemon sockets are restricted to `0600` with parent dir `0700`; file-system permissions are the access boundary. Runtime download is verified via SHA256 checksums. Session names are validated against path traversal. Docker fallback requires explicit opt-in.
 
 **Portability** — Binary discovery handles `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, and `*-apple-darwin` triples (browser.py `_platform_triple`, lines 68–76). Windows is unsupported (pexpect + Unix sockets); WSL is expected to work via the Linux path.
 
@@ -251,10 +251,10 @@ The SingletonLock symlink inside a Chromium profile (`<profile>/SingletonLock`) 
 
 ## 11. Technical Debt and Future Work
 
-1. **SHA256 verification of runtime tarballs** — install.py downloads and extracts without checksum validation. Mitigation: publish a `SHA256SUMS` manifest alongside each `runtime-<hash>` release and verify before extraction.
+1. ~~**SHA256 verification of runtime tarballs**~~ — **Resolved** in Iteration 1 (install.py `_verify_checksum`). SHA256SUMS downloaded and verified before extraction; `--checksum` override available.
 2. **Daemon concurrency** — `_BrowserServer` uses threaded handlers but the browser is shared without a lock. Either serialise dispatch with a mutex or document "single client per daemon."
-3. **Expanded test coverage** — Current `tests/test_smoke.py` covers imports and unit-level behaviour. Daemon mode, session fork/restore, and the installer have no integration tests.
-4. **Typed public API** — Public methods use `dict` return types (`find_text`, `raw_lines`) that should become `TypedDict` or dataclasses for downstream IDE support.
+3. ~~**Expanded test coverage**~~ — **Partially resolved** in Iteration 1. 155 tests across 6 test files (unit, integration, property). Remaining gap: E2E tests with real Carbonyl binary (tracked in #15).
+4. ~~**Typed public API**~~ — **Resolved** in Iteration 1. `mypy --strict` passes across all 7 source files. `py.typed` PEP 561 marker added. `TypedDict`/dataclass promotion deferred to Iteration 3.
 5. **Async daemon interface** — Current daemon is blocking per-call. An `asyncio` client would let downstream agents overlap I/O with navigation.
 6. **Windows support** — Requires replacing pexpect + Unix sockets with a `subprocess`/`asyncio` + named-pipe backend. Out of scope for v0.x.
 
