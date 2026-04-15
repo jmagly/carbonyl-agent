@@ -89,8 +89,13 @@ ANTI_BOT_FLAGS: list[str] = [
 # Use for sites that aggressively overlay Google Sign-In on top of their
 # own login form (X/Twitter, LinkedIn, many publishers). Without this,
 # overlays steal focus and scripted typing lands in the wrong input.
+#
+# Belt-and-suspenders: the feature flags handle modern Chromium, and the
+# host-resolver rule blackholes Google's One Tap accounts endpoint for
+# Chromium builds (like Carbonyl's) that don't honor the feature flag.
 ANTI_FEDCM_FLAGS: list[str] = [
-    "--disable-features=FedCm,FedCmAuthz,FedCmButtonMode,FedCmIdPRegistration",
+    "--disable-features=FedCm,FedCmAuthz,FedCmButtonMode,FedCmIdPRegistration,FederatedCredentialManagement,DigitalIdentityCredentials",
+    "--host-resolver-rules=MAP accounts.google.com ~NOTFOUND",
 ]
 
 # Alias: "One Tap" is the common name for the overlay this blocks.
