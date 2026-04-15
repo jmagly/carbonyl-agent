@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DaemonClient` and daemon server — persistent browser instances over Unix domain sockets
 - `carbonyl-agent install` CLI — download Carbonyl runtime binary from Gitea releases
 - `carbonyl-agent status` CLI — report installed runtime location and version
+- `carbonyl-agent daemon {start,stop,status,attach}` CLI — manage persistent browser daemons
+- `DaemonClient`, `start_daemon`, `stop_daemon` re-exported from top-level `carbonyl_agent` package for direct import
 - Binary discovery: `CARBONYL_BIN` env → installed path → `$PATH` → Docker fallback
 - SHA256 checksum verification for runtime tarball downloads
 - Docker fallback opt-in gate (`CARBONYL_ALLOW_DOCKER=1`) with pinned image digest

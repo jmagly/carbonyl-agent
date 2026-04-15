@@ -68,6 +68,7 @@ Complete **all** items before tagging. Check off as you go.
 - [ ] Dry-run build succeeds: `python -m build` produces sdist + wheel in `dist/`
 - [ ] `twine check dist/*` passes
 - [ ] (Optional) Smoke-tested against TestPyPI for MAJOR or MINOR releases
+- [ ] Local USPS PO Box smoke test passes (`python tests/local/test_usps_pobox.py`) — verifies bot-detection stack. Not in CI; gates release for any change touching `_HEADLESS_FLAGS` in `browser.py`
 
 ## 2. Tag Creation
 

@@ -253,12 +253,39 @@ def main() -> None:
 
     sub.add_parser("status", help="Show carbonyl binary location and version")
 
+    # daemon subcommand group
+    p_daemon = sub.add_parser("daemon", help="Manage persistent browser daemons")
+    daemon_sub = p_daemon.add_subparsers(dest="daemon_command", required=True)
+
+    p_dstart = daemon_sub.add_parser("start", help="Start a persistent browser daemon")
+    p_dstart.add_argument("session", help="Session name")
+    p_dstart.add_argument("url", nargs="?", default=None, help="Initial URL (default: about:blank)")
+
+    p_dstop = daemon_sub.add_parser("stop", help="Stop a running daemon")
+    p_dstop.add_argument("session")
+
+    daemon_sub.add_parser("status", help="Show daemon status for all sessions")
+
+    p_dattach = daemon_sub.add_parser("attach", help="Interactive REPL for a live daemon")
+    p_dattach.add_argument("session")
+
     args = parser.parse_args()
 
     if args.command == "install":
         sys.exit(cmd_install(args))
     elif args.command == "status":
         sys.exit(cmd_status(args))
+    elif args.command == "daemon":
+        from carbonyl_agent.daemon import _cmd_attach, _cmd_start, _cmd_status, _cmd_stop
+
+        dispatch = {
+            "start": _cmd_start,
+            "stop": _cmd_stop,
+            "status": _cmd_status,
+            "attach": _cmd_attach,
+        }
+        dispatch[args.daemon_command](args)
+        sys.exit(0)
     else:
         parser.print_help()
         sys.exit(0)

@@ -196,3 +196,41 @@ def test_platform_triple_format():
     assert len(parts) >= 3, f"Expected at least 3 parts in triple, got: {parts}"
     # First part should be a machine architecture
     assert len(parts[0]) > 0, "Architecture part must not be empty"
+
+
+# ---------------------------------------------------------------------------
+# CLI wiring (US-026) — daemon subcommand is dispatched correctly
+# ---------------------------------------------------------------------------
+
+def test_cli_daemon_subcommand_registered():
+    """carbonyl-agent daemon <cmd> is recognized by the top-level parser."""
+    import sys
+
+    from carbonyl_agent import install
+
+    # Capture parser by calling main() with --help and intercepting SystemExit
+    old_argv = sys.argv
+    try:
+        sys.argv = ["carbonyl-agent", "daemon", "--help"]
+        with pytest.raises(SystemExit) as exc:
+            install.main()
+        # argparse --help exits 0
+        assert exc.value.code == 0
+    finally:
+        sys.argv = old_argv
+
+
+def test_cli_daemon_unknown_subcommand_errors():
+    """carbonyl-agent daemon <unknown> exits non-zero."""
+    import sys
+
+    from carbonyl_agent import install
+
+    old_argv = sys.argv
+    try:
+        sys.argv = ["carbonyl-agent", "daemon", "nonexistent"]
+        with pytest.raises(SystemExit) as exc:
+            install.main()
+        assert exc.value.code != 0
+    finally:
+        sys.argv = old_argv
