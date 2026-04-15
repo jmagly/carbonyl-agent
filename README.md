@@ -216,6 +216,38 @@ print(si.annotate(marks=[(m["col"], m["row"]) for m in matches]))
 
 **If you hit bot-detection walls, do not remove these flags — they are the baseline.** For additional entropy, call `CarbonylBrowser.mouse_path([...])` to simulate organic mouse movement before interaction.
 
+### Composing flags for specific scenarios
+
+Flag groups are published as module constants so agents can pick and choose:
+
+```python
+from carbonyl_agent import (
+    CarbonylBrowser,
+    DEFAULT_HEADLESS_FLAGS,   # baseline (applied automatically)
+    BASE_CHROMIUM_FLAGS,      # first-run / keychain suppression only
+    ANTI_BOT_FLAGS,           # UA spoof, no-webdriver, HTTP/1.1
+    ANTI_FEDCM_FLAGS,         # disable Google One Tap (X, LinkedIn, publishers)
+    ANTI_ONETAP_FLAGS,        # alias for ANTI_FEDCM_FLAGS
+)
+
+# Default: BASE_CHROMIUM_FLAGS + ANTI_BOT_FLAGS
+b = CarbonylBrowser()
+
+# Add Google One Tap suppression — required for scripted X/Twitter login
+b = CarbonylBrowser(extra_flags=ANTI_FEDCM_FLAGS)
+
+# Compose multiple groups:
+b = CarbonylBrowser(extra_flags=ANTI_FEDCM_FLAGS + ["--disable-extensions"])
+
+# Completely replace the defaults (rarely needed):
+b = CarbonylBrowser(base_flags=[*BASE_CHROMIUM_FLAGS, "--my-flag"])
+```
+
+When to reach for `ANTI_FEDCM_FLAGS`: any site that aggressively overlays
+Google Sign-In on top of its own login form. Without this, the overlay's
+autofocused input steals your keystrokes and the underlying form is
+unreachable.
+
 ---
 
 ## Binary Search Order

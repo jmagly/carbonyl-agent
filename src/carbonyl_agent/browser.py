@@ -43,29 +43,64 @@ _DEFAULT_INSTALL_DIR = Path.home() / ".local" / "share" / "carbonyl" / "bin"
 _DOCKER_IMAGE_DIGEST = "fathyb/carbonyl@sha256:564733cd0e7c4ed82e3eb872df511092f84e848afd807f1c1db82e43c867aab0"
 _DOCKER_FALLBACK_ENV = "CARBONYL_ALLOW_DOCKER"
 
-# Chromium flags to suppress first-run noise, sync, and keychain prompts.
-# Applied to every Carbonyl launch regardless of session.
-_HEADLESS_FLAGS = [
+# ---------------------------------------------------------------------------
+# Chromium flag groups
+# ---------------------------------------------------------------------------
+# These are published as public module constants so agents can compose the
+# exact set of flags they need:
+#
+#   from carbonyl_agent.browser import (
+#       DEFAULT_HEADLESS_FLAGS, ANTI_BOT_FLAGS, ANTI_FEDCM_FLAGS,
+#       ANTI_ONETAP_FLAGS,
+#   )
+#
+#   # Default baseline (applied automatically):
+#   b = CarbonylBrowser()
+#
+#   # Add FedCM/One Tap suppression for sites that aggressively overlay
+#   # Google Sign-In (e.g. X, LinkedIn, many publishers):
+#   b = CarbonylBrowser(extra_flags=ANTI_FEDCM_FLAGS)
+#
+#   # Compose multiple groups:
+#   b = CarbonylBrowser(extra_flags=ANTI_FEDCM_FLAGS + MY_CUSTOM_FLAGS)
+#
+# The `extra_flags` list is appended to DEFAULT_HEADLESS_FLAGS in the order
+# given. To completely replace the default set, pass `base_flags=[...]`.
+
+# Baseline: suppress first-run noise, sync, keychain, and file-picker prompts.
+# Applied to every CarbonylBrowser by default.
+BASE_CHROMIUM_FLAGS: list[str] = [
     "--no-first-run",
     "--no-default-browser-check",
     "--disable-sync",
     "--password-store=basic",
     "--use-mock-keychain",
-    # Suppress navigator.webdriver=true so bot-detection scripts don't flag us.
+]
+
+# Anti-bot-detection: spoof UA, suppress webdriver markers, disable HTTP/2
+# (whose SETTINGS frame is a server-side fingerprint for Akamai et al).
+ANTI_BOT_FLAGS: list[str] = [
     "--disable-blink-features=AutomationControlled",
-    # Spoof a standard Firefox User-Agent.
-    # The Carbonyl binary appends " (Carbonyl)" to whatever product name is compiled
-    # in, which Akamai and similar bot-detection engines immediately flag.  Overriding
-    # here with a genuine Firefox UA removes both the Chrome identifier and the
-    # "(Carbonyl)" marker.  This affects both navigator.userAgent (JS) and the
-    # HTTP User-Agent request header.
     "--user-agent=Mozilla/5.0 (X11; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0",
-    # Force HTTP/1.1 by disabling HTTP/2.
-    # Chromium's HTTP/2 SETTINGS frame (window sizes, max streams, header table size)
-    # differs measurably from Firefox's and is a secondary fingerprint used by Akamai's
-    # server-side bot classifier.  Falling back to HTTP/1.1 removes this signal entirely.
     "--disable-http2",
 ]
+
+# Disable Federated Credential Management (FedCM) and Google One Tap.
+# Use for sites that aggressively overlay Google Sign-In on top of their
+# own login form (X/Twitter, LinkedIn, many publishers). Without this,
+# overlays steal focus and scripted typing lands in the wrong input.
+ANTI_FEDCM_FLAGS: list[str] = [
+    "--disable-features=FedCm,FedCmAuthz,FedCmButtonMode,FedCmIdPRegistration",
+]
+
+# Alias: "One Tap" is the common name for the overlay this blocks.
+ANTI_ONETAP_FLAGS: list[str] = ANTI_FEDCM_FLAGS
+
+# Default flags applied when no overrides are given.
+DEFAULT_HEADLESS_FLAGS: list[str] = BASE_CHROMIUM_FLAGS + ANTI_BOT_FLAGS
+
+# Backwards-compat alias (internal).
+_HEADLESS_FLAGS = DEFAULT_HEADLESS_FLAGS
 
 def _session_manager() -> Any:
     """Import and return a SessionManager."""
@@ -164,6 +199,9 @@ class CarbonylBrowser:
         cols: int = COLS,
         rows: int = ROWS,
         session: str | None = None,
+        *,
+        extra_flags: list[str] | None = None,
+        base_flags: list[str] | None = None,
     ):
         """
         Args:
@@ -181,6 +219,18 @@ class CarbonylBrowser:
 
                      Create/manage sessions with ``automation/session.py``
                      or ``SessionManager``.
+            extra_flags: Additional Chromium command-line flags to append.
+                     Compose from published flag groups for common scenarios::
+
+                         from carbonyl_agent.browser import (
+                             ANTI_FEDCM_FLAGS,   # disable Google One Tap
+                         )
+
+                         b = CarbonylBrowser(extra_flags=ANTI_FEDCM_FLAGS)
+
+            base_flags: Completely replace the default flag set
+                     (``DEFAULT_HEADLESS_FLAGS``). Rarely needed — prefer
+                     ``extra_flags`` for additive changes.
         """
         self.cols = cols
         self.rows = rows
@@ -189,6 +239,11 @@ class CarbonylBrowser:
         self._stream: Any = pyte.ByteStream(self._screen)
         self._child: Any | None = None
         self._daemon_client: Any | None = None
+        self._flags: list[str] = list(
+            base_flags if base_flags is not None else DEFAULT_HEADLESS_FLAGS
+        )
+        if extra_flags:
+            self._flags = self._flags + list(extra_flags)
 
     def open(self, url: str) -> None:
         # If a daemon is already running for this session, reconnect to it
@@ -207,7 +262,7 @@ class CarbonylBrowser:
                 return
 
         binary = _local_binary()
-        args = ["--fps=5", "--no-sandbox"] + _HEADLESS_FLAGS
+        args = ["--fps=5", "--no-sandbox"] + self._flags
 
         if self._session:
             sm = _session_manager()
@@ -239,12 +294,12 @@ class CarbonylBrowser:
                     "or set CARBONYL_ALLOW_DOCKER=1 to allow Docker fallback."
                 )
             log("local binary not found, falling back to Docker image")
-            # Docker: mount session profile if provided; ignore _HEADLESS_FLAGS
-            # (they're already baked into the image entrypoint)
+            # Docker: mount session profile if provided; drop SDK-supplied flags
+            # (they're already baked into the image entrypoint).
             flag_str = " ".join(
                 a for a in args
                 if not a.startswith("--user-data-dir")
-                and a not in _HEADLESS_FLAGS
+                and a not in self._flags
             )
             vol = ""
             if self._session:

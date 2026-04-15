@@ -6,6 +6,11 @@ import pytest
 
 from carbonyl_agent.browser import (
     _DOCKER_FALLBACK_ENV,
+    ANTI_BOT_FLAGS,
+    ANTI_FEDCM_FLAGS,
+    ANTI_ONETAP_FLAGS,
+    BASE_CHROMIUM_FLAGS,
+    DEFAULT_HEADLESS_FLAGS,
     CarbonylBrowser,
     _is_text_char,
     _local_binary,
@@ -53,3 +58,40 @@ class TestLocalBinary:
         result = _local_binary()
         if result is not None:
             assert result.is_file()
+
+
+class TestFlagGroups:
+    """Flag groups are composable and can be selected by agents per scenario."""
+
+    def test_default_is_base_plus_anti_bot(self):
+        assert DEFAULT_HEADLESS_FLAGS == BASE_CHROMIUM_FLAGS + ANTI_BOT_FLAGS
+
+    def test_onetap_alias_equals_fedcm(self):
+        assert ANTI_ONETAP_FLAGS == ANTI_FEDCM_FLAGS
+
+    def test_fedcm_flag_content(self):
+        assert any("FedCm" in f for f in ANTI_FEDCM_FLAGS)
+
+    def test_default_flags_used_when_none_specified(self):
+        b = CarbonylBrowser()
+        assert b._flags == list(DEFAULT_HEADLESS_FLAGS)
+
+    def test_extra_flags_appended(self):
+        extra = ["--disable-features=FedCm"]
+        b = CarbonylBrowser(extra_flags=extra)
+        assert b._flags == list(DEFAULT_HEADLESS_FLAGS) + extra
+
+    def test_extra_flags_anti_fedcm_group(self):
+        b = CarbonylBrowser(extra_flags=ANTI_FEDCM_FLAGS)
+        assert b._flags[-len(ANTI_FEDCM_FLAGS):] == ANTI_FEDCM_FLAGS
+
+    def test_base_flags_override_replaces_default(self):
+        custom = ["--foo", "--bar"]
+        b = CarbonylBrowser(base_flags=custom)
+        assert b._flags == custom
+
+    def test_base_and_extra_compose(self):
+        base = ["--foo"]
+        extra = ["--bar"]
+        b = CarbonylBrowser(base_flags=base, extra_flags=extra)
+        assert b._flags == ["--foo", "--bar"]

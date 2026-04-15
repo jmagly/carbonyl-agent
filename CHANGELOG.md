@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `carbonyl-agent status` CLI — report installed runtime location and version
 - `carbonyl-agent daemon {start,stop,status,attach}` CLI — manage persistent browser daemons
 - `DaemonClient`, `start_daemon`, `stop_daemon` re-exported from top-level `carbonyl_agent` package for direct import
+- Composable Chromium flag groups — agents can pick and choose per scenario: `DEFAULT_HEADLESS_FLAGS` (baseline), `BASE_CHROMIUM_FLAGS` (first-run / keychain suppression), `ANTI_BOT_FLAGS` (UA spoof, webdriver suppression, HTTP/1.1 fallback), `ANTI_FEDCM_FLAGS` / `ANTI_ONETAP_FLAGS` (disable Google One Tap overlays that interfere with scripted login on X/LinkedIn/publishers)
+- `CarbonylBrowser(extra_flags=...)` and `base_flags=...` keyword args for composing flag sets
 - Binary discovery: `CARBONYL_BIN` env → installed path → `$PATH` → Docker fallback
 - SHA256 checksum verification for runtime tarball downloads
 - Docker fallback opt-in gate (`CARBONYL_ALLOW_DOCKER=1`) with pinned image digest

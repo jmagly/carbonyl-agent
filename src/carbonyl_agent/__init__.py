@@ -19,7 +19,14 @@ Quick start::
     b.close()
 """
 
-from carbonyl_agent.browser import CarbonylBrowser  # noqa: F401
+from carbonyl_agent.browser import (  # noqa: F401
+    ANTI_BOT_FLAGS,
+    ANTI_FEDCM_FLAGS,
+    ANTI_ONETAP_FLAGS,
+    BASE_CHROMIUM_FLAGS,
+    DEFAULT_HEADLESS_FLAGS,
+    CarbonylBrowser,
+)
 from carbonyl_agent.daemon import (  # noqa: F401
     DaemonClient,
     daemon_status,
@@ -39,4 +46,10 @@ __all__ = [
     "stop_daemon",
     "daemon_status",
     "is_daemon_live",
+    # Chromium flag groups (composable)
+    "DEFAULT_HEADLESS_FLAGS",
+    "BASE_CHROMIUM_FLAGS",
+    "ANTI_BOT_FLAGS",
+    "ANTI_FEDCM_FLAGS",
+    "ANTI_ONETAP_FLAGS",
 ]
