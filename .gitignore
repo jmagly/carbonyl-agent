@@ -29,7 +29,3 @@ htmlcov/
 
 # Carbonyl runtime (installed locally, not committed)
 ~/.local/share/carbonyl/
-
-# Local-only smoke tests (network-dependent, site-structure-brittle)
-# e.g. USPS PO Box bot-detection verification — see #29
-tests/local/
