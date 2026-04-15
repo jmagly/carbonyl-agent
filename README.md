@@ -1,4 +1,19 @@
-# carbonyl-agent
+<table align="center">
+  <tbody>
+    <tr>
+      <td>
+        <p></p>
+        <pre>
+   O    O
+    \  /
+O —— Cr —— O
+    /  \
+   O    O</pre>
+      </td>
+      <td><h1>carbonyl-agent</h1></td>
+    </tr>
+  </tbody>
+</table>
 
 Python automation SDK for the [Carbonyl](https://git.integrolabs.net/roctinam/carbonyl) headless browser.
 
