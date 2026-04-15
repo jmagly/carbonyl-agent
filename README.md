@@ -3,7 +3,7 @@
 <pre>
    O    O
     \  /
-O —— Cr —— O
+   O —— Cr —— O
     /  \
    O    O
 </pre>

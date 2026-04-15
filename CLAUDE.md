@@ -7,8 +7,7 @@ Python automation SDK for the Carbonyl headless browser.
 
 ## Repository
 
-- Gitea: `roctinam/carbonyl-agent` (primary)
-- GitHub: `jmagly/carbonyl-agent` (mirror)
+- GitHub: `jmagly/carbonyl-agent`
 
 ## Layout
 
@@ -18,7 +17,7 @@ src/carbonyl_agent/
     __main__.py          # CLI entry point (carbonyl-agent install / status)
     browser.py           # CarbonylBrowser: PTY + pyte terminal emulation
     daemon.py            # DaemonClient + daemon server (Unix socket)
-    install.py           # Runtime download from Gitea releases
+    install.py           # Runtime download from release assets
     screen_inspector.py  # Coordinate visualization and region summaries
     session.py           # Named session management (user-data-dir)
 tests/
@@ -49,7 +48,7 @@ python3 -m venv .venv
 
 ## Relationship to carbonyl repo
 
-`carbonyl-agent` is extracted from `roctinam/carbonyl`'s `automation/` directory.
+`carbonyl-agent` is extracted from `jmagly/carbonyl`'s `automation/` directory.
 The `carbonyl` repo owns the Chromium build and the `libcarbonyl.so` Rust FFI layer.
 `carbonyl-agent` owns the Python automation layer only.
 
@@ -57,6 +56,6 @@ The `carbonyl` repo owns the Chromium build and the `libcarbonyl.so` Rust FFI la
 
 ## Runtime Distribution
 
-Pre-built Carbonyl binaries (~75 MB tarballs) are hosted on Gitea releases at
-`roctinam/carbonyl`, tagged `runtime-<hash>`. `carbonyl-agent install` downloads
+Pre-built Carbonyl binaries (~75 MB tarballs) are hosted as release assets on
+`jmagly/carbonyl`, tagged `runtime-<hash>`. `carbonyl-agent install` downloads
 the tarball for the current platform and extracts it to `~/.local/share/carbonyl/bin/`.
