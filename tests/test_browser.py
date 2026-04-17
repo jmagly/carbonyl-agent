@@ -95,3 +95,15 @@ class TestFlagGroups:
         extra = ["--bar"]
         b = CarbonylBrowser(base_flags=base, extra_flags=extra)
         assert b._flags == ["--foo", "--bar"]
+
+
+class TestViewport:
+    """Consumer-controlled CSS viewport (carbonyl issue #37 fix)."""
+
+    def test_default_is_none(self):
+        b = CarbonylBrowser()
+        assert b._viewport is None
+
+    def test_accepts_tuple(self):
+        b = CarbonylBrowser(viewport=(1280, 800))
+        assert b._viewport == (1280, 800)

@@ -205,6 +205,7 @@ class CarbonylBrowser:
         rows: int = ROWS,
         session: str | None = None,
         *,
+        viewport: tuple[int, int] | None = None,
         extra_flags: list[str] | None = None,
         base_flags: list[str] | None = None,
     ):
@@ -224,6 +225,20 @@ class CarbonylBrowser:
 
                      Create/manage sessions with ``automation/session.py``
                      or ``SessionManager``.
+            viewport: Consumer-controlled CSS viewport as ``(width, height)``
+                     in CSS pixels. When set, Blink lays out the page against
+                     this exact viewport and rasters to matching physical
+                     pixels (DSF = 1.0), so the terminal samples an
+                     upper-left window of a predictable layout rather than
+                     the upper-left of an inflated ``cells × scale`` layout.
+
+                     Requires Carbonyl build with ``--viewport`` support
+                     (runtime tag >= ``runtime-2026-04-17-viewport``). Falls
+                     through cleanly on older runtimes (env var is ignored).
+
+                     Pass ``viewport=(1280, 800)`` for a typical desktop
+                     layout. Terminals smaller than the viewport sample the
+                     upper-left portion; larger terminals see the full page.
             extra_flags: Additional Chromium command-line flags to append.
                      Compose from published flag groups for common scenarios::
 
@@ -240,6 +255,7 @@ class CarbonylBrowser:
         self.cols = cols
         self.rows = rows
         self._session = session
+        self._viewport = viewport
         self._screen: Any = pyte.Screen(cols, rows)
         self._stream: Any = pyte.ByteStream(self._screen)
         self._child: Any | None = None
@@ -283,6 +299,10 @@ class CarbonylBrowser:
         if binary:
             lib_dir = str(binary.parent)
             env = {**os.environ, "LD_LIBRARY_PATH": lib_dir}
+            if self._viewport is not None:
+                vw, vh = self._viewport
+                env["CARBONYL_VIEWPORT"] = f"{vw}x{vh}"
+                log(f"viewport override: {vw}x{vh}")
             log(f"using local binary: {binary}")
             self._child = pexpect.spawn(
                 str(binary), args,
