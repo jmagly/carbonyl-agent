@@ -1,0 +1,18 @@
+[package]
+name = "carbonyl-fingerprint"
+version = "0.0.1-alpha.1"
+edition = "2021"
+description = "Owned fingerprint registry for Carbonyl trusted-automation personas: schema, sampler, validator, applier"
+license = "MIT"
+repository = "https://git.integrolabs.net/roctinam/carbonyl-agent"
+
+[lib]
+name = "carbonyl_fingerprint"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+thiserror = "2"
+
+[dev-dependencies]
+pretty_assertions = "1"

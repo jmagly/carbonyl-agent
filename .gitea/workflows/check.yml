@@ -1,0 +1,65 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Builder-container discipline per Fortemi pattern — no host-installed toolchain.
+# See roctinam/carbonyl/docs/ci-cd-plan.md and
+# roctinam/carbonyl/.aiwg/working/trusted-automation/09-ci-plan.md
+#
+# This is the inaugural carbonyl-agent CI workflow. Covers Python linting,
+# type checking, unit tests, and Rust sub-crate tests. Integration workflows
+# (integration.yml, wreq-pin-audit.yml, corpus-refresh.yml, persona-lint.yml)
+# land as separate files per the approval-gate pattern.
+
+jobs:
+  python:
+    runs-on: titan
+    # Image not yet published — placeholder tag until build-builder workflow lands.
+    container:
+      image: git.integrolabs.net/roctinam/carbonyl-agent-ci:PLACEHOLDER_SHA
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install (editable, with dev deps)
+        run: |
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        # Ruff config lives in pyproject.toml; no hard-fail on warnings for now,
+        # tighten as the codebase stabilises.
+        run: |
+          python -m ruff check src tests || echo "ruff warnings (non-blocking during scaffold phase)"
+
+      - name: Type check (mypy)
+        run: |
+          python -m mypy src
+
+      - name: Unit tests (pytest)
+        run: |
+          python -m pytest tests -q
+
+  rust-crates:
+    runs-on: titan
+    container:
+      image: git.integrolabs.net/roctinam/carbonyl-agent-ci:PLACEHOLDER_SHA
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cargo fmt
+        working-directory: crates/carbonyl-fingerprint
+        run: cargo fmt --all -- --check
+
+      - name: Cargo clippy
+        working-directory: crates/carbonyl-fingerprint
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Cargo test
+        working-directory: crates/carbonyl-fingerprint
+        run: cargo test --all-targets
