@@ -29,3 +29,9 @@ htmlcov/
 
 # Carbonyl runtime (installed locally, not committed)
 ~/.local/share/carbonyl/
+
+# Rust build artifacts (applies to all crates/ sub-crates)
+target/
+**/target/
+# Library crates: don't commit Cargo.lock
+crates/*/Cargo.lock
