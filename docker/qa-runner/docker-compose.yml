@@ -1,0 +1,48 @@
+# docker-compose for carbonyl-agent-qa-runner
+#
+# Sane default: runs as root (--user 0) so uinput works on any host
+# without requiring the host udev rule. Override with the `--profile
+# nonroot` service for tighter isolation once 99-uinput.rules is installed.
+#
+# Usage:
+#   docker compose up                  # root mode (default)
+#   docker compose run runner bash     # interactive shell
+#   docker compose --profile nonroot up runner-nonroot   # after sudo scripts/setup-uinput-host.sh
+#
+# Required env (none; everything has sane defaults):
+#   CARBONYL_RUNNER_IMAGE — override image tag (default: carbonyl-agent-qa-runner:local)
+#   CARBONYL_GPU_MODE     — auto | cpu | gpu (default: auto)
+#   HOST_INPUT_GID        — only for nonroot profile; autodetected from host
+
+services:
+
+  # Default service: root mode, works anywhere. Ideal for CI + quick tests.
+  runner:
+    image: ${CARBONYL_RUNNER_IMAGE:-carbonyl-agent-qa-runner:local}
+    user: "0"  # root — bypasses host udev / GID alignment
+    devices:
+      - /dev/uinput:/dev/uinput
+    environment:
+      CARBONYL_GPU_MODE: ${CARBONYL_GPU_MODE:-auto}
+    # GPU passthrough is optional; comment these in if the host has /dev/dri
+    # and you want GPU-mode Chromium:
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # Uncomment for fully interactive usage:
+    # stdin_open: true
+    # tty: true
+
+  # Non-root service: only works after `sudo scripts/setup-uinput-host.sh`
+  # on the host. Tighter process isolation; matches production ops preferences.
+  runner-nonroot:
+    profiles: ["nonroot"]
+    image: ${CARBONYL_RUNNER_IMAGE:-carbonyl-agent-qa-runner:local}
+    # user remains the Dockerfile default (agent)
+    devices:
+      - /dev/uinput:/dev/uinput
+    group_add:
+      # HOST_INPUT_GID must be passed — run with:
+      #   HOST_INPUT_GID=$(getent group input | cut -d: -f3) docker compose --profile nonroot up
+      - ${HOST_INPUT_GID:?set HOST_INPUT_GID to the host 'input' group GID; see scripts/setup-uinput-host.sh}
+    environment:
+      CARBONYL_GPU_MODE: ${CARBONYL_GPU_MODE:-auto}

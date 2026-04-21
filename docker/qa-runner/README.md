@@ -24,35 +24,49 @@ docker build -t carbonyl-agent-qa-runner:local \
 
 ## Run
 
-### CPU mode (works anywhere)
+### Quickest — the wrapper handles everything
 
 ```bash
-docker run --rm \
-  --device=/dev/uinput --group-add input \
+cd docker/qa-runner
+./run.sh                          # interactive bash
+./run.sh pytest tests/layer1       # run a command
+CARBONYL_GPU_MODE=gpu ./run.sh    # force GPU mode
+CARBONYL_RUN_MODE=root ./run.sh   # force root mode (default on hosts without udev rule)
+```
+
+`run.sh` auto-detects whether the host has the `99-uinput.rules` udev rule installed:
+
+- **No udev rule** → `--user 0` (root in container), `--device=/dev/uinput`. Zero host setup; works anywhere.
+- **Udev rule installed** (via `sudo scripts/setup-uinput-host.sh`) → non-root `agent` user, `--group-add <host-input-gid>`. Tighter isolation.
+
+### Compose
+
+```bash
+# Default service: root mode, works anywhere
+docker compose up
+
+# Non-root (requires one-time host setup, below)
+HOST_INPUT_GID=$(getent group input | cut -d: -f3) \
+  docker compose --profile nonroot up runner-nonroot
+```
+
+### Raw docker (lowest-level)
+
+```bash
+# Simplest — root mode, works anywhere
+docker run --rm --device=/dev/uinput -e CARBONYL_GPU_MODE=cpu --user 0 \
+  carbonyl-agent-qa-runner:local
+
+# Non-root (requires 99-uinput.rules on host)
+docker run --rm --device=/dev/uinput \
+  --group-add "$(getent group input | cut -d: -f3)" \
   -e CARBONYL_GPU_MODE=cpu \
-  carbonyl-agent-qa-runner:local \
-  bash -c 'xset q && scrot /tmp/test.png && file /tmp/test.png'
-```
+  carbonyl-agent-qa-runner:local
 
-### GPU mode (requires `/dev/dri` passthrough)
-
-```bash
-docker run --rm \
-  --device=/dev/uinput --group-add input \
-  --device=/dev/dri --gpus all \
-  -e CARBONYL_GPU_MODE=gpu \
-  carbonyl-agent-qa-runner:local \
-  bash -c 'xset q && glxinfo | head -20'
-```
-
-### Auto (tries GPU, falls back to CPU if `/dev/dri` absent)
-
-```bash
-docker run --rm \
-  --device=/dev/uinput --group-add input \
-  --device=/dev/dri:/dev/dri \
-  carbonyl-agent-qa-runner:local \
-  bash
+# GPU mode
+docker run --rm --device=/dev/uinput --device=/dev/dri --gpus all \
+  --user 0 -e CARBONYL_GPU_MODE=gpu \
+  carbonyl-agent-qa-runner:local
 ```
 
 ## What the entrypoint does
@@ -101,32 +115,23 @@ Image is published to the Gitea container registry at `git.integrolabs.net/rocti
 | `CARBONYL_GPU_MODE=gpu but /dev/dri/card0 absent` | GPU mode requested but no passthrough | Add `--device=/dev/dri --gpus all` to `docker run` |
 | `carbonyl stub: no x11 runtime installed` | Image built without `CARBONYL_RUNTIME_URL` | Rebuild with `--build-arg CARBONYL_RUNTIME_URL=...` once `#57` ships |
 
-## Host uinput setup (REQUIRED for trusted input)
+## Host uinput setup — OPTIONAL (only for non-root operator mode)
 
-Docker's `--device=/dev/uinput` passes the raw device node into the container but does **not** preserve host ACLs. Out of the box, `/dev/uinput` in the container appears as `root:root` mode 660, so a non-root container user (like the `agent` user this image creates) cannot write to it. `--group-add input` alone is insufficient — it adds the *container's* `input` group to the user's supplemental groups, but the host device isn't a member of any `input` group by default on most distros.
-
-**Recommended operator setup — one-time host change**:
+The default path (`./run.sh`, `docker compose up`, or `docker run --user 0`) works on any host without setup. If you want the tighter-isolation non-root mode, run the one-command installer on the host once:
 
 ```bash
-# 1. Make /dev/uinput owned by the 'input' group on the host:
-cat <<'EOF' | sudo tee /etc/udev/rules.d/99-uinput.rules
-KERNEL=="uinput", GROUP="input", MODE="0660"
-EOF
-
-# 2. Reload + retrigger:
-sudo udevadm control --reload
-sudo udevadm trigger /dev/uinput
-
-# 3. Verify:
-ls -la /dev/uinput
-# Expected: crw-rw---- 1 root input ...
-
-# 4. Check the host's 'input' group GID:
-getent group input | cut -d: -f3
-# Note this number — you'll pass it to docker as --group-add <GID>
+sudo scripts/setup-uinput-host.sh
 ```
 
-With that in place, run containers via:
+What it does (idempotent; safe to re-run):
+
+1. Verifies the kernel has `uinput` support (loads module + persists via `/etc/modules-load.d/uinput.conf`)
+2. Ensures the `input` group exists on the host
+3. Installs `/etc/udev/rules.d/99-uinput.rules` (shipped in `docker/qa-runner/host-setup/`)
+4. Reloads udev + retriggers `/dev/uinput`
+5. Prints next steps (add yourself to `input` group; host input GID for `--group-add`)
+
+After that, `./run.sh` auto-detects the setup and switches to non-root mode. You can also use it manually:
 
 ```bash
 HOST_INPUT_GID=$(getent group input | cut -d: -f3)
@@ -139,9 +144,16 @@ docker run --rm \
 
 Passing the GID numerically (instead of `--group-add input`) bypasses the container-side vs host-side name resolution mismatch — the agent user ends up with supplemental membership in the group that owns the host device.
 
-**CI shortcut**: for automated runs where the extra setup is inconvenient, run the container as root (`--user 0`). Accepts the trade-off of less-strict process isolation for simpler setup. Not recommended for interactive operator use.
+### Why the two modes exist
 
-**If you can't modify host udev**: the agent SDK can emit uinput from *outside* the container (on the host) and the Carbonyl-inside-the-container still sees the events via X, because Xorg reads `/dev/input/eventN` from the shared kernel. This is actually the canonical Phase 0 pattern — W0.4's tests do exactly that.
+Docker's `--device=/dev/uinput` passes the raw device node into the container but does **not** preserve host ACLs. Out of the box, `/dev/uinput` in the container appears as `root:root` mode 660:
+
+- `--user 0` mode (default in `run.sh` / compose) → root inside container, has access. Simple.
+- Non-root mode → requires the udev rule above, plus matching GID alignment via `--group-add <host-gid>`.
+
+The `run.sh` wrapper hides this distinction: it picks whichever mode the host is set up for. Compose's `runner` service (default) uses root; `runner-nonroot` profile uses the group-add approach.
+
+**If you can't modify host udev and don't want root**: the agent SDK can emit uinput from *outside* the container (on the host) and the Carbonyl-inside-the-container still sees the events via X, because Xorg reads `/dev/input/eventN` from the shared kernel. This is actually the canonical Phase 0 pattern — W0.4's tests do exactly that.
 
 ## Limitations (current state)
 

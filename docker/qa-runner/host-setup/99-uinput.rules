@@ -1,0 +1,19 @@
+# udev rule — makes /dev/uinput accessible to the `input` group.
+#
+# Install: sudo cp 99-uinput.rules /etc/udev/rules.d/
+#          sudo udevadm control --reload
+#          sudo udevadm trigger /dev/uinput
+#
+# Or run the full installer: scripts/setup-uinput-host.sh
+#
+# Why: out of the box on most distros /dev/uinput is root:root mode 660,
+# which means only root processes can write to it. Docker's --device
+# passthrough preserves host ownership, so a non-root container user
+# hits "Permission denied" without this rule.
+#
+# Once this rule is in place:
+#   - /dev/uinput is owned root:input, mode 660
+#   - Any host user in the 'input' group can write to it
+#   - docker run --device=/dev/uinput --group-add $(getent group input | cut -d: -f3)
+#     (passing the host GID numerically) gives the container agent user access
+KERNEL=="uinput", GROUP="input", MODE="0660"
