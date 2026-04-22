@@ -47,6 +47,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       x11vnc \
       && rm -rf /var/lib/apt/lists/*
 
+# Chromium runtime shared libraries. The Carbonyl binary is a Chromium
+# headless_shell fork; it has the usual heavy runtime dep surface. These
+# are runtime-only (no -dev packages); libnss3 pulls libnspr4 transitively.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libnss3 \
+      libnspr4 \
+      libasound2t64 \
+      libexpat1 \
+      libfontconfig1 \
+      libdbus-1-3 \
+      libglib2.0-0t64 \
+      libxkbcommon0 \
+      libxcomposite1 \
+      libxdamage1 \
+      libxfixes3 \
+      libxrandr2 \
+      libgbm1 \
+      libegl1 \
+      libgl1 \
+      libpango-1.0-0 \
+      libcairo2 \
+      libatk1.0-0t64 \
+      libatk-bridge2.0-0t64 \
+      libcups2t64 \
+      libdrm2 \
+      libatspi2.0-0t64 \
+      && rm -rf /var/lib/apt/lists/*
+
 # Python runtime + dev tooling the agent SDK needs.
 # gcc + libc-dev are needed to build python-uinput (C extension);
 # we clean them up after install to keep the image lean.
@@ -96,8 +124,13 @@ RUN mkdir -p /opt/carbonyl
 RUN if [ -n "$CARBONYL_RUNTIME_URL" ]; then \
       echo "Installing Carbonyl x11 runtime from $CARBONYL_RUNTIME_URL"; \
       curl -fsSL "$CARBONYL_RUNTIME_URL" -o /tmp/carbonyl.tar.gz; \
-      tar -xzf /tmp/carbonyl.tar.gz -C /opt/carbonyl; \
+      # Tarball wraps files in a <triple>/ top-level dir; strip it so
+      # /opt/carbonyl/carbonyl is the executable path without hardcoding
+      # the triple in PATH.
+      tar -xzf /tmp/carbonyl.tar.gz -C /opt/carbonyl --strip-components=1; \
       rm /tmp/carbonyl.tar.gz; \
+      ls -lh /opt/carbonyl/carbonyl /opt/carbonyl/libcarbonyl.so 2>/dev/null || \
+        { echo "ERROR: expected carbonyl binary + libcarbonyl.so missing after extract"; exit 1; }; \
     else \
       echo '#!/bin/sh' > /opt/carbonyl/carbonyl; \
       echo 'echo "carbonyl stub: no x11 runtime installed. Provide --build-arg CARBONYL_RUNTIME_URL or bind-mount a real runtime at /opt/carbonyl/"' >> /opt/carbonyl/carbonyl; \
