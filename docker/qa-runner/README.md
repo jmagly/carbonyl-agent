@@ -10,6 +10,23 @@ Runtime container for Phase 0+ QA of the Carbonyl Trusted Automation Initiative.
 - **Python 3 + `python-uinput`**: enough to drive the agent SDK from inside the container
 - **Carbonyl x11 runtime** at `/opt/carbonyl/carbonyl` — fetched at image build time via `--build-arg CARBONYL_RUNTIME_URL=...`. The runtime ships as `runtime-x11-<hash>` Gitea releases (e.g. `runtime-x11-dd69bef0ea4b2512` for current main); a stub is left in place if no URL is passed so the image builds standalone
 
+## Pull (preferred)
+
+The image is published to the Gitea container registry by `.gitea/workflows/build-qa-runner.yml` (issue #38) on every push to `main` that touches `docker/qa-runner/**` or `.carbonyl-runtime-version`.
+
+```bash
+docker login git.integrolabs.net   # one-time, with a Gitea PAT
+docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:latest
+
+# Or pin to a specific runtime hash (matches .carbonyl-runtime-version):
+docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:runtime-dd69bef0ea4b2512
+
+# Or pin to a specific repo commit:
+docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:sha-<short-sha>
+```
+
+Use the published image unless you're iterating on the Dockerfile itself or a network egress to the registry isn't available.
+
 ## Build
 
 The repo ships `.carbonyl-runtime-version` at its root (issue #39) and a wrapper

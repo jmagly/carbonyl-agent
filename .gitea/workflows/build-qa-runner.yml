@@ -1,0 +1,167 @@
+# build-qa-runner.yml — build + publish carbonyl-agent-qa-runner image
+#
+# Reads `.carbonyl-runtime-version` (issue #39) for the runtime hash so SDK,
+# qa-runner image, and CI all reference the same Carbonyl build.
+#
+# Image is published to the Gitea Container Registry next to the source
+# repo. Tags applied per build:
+#   - latest                    (only on main)
+#   - runtime-<hash>            (matches the pin file)
+#   - sha-<short-git-sha>       (immutable per-commit reference)
+#
+# Triggered by:
+#   - workflow_dispatch (primary — manual rebuild or override hash)
+#   - push to main when docker/qa-runner/** or .carbonyl-runtime-version changes
+#
+# Secret: BUILD_REPO_TOKEN — same Gitea PAT used by build-runtime.yml in
+# carbonyl, with read+write on the container registry. See
+# `roctinam/carbonyl/docs/ci-secrets.md` for the rotation playbook.
+#
+# Refs: roctinam/carbonyl-agent#38
+
+name: Build qa-runner image
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime_hash:
+        description: 'Runtime hash override (default: read from .carbonyl-runtime-version)'
+        required: false
+        default: ''
+      push:
+        description: 'Push to registry after build'
+        required: false
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+  push:
+    branches: [main]
+    paths:
+      - 'docker/qa-runner/**'
+      - '.carbonyl-runtime-version'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: git.integrolabs.net
+  IMAGE_REPO: git.integrolabs.net/roctinam/carbonyl-agent/qa-runner
+  GITEA_RUNTIME_REPO: roctinam/carbonyl
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve runtime hash
+        id: pin
+        run: |
+          set -euo pipefail
+          OVERRIDE='${{ inputs.runtime_hash }}'
+          if [[ -n "$OVERRIDE" ]]; then
+            HASH="$OVERRIDE"
+            SOURCE="workflow_dispatch override"
+          else
+            if [[ ! -f .carbonyl-runtime-version ]]; then
+              echo "ERROR: .carbonyl-runtime-version missing" >&2
+              exit 1
+            fi
+            HASH="$(grep -E '^runtime-hash=' .carbonyl-runtime-version | head -1 | cut -d= -f2 | tr -d '[:space:]')"
+            SOURCE=".carbonyl-runtime-version"
+          fi
+          if [[ -z "$HASH" ]] || [[ "$HASH" == "runtime-latest" ]]; then
+            echo "ERROR: runtime hash not concrete (got '$HASH'); refusing to build a drift-prone image" >&2
+            exit 1
+          fi
+          URL="https://${REGISTRY}/${GITEA_RUNTIME_REPO}/releases/download/runtime-x11-${HASH}/x86_64-unknown-linux-gnu.tgz"
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          echo "Pinned runtime: $HASH (from $SOURCE)"
+          echo "Tarball URL:    $URL"
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          set -euo pipefail
+          SHORT_SHA="$(git rev-parse --short=12 HEAD)"
+          HASH='${{ steps.pin.outputs.hash }}'
+          TAGS=()
+          TAGS+=("${IMAGE_REPO}:runtime-${HASH}")
+          TAGS+=("${IMAGE_REPO}:sha-${SHORT_SHA}")
+          if [[ "${GITHUB_REF_NAME:-}" == "main" ]]; then
+            TAGS+=("${IMAGE_REPO}:latest")
+          fi
+          # Output as newline-separated for docker build --tag iteration
+          printf '%s\n' "${TAGS[@]}" > /tmp/tags.txt
+          echo "Tags planned:"
+          cat /tmp/tags.txt
+          echo "tags_file=/tmp/tags.txt" >> "$GITHUB_OUTPUT"
+          # Primary tag (used for the post-build smoke test)
+          echo "primary=${IMAGE_REPO}:runtime-${HASH}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify runtime tarball exists at the resolved URL
+        run: |
+          set -euo pipefail
+          URL='${{ steps.pin.outputs.url }}'
+          # HEAD against the URL — fail fast if the runtime release was deleted
+          # or the hash never published the x11 variant.
+          if ! curl -fsSI "$URL" >/dev/null; then
+            echo "ERROR: runtime tarball not reachable at $URL" >&2
+            echo "Either the hash in .carbonyl-runtime-version doesn't have an x11 build" >&2
+            echo "published, or the Gitea release is not public. Bump the pin or" >&2
+            echo "re-run the upstream build." >&2
+            exit 1
+          fi
+
+      - name: Log in to Gitea container registry
+        run: |
+          echo "${{ secrets.BUILD_REPO_TOKEN }}" | \
+            docker login "${REGISTRY}" \
+              -u "${{ github.actor }}" \
+              --password-stdin
+
+      - name: Build image
+        run: |
+          set -euo pipefail
+          TAG_ARGS=()
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] && TAG_ARGS+=( -t "$tag" )
+          done < '${{ steps.tags.outputs.tags_file }}'
+          docker build \
+            --build-arg "CARBONYL_RUNTIME_URL=${{ steps.pin.outputs.url }}" \
+            "${TAG_ARGS[@]}" \
+            docker/qa-runner/
+
+      - name: Smoke-test the built image
+        run: |
+          set -euo pipefail
+          IMG='${{ steps.tags.outputs.primary }}'
+          # python-uinput is importable in the image
+          docker run --rm "$IMG" python3 -c "import uinput; print('uinput import OK')"
+          # Carbonyl binary is present and reports a version
+          docker run --rm "$IMG" /opt/carbonyl/carbonyl --version
+
+      - name: Push image
+        if: github.event_name == 'push' || inputs.push != 'false'
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] && docker push "$tag"
+          done < '${{ steps.tags.outputs.tags_file }}'
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## qa-runner build"
+            echo ""
+            echo "| key | value |"
+            echo "|-----|-------|"
+            echo "| Runtime hash | \`${{ steps.pin.outputs.hash }}\` (${{ steps.pin.outputs.source }}) |"
+            echo "| Tarball URL | ${{ steps.pin.outputs.url }} |"
+            echo "| Primary tag | \`${{ steps.tags.outputs.primary }}\` |"
+            echo "| Pushed | ${{ github.event_name == 'push' || inputs.push != 'false' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
