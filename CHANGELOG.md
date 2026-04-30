@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- New `carbonyl_agent.UinputEmitter` — emits keyboard and mouse events via `/dev/uinput` so the browser receives them as `event.isTrusted = true`. Required for scripted login on modern SPAs (X, LinkedIn, etc.) where React-controlled inputs reject synthetic events. Companion exceptions: `UinputUnavailableError`, `UnsupportedKeyError` (#36)
+- `CarbonylBrowser(input_backend="uinput")` — opt-in routing of `send()`, `send_key()`, `click()`, `mouse_move()`, `mouse_path()` through the uinput emitter. Default remains `"pty"` for backward compatibility. Uinput backend requires the `carbonyl-agent-qa-runner` container (or equivalent Xorg + uinput environment); see ADR-002 rev 2 for the rationale (#36)
 - CI workflow `.gitea/workflows/build-qa-runner.yml` that builds and publishes `carbonyl-agent-qa-runner` to the Gitea container registry on every push to `main` that touches `docker/qa-runner/**` or `.carbonyl-runtime-version`. Image tags: `runtime-<hash>`, `sha-<short-git-sha>`, plus `latest` on main. Includes a post-build smoke test inside the published image (uinput import + Carbonyl `--version`) (#38)
 - `.carbonyl-runtime-version` pin file at the repo root — single source of truth for the Carbonyl runtime hash consumed by the SDK installer, the qa-runner Docker image, and CI workflows. New helper module `carbonyl_agent.runtime_pin` exposes `read_pinned_hash()` and `resolve_default_tag()` (#39)
 - `docker/qa-runner/build.sh` — wrapper around `docker build` that reads the pin file and constructs the right `CARBONYL_RUNTIME_URL` build-arg automatically. `CARBONYL_RUNTIME_HASH` / `CARBONYL_RUNTIME_URL` env overrides supported (#39)

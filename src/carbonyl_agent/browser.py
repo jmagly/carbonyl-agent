@@ -208,6 +208,7 @@ class CarbonylBrowser:
         viewport: tuple[int, int] | None = None,
         extra_flags: list[str] | None = None,
         base_flags: list[str] | None = None,
+        input_backend: str = "pty",
     ):
         """
         Args:
@@ -251,15 +252,45 @@ class CarbonylBrowser:
             base_flags: Completely replace the default flag set
                      (``DEFAULT_HEADLESS_FLAGS``). Rarely needed — prefer
                      ``extra_flags`` for additive changes.
+            input_backend: How keystrokes and mouse events reach Chromium.
+
+                     - ``"pty"`` (default) — events are written to the PTY
+                       and synthesised by Carbonyl in-process. Cheap, works
+                       anywhere a terminal works, but the events arrive at
+                       JavaScript with ``event.isTrusted = false`` so
+                       React-controlled inputs and bot detection libraries
+                       reject them silently.
+                     - ``"uinput"`` — events are emitted via
+                       ``/dev/uinput`` to a virtual HID device the kernel
+                       routes through Xorg into the browser. Events arrive
+                       with ``event.isTrusted = true``, indistinguishable
+                       from a physical keyboard/mouse. Required for
+                       scripted login on modern SPAs (X, LinkedIn, etc.).
+                       Requires the carbonyl-agent-qa-runner container or
+                       an equivalent Xorg + uinput environment; see
+                       ``roctinam/carbonyl/docs/runtime-modes.md`` Mode 2
+                       and ADR-002 rev 2 for the rationale.
+
+                     The viewport coordinates passed to ``click()`` /
+                     ``mouse_move()`` are scaled to the CSS viewport
+                     declared via the ``viewport`` argument when uinput
+                     is in use, so call sites are interchangeable
+                     between backends.
         """
+        if input_backend not in ("pty", "uinput"):
+            raise ValueError(
+                f"input_backend must be 'pty' or 'uinput', got {input_backend!r}"
+            )
         self.cols = cols
         self.rows = rows
         self._session = session
         self._viewport = viewport
+        self.input_backend = input_backend
         self._screen: Any = pyte.Screen(cols, rows)
         self._stream: Any = pyte.ByteStream(self._screen)
         self._child: Any | None = None
         self._daemon_client: Any | None = None
+        self._uinput_emitter: Any | None = None
         self._flags: list[str] = list(
             base_flags if base_flags is not None else DEFAULT_HEADLESS_FLAGS
         )
@@ -356,10 +387,42 @@ class CarbonylBrowser:
             except pexpect.EOF:
                 break
 
+    def _ensure_uinput(self) -> Any:
+        """Lazy-create the UinputEmitter. Called only when input_backend == 'uinput'."""
+        if self._uinput_emitter is None:
+            from carbonyl_agent.uinput_emitter import UinputEmitter
+            # Use the consumer-supplied viewport for absolute mouse scaling
+            # so click(col, row) → (col * 2, row * 4) physical px lands at the
+            # intended CSS coordinate. Cell-to-pixel ratio matches Carbonyl's
+            # rendering convention (2x4 px per cell).
+            vp_x = self._viewport[0] if self._viewport else max(self.cols * 2, 1)
+            vp_y = self._viewport[1] if self._viewport else max(self.rows * 4, 1)
+            self._uinput_emitter = UinputEmitter(viewport=(vp_x, vp_y))
+            self._uinput_emitter.open()
+        return self._uinput_emitter
+
+    def _cell_to_viewport_px(self, col: int, row: int) -> tuple[int, int]:
+        """Convert 1-indexed terminal (col, row) to viewport-absolute pixel
+        coordinates suitable for uinput's ABS_X/ABS_Y. Honours the
+        consumer-supplied viewport so the mouse lands at the same CSS
+        location regardless of input backend."""
+        # Each terminal cell maps to 2x4 CSS pixels in Carbonyl's quadrant
+        # rendering convention (see roctinam/carbonyl#37).
+        return (col * 2, row * 4)
+
     def send(self, text: str) -> None:
-        """Type text into the browser (encodes as UTF-8 bytes)."""
+        """Type text into the browser.
+
+        Routing:
+        - daemon-connected: forwards to daemon
+        - input_backend="uinput": emits via /dev/uinput (isTrusted=true)
+        - input_backend="pty": writes UTF-8 bytes to the PTY (isTrusted=false)
+        """
         if self._daemon_client:
             self._daemon_client.send(text)
+            return
+        if self.input_backend == "uinput":
+            self._ensure_uinput().type_text(text)
             return
         assert self._child is not None
         self._child.send(text.encode("utf-8"))
@@ -368,13 +431,20 @@ class CarbonylBrowser:
         """
         Send a mouse-move event at terminal cell (col, row).
 
-        Uses SGR button code 32 (0x20 = MouseMove mask, no button pressed).
-        Carbonyl translates this into a DOM ``mousemove`` event delivered to
-        the page — essential for sites that require mouse-movement entropy
-        before accepting interaction (e.g. Akamai Bot Manager sensor).
+        Routing:
+        - daemon-connected: forwards to daemon
+        - input_backend="uinput": EV_ABS via /dev/uinput (isTrusted=true)
+        - input_backend="pty": SGR mouse code 32 escape (isTrusted=false).
+          Carbonyl translates the SGR into a DOM ``mousemove`` event —
+          essential for sites that require mouse-movement entropy before
+          accepting interaction (e.g. Akamai Bot Manager sensor).
         """
         if self._daemon_client:
             self._daemon_client.mouse_move(col, row)
+            return
+        if self.input_backend == "uinput":
+            x, y = self._cell_to_viewport_px(col, row)
+            self._ensure_uinput().move_mouse(x, y)
             return
         assert self._child is not None
         self._child.send(f"\x1b[<32;{col};{row}M".encode())
@@ -397,9 +467,21 @@ class CarbonylBrowser:
             time.sleep(delay)
 
     def click(self, col: int, row: int) -> None:
-        """Send a left-click at terminal cell (col, row) using SGR mouse protocol."""
+        """Send a left-click at terminal cell (col, row).
+
+        Routing:
+        - daemon-connected: forwards to daemon
+        - input_backend="uinput": EV_KEY BTN_LEFT via /dev/uinput
+          (isTrusted=true). React-controlled buttons fire onClick.
+        - input_backend="pty": SGR mouse protocol press+release
+          (isTrusted=false). Cheaper but blocked by SPA bot detection.
+        """
         if self._daemon_client:
             self._daemon_client.click(col, row)
+            return
+        if self.input_backend == "uinput":
+            x, y = self._cell_to_viewport_px(col, row)
+            self._ensure_uinput().click(x, y)
             return
         assert self._child is not None
         press   = f"\x1b[<0;{col};{row}M".encode()
@@ -461,9 +543,19 @@ class CarbonylBrowser:
         return (center, m["row"])
 
     def send_key(self, key: str) -> None:
-        """Send a named key sequence."""
+        """Send a named key.
+
+        Routing:
+        - daemon-connected: forwards to daemon
+        - input_backend="uinput": EV_KEY via /dev/uinput (isTrusted=true)
+        - input_backend="pty": ANSI escape sequence over the PTY
+          (isTrusted=false)
+        """
         if self._daemon_client:
             self._daemon_client.send_key(key)
+            return
+        if self.input_backend == "uinput":
+            self._ensure_uinput().press_key(key)
             return
         keys = {
             "enter":     b"\r",
@@ -628,6 +720,14 @@ class CarbonylBrowser:
         is in use) to let Chromium flush session cookies to disk, then
         SIGKILL if it doesn't exit within ``graceful_timeout`` seconds.
         """
+        # Tear down the uinput emitter first so its virtual devices are
+        # destroyed even if Chromium shutdown errors.
+        if self._uinput_emitter is not None:
+            try:
+                self._uinput_emitter.close()
+            except Exception:
+                pass
+            self._uinput_emitter = None
         if self._daemon_client:
             self._daemon_client.close_daemon()
             self._daemon_client = None

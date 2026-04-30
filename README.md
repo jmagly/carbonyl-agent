@@ -216,6 +216,44 @@ print(si.annotate(marks=[(m["col"], m["row"]) for m in matches]))
 
 **If you hit bot-detection walls, do not remove these flags — they are the baseline.** For additional entropy, call `CarbonylBrowser.mouse_path([...])` to simulate organic mouse movement before interaction.
 
+### Trusted input backend (uinput)
+
+Synthetic browser events arrive at JavaScript with `event.isTrusted = false`. Modern React forms and bot-detection libraries refuse to update controlled-input state when this flag is false, so scripted login on X, LinkedIn, and similar sites silently fails — typed text is rendered into the input but never submitted.
+
+`CarbonylBrowser` accepts an `input_backend="uinput"` constructor argument. When set, every `send()` / `send_key()` / `click()` / `mouse_move()` routes through `/dev/uinput`. The kernel routes the events through Xorg into Chromium with `isTrusted = true`, indistinguishable from a physical keyboard and mouse.
+
+```python
+from carbonyl_agent import CarbonylBrowser, ANTI_FEDCM_FLAGS
+
+with CarbonylBrowser(
+    cols=500, rows=150,
+    viewport=(1280, 800),
+    input_backend="uinput",
+    extra_flags=ANTI_FEDCM_FLAGS,
+) as b:
+    b.open("https://x.com/i/flow/login")
+    b.drain(15)
+    b.click(320, 88)         # focus the input
+    b.send("jmagly")         # typed via uinput → isTrusted=true
+    b.send_key("enter")      # advances the form
+    ...
+```
+
+**Requirements**:
+
+- Linux host with `/dev/uinput` writable (`sudo modprobe uinput` if missing; user in `input` group or use the `99-uinput.rules` udev rule from `scripts/setup-uinput-host.sh`)
+- An X server running so Carbonyl's `--ozone-platform=x11` build has a display to attach to
+- The `python-uinput` package: `pip install python-uinput`
+
+**Recommended deployment**: run inside the `carbonyl-agent-qa-runner` container, which packages Xorg, the X-Carbonyl runtime, and uinput passthrough so you don't have to assemble the environment yourself:
+
+```bash
+docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:latest
+cd docker/qa-runner && ./run.sh pytest tests/
+```
+
+See `roctinam/carbonyl/docs/runtime-modes.md` for the full deployment-shape reference (terminal-only / x11+uinput / x11+uinput+X-mirror) and ADR-002 rev 2 for the architecture rationale.
+
 ### Composing flags for specific scenarios
 
 Flag groups are published as module constants so agents can pick and choose:

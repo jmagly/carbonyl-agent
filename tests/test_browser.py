@@ -1,6 +1,6 @@
 """Tests for carbonyl_agent.browser module."""
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -107,3 +107,63 @@ class TestViewport:
     def test_accepts_tuple(self):
         b = CarbonylBrowser(viewport=(1280, 800))
         assert b._viewport == (1280, 800)
+
+
+class TestInputBackend:
+    """input_backend kwarg routes send/click/etc through the right path (#36)."""
+
+    def test_default_is_pty(self):
+        b = CarbonylBrowser()
+        assert b.input_backend == "pty"
+
+    def test_accepts_uinput(self):
+        b = CarbonylBrowser(input_backend="uinput")
+        assert b.input_backend == "uinput"
+
+    def test_rejects_unknown_backend(self):
+        with pytest.raises(ValueError, match="input_backend"):
+            CarbonylBrowser(input_backend="bogus")
+
+    def test_uinput_routes_send_through_emitter(self):
+        b = CarbonylBrowser(input_backend="uinput")
+        mock_emitter = MagicMock()
+        b._uinput_emitter = mock_emitter
+        # _ensure_uinput would normally lazy-create; we pre-set it
+        b.send("hello")
+        mock_emitter.type_text.assert_called_once_with("hello")
+
+    def test_uinput_routes_send_key_through_emitter(self):
+        b = CarbonylBrowser(input_backend="uinput")
+        mock_emitter = MagicMock()
+        b._uinput_emitter = mock_emitter
+        b.send_key("enter")
+        mock_emitter.press_key.assert_called_once_with("enter")
+
+    def test_uinput_routes_click_through_emitter(self):
+        b = CarbonylBrowser(input_backend="uinput", viewport=(1280, 800))
+        mock_emitter = MagicMock()
+        b._uinput_emitter = mock_emitter
+        # cell (320, 105) → CSS pixel (640, 420)
+        b.click(320, 105)
+        mock_emitter.click.assert_called_once_with(640, 420)
+
+    def test_uinput_routes_mouse_move_through_emitter(self):
+        b = CarbonylBrowser(input_backend="uinput", viewport=(1280, 800))
+        mock_emitter = MagicMock()
+        b._uinput_emitter = mock_emitter
+        b.mouse_move(100, 50)
+        mock_emitter.move_mouse.assert_called_once_with(200, 200)
+
+    def test_close_destroys_emitter(self):
+        b = CarbonylBrowser(input_backend="uinput")
+        mock_emitter = MagicMock()
+        b._uinput_emitter = mock_emitter
+        b.close()
+        mock_emitter.close.assert_called_once()
+        assert b._uinput_emitter is None
+
+    def test_pty_backend_does_not_create_emitter(self):
+        b = CarbonylBrowser(input_backend="pty")
+        # Default backend should leave the emitter slot empty until any uinput
+        # call is made (which there won't be, in pty mode).
+        assert b._uinput_emitter is None

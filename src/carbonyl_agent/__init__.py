@@ -36,6 +36,11 @@ from carbonyl_agent.daemon import (  # noqa: F401
 )
 from carbonyl_agent.screen_inspector import ScreenInspector  # noqa: F401
 from carbonyl_agent.session import SessionManager  # noqa: F401
+from carbonyl_agent.uinput_emitter import (  # noqa: F401
+    UinputEmitter,
+    UinputUnavailableError,
+    UnsupportedKeyError,
+)
 
 __all__ = [
     "CarbonylBrowser",
@@ -52,4 +57,8 @@ __all__ = [
     "ANTI_BOT_FLAGS",
     "ANTI_FEDCM_FLAGS",
     "ANTI_ONETAP_FLAGS",
+    # Trusted input backend (#36)
+    "UinputEmitter",
+    "UinputUnavailableError",
+    "UnsupportedKeyError",
 ]

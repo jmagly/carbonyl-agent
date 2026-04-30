@@ -30,7 +30,7 @@ warn_return_any = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["pexpect", "pyte"]
+module = ["pexpect", "pyte", "uinput"]
 ignore_missing_imports = true
 
 [tool.ruff]
