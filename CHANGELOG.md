@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `.carbonyl-runtime-version` pin file at the repo root — single source of truth for the Carbonyl runtime hash consumed by the SDK installer, the qa-runner Docker image, and CI workflows. New helper module `carbonyl_agent.runtime_pin` exposes `read_pinned_hash()` and `resolve_default_tag()` (#39)
+- `docker/qa-runner/build.sh` — wrapper around `docker build` that reads the pin file and constructs the right `CARBONYL_RUNTIME_URL` build-arg automatically. `CARBONYL_RUNTIME_HASH` / `CARBONYL_RUNTIME_URL` env overrides supported (#39)
+- `CARBONYL_RUNTIME_TAG` env var: explicit override that takes precedence over the pin file when running `carbonyl-agent install` (#39)
+
+### Changed
+- `carbonyl-agent install` now reads `.carbonyl-runtime-version` for the default `--tag` value when one is not specified on the CLI. `runtime-latest` becomes a deliberate opt-out rather than the silent default. The installer prints which path was taken (pin / env / latest-sentinel / unpinned) so operators can spot drift (#39)
+
+
 ## [0.1.0] - Unreleased
 
 ### Added

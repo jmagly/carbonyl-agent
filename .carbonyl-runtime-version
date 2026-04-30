@@ -1,0 +1,11 @@
+# Pinned Carbonyl runtime hash. Bump in lockstep across:
+#   - `carbonyl-agent install` (default --tag)
+#   - `docker/qa-runner/` build
+#   - CI workflows that consume the runtime
+#
+# Format: one `key=value` line per setting. Comments and blank lines ignored.
+# Hash refers to a `runtime-<hash>` Gitea release on roctinam/carbonyl.
+# When the X11 ozone variant is needed, the corresponding tarball is
+# `runtime-x11-<hash>` at the same release.
+
+runtime-hash=dd69bef0ea4b2512

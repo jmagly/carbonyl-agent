@@ -22,14 +22,17 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
+from carbonyl_agent import runtime_pin
+
 GITEA_BASE = os.environ.get("GITEA_BASE", "https://git.integrolabs.net")
 GITEA_REPO = "roctinam/carbonyl"
 
 # Default install directory (same location _local_binary() checks)
 DEFAULT_DEST = Path.home() / ".local" / "share" / "carbonyl" / "bin"
 
-# Latest known runtime tag — update when a new runtime is pushed
-LATEST_TAG = "runtime-latest"
+# Sentinel meaning "resolve to the latest release at install time" (drift-prone).
+# Use this only when explicitly opting out of the pin file. See `runtime_pin`.
+LATEST_TAG = runtime_pin.LATEST_SENTINEL
 
 
 def _platform_triple() -> str:
@@ -137,7 +140,20 @@ def _verify_checksum(
 
 def cmd_install(args: argparse.Namespace) -> int:
     triple = _platform_triple()
-    tag = _resolve_tag(args.tag)
+    if args.tag is None:
+        default_tag, source = runtime_pin.resolve_default_tag()
+        if source == "pin":
+            print(f"Using pinned runtime: {default_tag} (from .carbonyl-runtime-version)")
+        elif source == "env":
+            print(f"Using runtime from CARBONYL_RUNTIME_TAG: {default_tag}")
+        elif source == "latest-sentinel":
+            print(f"Pin file requests {default_tag} — resolving to latest release")
+        else:
+            print(f"No pin file found; defaulting to {default_tag} (will resolve to latest)")
+        tag_input = default_tag
+    else:
+        tag_input = args.tag
+    tag = _resolve_tag(tag_input)
     dest = Path(args.dest)
 
     url = f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/{triple}.tgz"
@@ -223,10 +239,13 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command")
 
     p_install = sub.add_parser("install", help="Download and install the Carbonyl runtime")
+    # No argparse default — None means "use the pin file" (resolved in cmd_install).
     p_install.add_argument(
         "--tag",
-        default=LATEST_TAG,
-        help="Gitea release tag to download (default: runtime-latest)",
+        default=None,
+        help="Gitea release tag to download (default: read from "
+             ".carbonyl-runtime-version pin file; falls back to runtime-latest "
+             "if no pin is present)",
     )
     p_install.add_argument(
         "--dest",

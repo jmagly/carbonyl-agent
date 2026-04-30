@@ -12,8 +12,25 @@ Runtime container for Phase 0+ QA of the Carbonyl Trusted Automation Initiative.
 
 ## Build
 
+The repo ships `.carbonyl-runtime-version` at its root (issue #39) and a wrapper
+script that reads it and passes the right URL to `docker build`. Use the wrapper
+unless you have a specific reason not to.
+
 ```bash
-# Real x11 runtime — preferred. URL points at any runtime-x11-<hash> Gitea release.
+# Pin-driven (preferred) — reads .carbonyl-runtime-version automatically.
+docker/qa-runner/build.sh
+
+# Override the hash for a one-off build:
+CARBONYL_RUNTIME_HASH=<hex> docker/qa-runner/build.sh
+
+# Override the full URL (e.g. local mirror):
+CARBONYL_RUNTIME_URL=https://my-mirror/.../x86_64-unknown-linux-gnu.tgz \
+  docker/qa-runner/build.sh
+
+# Custom image tag:
+docker/qa-runner/build.sh my-tag:dev
+
+# Manual fallback (equivalent to what build.sh does):
 docker build -t carbonyl-agent-qa-runner:local \
   --build-arg CARBONYL_RUNTIME_URL=https://git.integrolabs.net/roctinam/carbonyl/releases/download/runtime-x11-dd69bef0ea4b2512/x86_64-unknown-linux-gnu.tgz \
   docker/qa-runner/
