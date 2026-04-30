@@ -8,18 +8,18 @@ Runtime container for Phase 0+ QA of the Carbonyl Trusted Automation Initiative.
 - **evdev + libinput** input drivers wired via `/etc/X11/xorg.conf.d/20-evdev-input.conf` — reads any `/dev/input/event*` including uinput virtual devices
 - **Capture tools**: `scrot` (single frames), `ffmpeg` (streams), `x11vnc` (remote display)
 - **Python 3 + `python-uinput`**: enough to drive the agent SDK from inside the container
-- **Carbonyl x11 runtime** at `/opt/carbonyl/carbonyl` — provided via `--build-arg CARBONYL_RUNTIME_URL=...` once `roctinam/carbonyl#57` ships one; stub until then
+- **Carbonyl x11 runtime** at `/opt/carbonyl/carbonyl` — fetched at image build time via `--build-arg CARBONYL_RUNTIME_URL=...`. The runtime ships as `runtime-x11-<hash>` Gitea releases (e.g. `runtime-x11-dd69bef0ea4b2512` for current main); a stub is left in place if no URL is passed so the image builds standalone
 
 ## Build
 
 ```bash
-# Stub runtime (current state; #57 hasn't shipped yet)
-docker build -t carbonyl-agent-qa-runner:local docker/qa-runner/
-
-# With the real x11 Carbonyl runtime tarball:
+# Real x11 runtime — preferred. URL points at any runtime-x11-<hash> Gitea release.
 docker build -t carbonyl-agent-qa-runner:local \
-  --build-arg CARBONYL_RUNTIME_URL=https://git.integrolabs.net/... \
+  --build-arg CARBONYL_RUNTIME_URL=https://git.integrolabs.net/roctinam/carbonyl/releases/download/runtime-x11-dd69bef0ea4b2512/x86_64-unknown-linux-gnu.tgz \
   docker/qa-runner/
+
+# Stub runtime — useful for smoke-testing the entrypoint / Xorg without the heavy tarball.
+docker build -t carbonyl-agent-qa-runner:local docker/qa-runner/
 ```
 
 ## Run
@@ -113,7 +113,7 @@ Image is published to the Gitea container registry at `git.integrolabs.net/rocti
 | `Xorg socket did not appear` | Missing xkb data or evdev driver conflict | `tail /tmp/xorg.log`; often a permissions issue on shared host |
 | `/dev/uinput: Permission denied` | Host udev doesn't group the device correctly; `--group-add input` alone isn't enough | See §"Host uinput setup" below — needs a host udev rule **and** aligned GIDs, OR `--user 0` |
 | `CARBONYL_GPU_MODE=gpu but /dev/dri/card0 absent` | GPU mode requested but no passthrough | Add `--device=/dev/dri --gpus all` to `docker run` |
-| `carbonyl stub: no x11 runtime installed` | Image built without `CARBONYL_RUNTIME_URL` | Rebuild with `--build-arg CARBONYL_RUNTIME_URL=...` once `#57` ships |
+| `carbonyl stub: no x11 runtime installed` | Image built without `CARBONYL_RUNTIME_URL` | Rebuild with `--build-arg CARBONYL_RUNTIME_URL=https://git.integrolabs.net/roctinam/carbonyl/releases/download/runtime-x11-<hash>/x86_64-unknown-linux-gnu.tgz` |
 
 ## Host uinput setup — OPTIONAL (only for non-root operator mode)
 
@@ -155,15 +155,18 @@ The `run.sh` wrapper hides this distinction: it picks whichever mode the host is
 
 **If you can't modify host udev and don't want root**: the agent SDK can emit uinput from *outside* the container (on the host) and the Carbonyl-inside-the-container still sees the events via X, because Xorg reads `/dev/input/eventN` from the shared kernel. This is actually the canonical Phase 0 pattern — W0.4's tests do exactly that.
 
-## Limitations (current state)
+## Status (2026-04-29)
 
-- **Carbonyl x11 runtime is a stub** until `roctinam/carbonyl#57` completes. The container builds and the entrypoint runs correctly, but actual Chromium launch requires a real runtime tarball.
-- **No build-builder workflow yet** — image is built locally. Publishing workflow lands with `roctinam/carbonyl-agent#35` CI track.
-- **Image size**: 1.36 GB with the Carbonyl stub + full Xorg + driver stack + capture tools. Well under the 1.5 GB acceptance criterion from `#37`. Adding the real Carbonyl runtime (expected ~150 MB compressed) brings it to ~1.5 GB.
+- ✅ **Carbonyl x11 runtime ships.** `roctinam/carbonyl#57` and `#63` (X-mirror) closed in `v0.2.0-alpha.3`. Use `runtime-x11-<hash>` Gitea releases as `CARBONYL_RUNTIME_URL`. With `CARBONYL_X_MIRROR=1` set, the runtime mirrors compositor frames into a real X window so `scrot`/`ffmpeg`/`x11vnc` capture works alongside the terminal render.
+- ✅ **End-to-end validation runs in CI.** `roctinam/carbonyl/scripts/test-x-mirror.sh` exercises both pipelines (terminal SGR stream + X framebuffer pixel histogram) inside this image on every `build-runtime.yml` x11 build. See commit `eee943d`.
+- 🔵 **Image-publish workflow** is the remaining piece — `roctinam/carbonyl-agent#35` CI track. Today the image is built locally / inline by `build-runtime.yml`'s validation step.
+- **Image size**: ~1.5 GB with the real x11 runtime included.
 
 ## Reference
 
-- Issue: `roctinam/carbonyl-agent#37`
+- Issue: `roctinam/carbonyl-agent#37` (closed)
 - Phase 0 tracker: `roctinam/carbonyl#60`
+- X-mirror feature: `roctinam/carbonyl#63` (closed)
+- Operator reference: `roctinam/carbonyl/docs/runtime-modes.md`
 - CI plan: `roctinam/carbonyl/.aiwg/working/trusted-automation/09-ci-plan.md`
 - ADR-002 rev 2: `roctinam/carbonyl/docs/adr-002-trusted-input-approach.md`
