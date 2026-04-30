@@ -98,6 +98,11 @@ def client(daemon_server):
     c._sock_path = daemon_server["sock"]
     c._sock = None
     c._buf = ""
+    # Attributes added by #40 (backend awareness). Tests bypass __init__
+    # to inject a custom socket path; mimic the defaults here.
+    c._require_backend = None
+    c.backend = None
+    c.protocol_version = 0
     c.connect()
     yield c
     c.disconnect()
@@ -236,3 +241,90 @@ class TestCloseCommand:
         assert data["ok"] is True
         # Server should have shutdown_requested set
         assert daemon_server["server"].shutdown_requested is True
+
+
+# --- Backend awareness (#40) ---
+
+
+class TestBackendHandshake:
+    def test_hello_returns_input_backend(self, daemon_server):
+        """The hello command exposes the daemon's input_backend."""
+        # MockBrowser has no input_backend attribute → defensive default 'pty'
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(5.0)
+        s.connect(str(daemon_server["sock"]))
+        s.sendall(json.dumps({"cmd": "hello"}).encode() + b"\n")
+        resp = b""
+        while b"\n" not in resp:
+            resp += s.recv(4096)
+        s.close()
+        data = json.loads(resp.split(b"\n")[0])
+        assert data["ok"] is True
+        assert data["result"]["input_backend"] == "pty"
+        assert "protocol_version" in data["result"]
+
+    def test_hello_reflects_browser_backend(self, daemon_server):
+        """When the browser has input_backend='uinput', hello reports it."""
+        # MockBrowser doesn't set input_backend; inject it for this test.
+        daemon_server["browser"].input_backend = "uinput"
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(5.0)
+            s.connect(str(daemon_server["sock"]))
+            s.sendall(json.dumps({"cmd": "hello"}).encode() + b"\n")
+            resp = b""
+            while b"\n" not in resp:
+                resp += s.recv(4096)
+            s.close()
+            data = json.loads(resp.split(b"\n")[0])
+            assert data["result"]["input_backend"] == "uinput"
+        finally:
+            del daemon_server["browser"].input_backend
+
+    def test_client_records_backend_on_connect(self, client):
+        """DaemonClient.connect() populates .backend and .protocol_version."""
+        # client fixture connects and yields; backend should be populated
+        assert client.backend == "pty"
+        assert client.protocol_version >= 1
+
+    def test_require_backend_match_succeeds(self, daemon_server):
+        """DaemonClient(require_backend=...) succeeds when backend matches."""
+        from carbonyl_agent.daemon import DaemonClient
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = "pty"
+        c.backend = None
+        c.protocol_version = 0
+        c.connect()
+        assert c.backend == "pty"
+        c.disconnect()
+
+    def test_require_backend_mismatch_raises(self, daemon_server):
+        """DaemonClient with require_backend='uinput' against pty daemon raises."""
+        from carbonyl_agent.daemon import BackendMismatchError, DaemonClient
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = "uinput"
+        c.backend = None
+        c.protocol_version = 0
+        with pytest.raises(BackendMismatchError, match="uinput"):
+            c.connect()
+
+
+class TestStartDaemonBackend:
+    def test_invalid_backend_raises_valueerror(self):
+        from carbonyl_agent.daemon import start_daemon
+        with pytest.raises(ValueError, match="backend"):
+            start_daemon("nope", backend="bogus")
+
+    def test_uinput_backend_preflight_failure_raises_oserror(self, monkeypatch):
+        from carbonyl_agent import uinput_emitter
+        from carbonyl_agent.daemon import start_daemon
+        # Force python-uinput unavailable so the preflight fails
+        monkeypatch.setattr(uinput_emitter, "_UINPUT_AVAILABLE", False)
+        with pytest.raises(OSError, match="pre-flight failed"):
+            start_daemon("preflight-test", backend="uinput")

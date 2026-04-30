@@ -279,6 +279,11 @@ def main() -> None:
     p_dstart = daemon_sub.add_parser("start", help="Start a persistent browser daemon")
     p_dstart.add_argument("session", help="Session name")
     p_dstart.add_argument("url", nargs="?", default=None, help="Initial URL (default: about:blank)")
+    p_dstart.add_argument(
+        "--backend", choices=("pty", "uinput"), default="pty",
+        help="Input backend the daemon will run with (default: pty). "
+             "uinput requires /dev/uinput access; see ADR-002 rev 2.",
+    )
 
     p_dstop = daemon_sub.add_parser("stop", help="Stop a running daemon")
     p_dstop.add_argument("session")

@@ -28,6 +28,7 @@ from carbonyl_agent.browser import (  # noqa: F401
     CarbonylBrowser,
 )
 from carbonyl_agent.daemon import (  # noqa: F401
+    BackendMismatchError,
     DaemonClient,
     daemon_status,
     is_daemon_live,
@@ -51,6 +52,7 @@ __all__ = [
     "stop_daemon",
     "daemon_status",
     "is_daemon_live",
+    "BackendMismatchError",
     # Chromium flag groups (composable)
     "DEFAULT_HEADLESS_FLAGS",
     "BASE_CHROMIUM_FLAGS",

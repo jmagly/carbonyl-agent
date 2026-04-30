@@ -54,6 +54,16 @@ from carbonyl_agent.session import _DEFAULT_SESSION_DIR, SessionManager
 _SOCK_SUFFIX = ".sock"
 _PID_KEY = "daemon_pid"
 _SOCK_KEY = "daemon_socket"
+_BACKEND_KEY = "input_backend"
+
+# Wire protocol version. Bumped when the daemon adds a new command that
+# clients can rely on; older daemons report version 0 (treated as PTY-only).
+PROTOCOL_VERSION = 1
+
+
+class BackendMismatchError(RuntimeError):
+    """Raised when ``DaemonClient(require_backend=...)`` is set and the
+    daemon's actual ``input_backend`` doesn't match (#40)."""
 
 
 # ---------------------------------------------------------------------------
@@ -86,18 +96,60 @@ def is_daemon_live(session_name: str, session_dir: Path | None = None) -> bool:
 # ---------------------------------------------------------------------------
 
 class DaemonClient:
-    """Thin client that forwards browser calls to a running daemon."""
+    """Thin client that forwards browser calls to a running daemon.
 
-    def __init__(self, session_name: str, session_dir: Path | None = None) -> None:
+    Backend awareness (#40): when ``require_backend`` is set, the client
+    performs a ``hello`` handshake on connect and raises
+    :class:`BackendMismatchError` if the daemon's ``input_backend`` does
+    not match. Without ``require_backend``, the client still records the
+    daemon's backend for inspection via the :attr:`backend` attribute.
+    """
+
+    def __init__(
+        self,
+        session_name: str,
+        session_dir: Path | None = None,
+        *,
+        require_backend: str | None = None,
+    ) -> None:
+        if require_backend is not None and require_backend not in ("pty", "uinput"):
+            raise ValueError(
+                f"require_backend must be 'pty' or 'uinput' or None, "
+                f"got {require_backend!r}"
+            )
         self._sock_path = _sock_path(session_name, session_dir)
         self._sock: socket.socket | None = None
         self._buf = ""
+        self._require_backend = require_backend
+        # Populated by the connect-time handshake.
+        self.backend: str | None = None
+        self.protocol_version: int = 0
 
     def connect(self) -> None:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.settimeout(10.0)
         s.connect(str(self._sock_path))
         self._sock = s
+        # Handshake. Older daemons (pre-#40) don't know "hello" — treat as
+        # protocol version 0, PTY backend.
+        try:
+            resp = self._rpc({"cmd": "hello"})
+            payload = resp.get("result") or {}
+            self.backend = payload.get("input_backend", "pty")
+            self.protocol_version = int(payload.get("protocol_version", 1))
+        except RuntimeError as exc:
+            if "Unknown command" in str(exc):
+                self.backend = "pty"
+                self.protocol_version = 0
+            else:
+                raise
+        if self._require_backend and self.backend != self._require_backend:
+            self.disconnect()
+            raise BackendMismatchError(
+                f"Daemon for session reports input_backend={self.backend!r} "
+                f"but client requires {self._require_backend!r}. Stop the "
+                f"daemon and restart with backend={self._require_backend!r}."
+            )
 
     def disconnect(self) -> None:
         if self._sock:
@@ -214,7 +266,22 @@ class _BrowserHandler(socketserver.StreamRequestHandler):
         browser: CarbonylBrowser = self.server.browser  # type: ignore[attr-defined]
         cmd = req.get("cmd")
         try:
-            if cmd == "send":
+            if cmd == "hello":
+                # Capability handshake (#40). Lets clients discover what
+                # input backend the daemon is running so they can fail
+                # fast when require_backend doesn't match, and so
+                # `daemon status` can render the backend column without
+                # reading metadata. Defensive on `input_backend` so
+                # duck-typed test browsers (without the attribute) still
+                # complete the handshake.
+                return {
+                    "ok": True,
+                    "result": {
+                        "input_backend": getattr(browser, "input_backend", "pty"),
+                        "protocol_version": PROTOCOL_VERSION,
+                    },
+                }
+            elif cmd == "send":
                 browser.send(req["text"])
             elif cmd == "mouse_move":
                 browser.mouse_move(req["col"], req["row"])
@@ -298,6 +365,8 @@ def _run_daemon(
     url: str,
     sock_path: Path,
     session_dir: Path | None = None,
+    *,
+    input_backend: str = "pty",
 ) -> None:
     """
     This function runs in the daemon process (after fork).
@@ -305,10 +374,10 @@ def _run_daemon(
     """
     import atexit
 
-    log(f"daemon: starting for session {session_name!r}")
+    log(f"daemon: starting for session {session_name!r} (backend={input_backend})")
     sm = SessionManager(session_dir)
 
-    browser = CarbonylBrowser(session=session_name)
+    browser = CarbonylBrowser(session=session_name, input_backend=input_backend)
     browser.open(url)
     # Initial drain to let the page start loading
     browser.drain(3.0)
@@ -327,6 +396,7 @@ def _run_daemon(
                 "snapshot_of": meta.snapshot_of,
                 _PID_KEY: os.getpid(),
                 _SOCK_KEY: str(sock_path),
+                _BACKEND_KEY: input_backend,
             }
             sm._meta_path(session_name).write_text(json.dumps(data, indent=2) + "\n")
         except Exception as exc:
@@ -365,11 +435,40 @@ def start_daemon(
     session_dir: Path | None = None,
     *,
     wait: float = 5.0,
+    backend: str = "pty",
 ) -> int:
     """
     Fork a daemon process for this session and wait until it's accepting
     connections. Returns the daemon PID.
+
+    Args:
+        backend: Input backend the daemon will run with. ``"pty"`` (default)
+            keeps existing behaviour. ``"uinput"`` opts into the trusted-
+            input backend (#36) — the daemon will reject ``send``/``click``
+            from clients otherwise unless the daemon's host has
+            ``/dev/uinput`` writable. The pre-flight check runs in the
+            parent process so the error is visible to the operator
+            before forking.
     """
+    if backend not in ("pty", "uinput"):
+        raise ValueError(
+            f"backend must be 'pty' or 'uinput', got {backend!r}"
+        )
+    if backend == "uinput":
+        # Pre-flight in the parent so the error is visible. Importing the
+        # emitter triggers the python-uinput dependency check and the
+        # /dev/uinput accessibility check.
+        from carbonyl_agent.uinput_emitter import UinputEmitter
+        # Construct + open + close to validate end-to-end without
+        # leaving a device live.
+        try:
+            with UinputEmitter(device_suffix=f"daemon-preflight-{os.getpid()}"):
+                pass
+        except Exception as exc:
+            raise OSError(
+                f"start_daemon(backend='uinput') pre-flight failed: {exc}"
+            ) from exc
+
     sm = SessionManager(session_dir)
     if not sm.exists(session_name):
         sm.create(session_name)
@@ -391,7 +490,7 @@ def start_daemon(
             os.dup2(devnull, fd)
         os.close(devnull)
         try:
-            _run_daemon(session_name, url, sock, session_dir)
+            _run_daemon(session_name, url, sock, session_dir, input_backend=backend)
         except Exception:
             pass
         os._exit(0)
@@ -423,13 +522,42 @@ def stop_daemon(
 
 
 def daemon_status(session_dir: Path | None = None) -> list[dict[str, Any]]:
-    """Return status dicts for all sessions that have a live daemon."""
+    """Return status dicts for all sessions that have a live daemon.
+
+    Includes ``input_backend`` per session (#40). Read order:
+      1. Live handshake via DaemonClient.hello (fresh, authoritative)
+      2. Session metadata fallback (when daemon is dead)
+      3. Default ``"pty"`` for old daemons / sessions
+    """
     sm = SessionManager(session_dir)
     results = []
     for s in sm.list():
         name = s["name"]
         live = is_daemon_live(name, session_dir)
-        results.append({"session": name, "daemon_live": live})
+        backend = "pty"
+        if live:
+            try:
+                client = DaemonClient(name, session_dir)
+                client.connect()
+                backend = client.backend or "pty"
+                client.disconnect()
+            except Exception:
+                pass
+        else:
+            # Read from session metadata if the daemon is dead but we still
+            # want to know what backend it was running with last.
+            try:
+                meta_path = sm._meta_path(name)
+                if meta_path.is_file():
+                    raw = json.loads(meta_path.read_text())
+                    backend = raw.get(_BACKEND_KEY, "pty")
+            except Exception:
+                pass
+        results.append({
+            "session": name,
+            "daemon_live": live,
+            "input_backend": backend,
+        })
     return results
 
 
@@ -439,9 +567,10 @@ def daemon_status(session_dir: Path | None = None) -> list[dict[str, Any]]:
 
 def _cmd_start(args: argparse.Namespace) -> None:
     url: str = args.url or "about:blank"
-    log(f"Starting daemon for session {args.session!r} → {url}")
-    pid = start_daemon(args.session, url=url)
-    print(f"Daemon started (PID {pid})")
+    backend: str = getattr(args, "backend", None) or "pty"
+    log(f"Starting daemon for session {args.session!r} → {url} (backend={backend})")
+    pid = start_daemon(args.session, url=url, backend=backend)
+    print(f"Daemon started (PID {pid}, backend={backend})")
     print(f"Socket: {_sock_path(args.session)}")
 
 
@@ -454,12 +583,13 @@ def _cmd_status(args: argparse.Namespace) -> None:  # noqa: ARG001
     if not statuses:
         print("No sessions.")
         return
-    fmt = "{:<30} {}"
-    print(fmt.format("SESSION", "DAEMON"))
-    print("-" * 45)
+    fmt = "{:<30} {:<10} {}"
+    print(fmt.format("SESSION", "BACKEND", "DAEMON"))
+    print("-" * 55)
     for s in statuses:
         live = "running" if s["daemon_live"] else "stopped"
-        print(fmt.format(s["session"], live))
+        backend = s.get("input_backend", "pty")
+        print(fmt.format(s["session"], backend, live))
 
 
 def _cmd_attach(args: argparse.Namespace) -> None:
@@ -520,6 +650,10 @@ def main() -> None:
     p_start = sub.add_parser("start", help="Start a persistent browser daemon")
     p_start.add_argument("session", help="Session name")
     p_start.add_argument("url", nargs="?", default=None, help="Initial URL (default: about:blank)")
+    p_start.add_argument(
+        "--backend", choices=("pty", "uinput"), default="pty",
+        help="Input backend (default: pty). uinput requires /dev/uinput access.",
+    )
 
     p_stop = sub.add_parser("stop", help="Stop a running daemon")
     p_stop.add_argument("session")
