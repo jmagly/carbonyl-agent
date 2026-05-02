@@ -221,9 +221,31 @@ class UinputEmitter:
         self._preflight()
         kbd_events = self._all_keyboard_event_codes()
         mouse_events = self._all_mouse_event_codes()
-        self._kbd = self._device_factory(kbd_events, self.kbd_name)
+        try:
+            self._kbd = self._device_factory(kbd_events, self.kbd_name)
+        except PermissionError as exc:
+            raise UinputUnavailableError(
+                f"Permission denied opening /dev/uinput as uid={os.getuid()}: "
+                f"{exc}\n"
+                "  - Add your user to the 'input' group and re-login\n"
+                "  - In a container, pass --device=/dev/uinput "
+                "and --group-add input"
+            ) from exc
         try:
             self._mouse = self._device_factory(mouse_events, self.mouse_name)
+        except PermissionError as exc:
+            try:
+                self._kbd.destroy()
+            except Exception:
+                pass
+            self._kbd = None
+            raise UinputUnavailableError(
+                f"Permission denied opening /dev/uinput as uid={os.getuid()}: "
+                f"{exc}\n"
+                "  - Add your user to the 'input' group and re-login\n"
+                "  - In a container, pass --device=/dev/uinput "
+                "and --group-add input"
+            ) from exc
         except Exception:
             # Roll back keyboard if mouse creation fails so we don't leak
             # half-open state.

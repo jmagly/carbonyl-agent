@@ -266,5 +266,25 @@ class TestPreflight:
             fake = MagicMock()
             fake.exists.return_value = True
             path_mock.return_value = fake
-            with pytest.raises(UinputUnavailableError, match="not writable"):
+            with pytest.raises(UinputUnavailableError, match=r"input.*group"):
+                em.open()
+
+    def test_late_permission_error_wrapped(self, monkeypatch):
+        """If os.access says writable but the kernel ioctl returns EACCES
+        (e.g. AppArmor / seccomp / racing rule reload), the raw
+        PermissionError must be re-raised as UinputUnavailableError so
+        downstream typed-exception handlers stay coherent.
+        """
+        monkeypatch.setattr(uinput_emitter, "_UINPUT_AVAILABLE", True)
+
+        def factory(events, name):
+            raise PermissionError(13, "Permission denied")
+
+        em = UinputEmitter(device_suffix="late-eacces", device_factory=factory)
+        with patch("carbonyl_agent.uinput_emitter.Path") as path_mock, \
+             patch("carbonyl_agent.uinput_emitter.os.access", return_value=True):
+            fake = MagicMock()
+            fake.exists.return_value = True
+            path_mock.return_value = fake
+            with pytest.raises(UinputUnavailableError, match=r"input.*group"):
                 em.open()
