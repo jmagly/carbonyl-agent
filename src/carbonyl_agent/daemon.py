@@ -75,6 +75,24 @@ def _sock_path(session_name: str, session_dir: Path | None = None) -> Path:
     return root / f"{session_name}{_SOCK_SUFFIX}"
 
 
+# Public alias of the default socket directory so consumers (e.g. the
+# carbonyl-agent-qa-runner fixture) don't have to import a private
+# constant from carbonyl_agent.session. Override per-call with the
+# ``session_dir`` kwarg or globally via the ``CARBONYL_SESSION_DIR``
+# env var (read by SessionManager at construction).
+DEFAULT_SOCKET_DIR: Path = _DEFAULT_SESSION_DIR
+
+
+def sock_path(session_name: str, session_dir: Path | None = None) -> Path:
+    """Return the Unix-domain socket path for a session daemon.
+
+    Public API (#47). Mirrors the path the daemon binds and the client
+    connects to, so external tooling (CI fixtures, debug scripts) can
+    locate the socket without poking at private helpers.
+    """
+    return _sock_path(session_name, session_dir)
+
+
 def is_daemon_live(session_name: str, session_dir: Path | None = None) -> bool:
     """Return True if a daemon is accepting connections for this session."""
     sock = _sock_path(session_name, session_dir)
@@ -97,6 +115,35 @@ def is_daemon_live(session_name: str, session_dir: Path | None = None) -> bool:
 
 class DaemonClient:
     """Thin client that forwards browser calls to a running daemon.
+
+    Transport contract (#47): the daemon is a **Unix domain socket**
+    server, not TCP/HTTP. There is no listen port, base URL, or HTTP
+    surface. The socket lives at::
+
+        <session_dir>/<session_name>.sock
+
+    where ``session_dir`` defaults to ``~/.local/share/carbonyl/sessions``
+    and is overridable via the ``CARBONYL_SESSION_DIR`` env var or the
+    ``session_dir=`` kwarg on this constructor. Socket permissions are
+    ``0o600``; parent dir is ``0o700``.
+
+    For container deployments (e.g. ``carbonyl-agent-qa-runner``): the
+    daemon and its clients must share a filesystem path for the socket.
+    Either run both inside the same container, or bind-mount
+    ``/path/on/host:/root/.local/share/carbonyl/sessions`` so the host
+    can ``DaemonClient(session_name, session_dir=Path("/path/on/host"))``
+    and reach the in-container daemon's socket.
+
+    Readiness probes:
+
+    - :func:`is_daemon_live` — module-level; opens a TCP-style probe
+      against the socket without performing the protocol handshake.
+      Cheapest readiness check; suitable for fixture wait loops.
+    - :meth:`ping` — instance method on a connected client; performs a
+      semantic ``hello`` handshake round-trip. Returns ``True`` if the
+      daemon answered, ``False`` on any error. Use this when you need
+      to confirm the daemon is not just listening but actually serving
+      the protocol you expect.
 
     Backend awareness (#40): when ``require_backend`` is set, the client
     performs a ``hello`` handshake on connect and raises
@@ -219,6 +266,22 @@ class DaemonClient:
     def raw_lines(self) -> list[dict[str, Any]]:
         """Return [{row, text}, ...] for the full raw screen buffer."""
         return self._rpc({"cmd": "raw_lines"})["result"]  # type: ignore[no-any-return]
+
+    def ping(self) -> bool:
+        """Return True if the daemon answers a ``hello`` handshake right now.
+
+        Unlike :func:`is_daemon_live` (TCP-style socket probe), this round-
+        trips the protocol so a half-broken daemon (listening but not
+        serving) returns ``False``. Never raises; suitable for readiness
+        loops in CI fixtures.
+        """
+        if self._sock is None:
+            return False
+        try:
+            self._rpc({"cmd": "hello"}, timeout=5.0)
+            return True
+        except Exception:
+            return False
 
     def close_daemon(self) -> None:
         """Send close command (shuts down daemon + browser)."""

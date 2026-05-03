@@ -168,7 +168,19 @@ A file lock prevents accidental dual-open of the same persona; a second open rai
 
 ## Daemon Mode
 
-A long-running Carbonyl process exposed over a Unix socket. Clients reconnect without losing in-memory state — ideal for agent loops that want to amortize browser startup cost across many short scripts.
+A long-running Carbonyl process exposed over a **Unix domain socket** (not TCP/HTTP — there is no listen port or base URL). Clients reconnect without losing in-memory state — ideal for agent loops that want to amortize browser startup cost across many short scripts.
+
+**Transport contract** (issue #47):
+
+| Concern | Default | Override |
+|---|---|---|
+| Socket path | `~/.local/share/carbonyl/sessions/<session>.sock` | `session_dir=` kwarg or `CARBONYL_SESSION_DIR` env var |
+| Permissions | socket `0o600`, parent dir `0o700` | (not configurable) |
+| Public path API | `from carbonyl_agent import sock_path, DEFAULT_SOCKET_DIR` | — |
+| TCP-style readiness | `is_daemon_live(session_name)` — checks the socket accepts connections | — |
+| Semantic readiness | `client.ping()` — round-trips the `hello` handshake; returns `bool`, never raises | — |
+
+**Containers**: the daemon and clients must share a filesystem path for the socket. Either run both inside the same container, or bind-mount the session dir from host into container so the host can `DaemonClient("myapp", session_dir=Path("/host/path"))` to reach the in-container daemon.
 
 ```python
 from carbonyl_agent import DaemonClient, start_daemon, stop_daemon

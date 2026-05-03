@@ -328,3 +328,42 @@ class TestStartDaemonBackend:
         monkeypatch.setattr(uinput_emitter, "_UINPUT_AVAILABLE", False)
         with pytest.raises(OSError, match="pre-flight failed"):
             start_daemon("preflight-test", backend="uinput")
+
+
+# --- Public surface (#47) ---
+
+
+class TestPublicSurface:
+    def test_sock_path_is_public(self, tmp_path):
+        from carbonyl_agent.daemon import sock_path
+        p = sock_path("alpha", session_dir=tmp_path)
+        assert p == tmp_path / "alpha.sock"
+
+    def test_default_socket_dir_exposed(self):
+        from carbonyl_agent import DEFAULT_SOCKET_DIR
+        assert DEFAULT_SOCKET_DIR is not None
+        # Should be the default sessions root
+        assert str(DEFAULT_SOCKET_DIR).endswith("carbonyl/sessions")
+
+    def test_top_level_reexports_present(self):
+        import carbonyl_agent
+        for name in ("sock_path", "DEFAULT_SOCKET_DIR", "is_daemon_live",
+                    "DaemonClient", "BackendMismatchError"):
+            assert hasattr(carbonyl_agent, name), f"missing re-export: {name}"
+
+
+class TestPing:
+    def test_ping_returns_true_when_handshake_succeeds(self, client):
+        assert client.ping() is True
+
+    def test_ping_returns_false_when_disconnected(self, daemon_server):
+        from carbonyl_agent.daemon import DaemonClient
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = None
+        c.backend = None
+        c.protocol_version = 0
+        # Never connected
+        assert c.ping() is False

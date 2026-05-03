@@ -28,10 +28,12 @@ from carbonyl_agent.browser import (  # noqa: F401
     CarbonylBrowser,
 )
 from carbonyl_agent.daemon import (  # noqa: F401
+    DEFAULT_SOCKET_DIR,
     BackendMismatchError,
     DaemonClient,
     daemon_status,
     is_daemon_live,
+    sock_path,
     start_daemon,
     stop_daemon,
 )
@@ -57,6 +59,8 @@ __all__ = [
     "stop_daemon",
     "daemon_status",
     "is_daemon_live",
+    "sock_path",
+    "DEFAULT_SOCKET_DIR",
     "BackendMismatchError",
     # Chromium flag groups (composable)
     "DEFAULT_HEADLESS_FLAGS",
