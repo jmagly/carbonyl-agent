@@ -167,3 +167,55 @@ class TestInputBackend:
         # Default backend should leave the emitter slot empty until any uinput
         # call is made (which there won't be, in pty mode).
         assert b._uinput_emitter is None
+
+
+class TestPersonaGracefulShutdown:
+    """Issue #49: persona= mode must use SIGTERM-then-SIGKILL like session= so
+    Chromium can flush cookies/localStorage to disk before exit.
+    """
+
+    @patch("os.killpg")
+    @patch("os.getpgid", return_value=12345)
+    def test_persona_triggers_sigterm_path(self, _mock_getpgid, mock_killpg, tmp_path):
+        import signal as _signal
+        b = CarbonylBrowser(persona="alpha", profiles_dir=str(tmp_path))
+        # Fake an alive child that exits quickly so the wait loop doesn't drag
+        child = MagicMock()
+        # First isalive() check enters the conditional, subsequent checks bail.
+        child.isalive.side_effect = [True, False]
+        child.pid = 99
+        b._child = child
+        b.close(graceful_timeout=0.1)
+        # Both SIGTERM and SIGKILL should fire (SIGKILL is best-effort cleanup)
+        signals_sent = [call.args[1] for call in mock_killpg.call_args_list]
+        assert _signal.SIGTERM in signals_sent
+
+    @patch("os.killpg")
+    @patch("os.getpgid", return_value=12345)
+    def test_no_persona_no_session_skips_sigterm(self, _mock_getpgid, mock_killpg):
+        import signal as _signal
+        b = CarbonylBrowser()  # neither persona nor session
+        child = MagicMock()
+        child.isalive.side_effect = [True, False]
+        child.pid = 99
+        b._child = child
+        b.close(graceful_timeout=5.0)
+        signals_sent = [call.args[1] for call in mock_killpg.call_args_list]
+        assert _signal.SIGTERM not in signals_sent
+        # SIGKILL still fires as the unconditional force-kill path
+        assert _signal.SIGKILL in signals_sent
+
+    @patch("os.killpg")
+    @patch("os.getpgid", return_value=12345)
+    def test_persona_with_zero_timeout_skips_sigterm(
+        self, _mock_getpgid, mock_killpg, tmp_path
+    ):
+        import signal as _signal
+        b = CarbonylBrowser(persona="alpha", profiles_dir=str(tmp_path))
+        child = MagicMock()
+        child.isalive.side_effect = [True, False]
+        child.pid = 99
+        b._child = child
+        b.close(graceful_timeout=0)
+        signals_sent = [call.args[1] for call in mock_killpg.call_args_list]
+        assert _signal.SIGTERM not in signals_sent

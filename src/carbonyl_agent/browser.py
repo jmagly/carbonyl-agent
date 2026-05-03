@@ -737,8 +737,8 @@ class CarbonylBrowser:
         the daemon process and the browser it holds.
 
         For directly-spawned browsers, sends SIGTERM first (when a session
-        is in use) to let Chromium flush session cookies to disk, then
-        SIGKILL if it doesn't exit within ``graceful_timeout`` seconds.
+        or persona is in use) to let Chromium flush session cookies to disk,
+        then SIGKILL if it doesn't exit within ``graceful_timeout`` seconds.
         """
         # Tear down the uinput emitter first so its virtual devices are
         # destroyed even if Chromium shutdown errors.
@@ -758,7 +758,7 @@ class CarbonylBrowser:
                 import signal as _signal
                 if self._child.isalive():
                     pgid = os.getpgid(self._child.pid)
-                    if self._session and graceful_timeout > 0:
+                    if (self._session or self._persona) and graceful_timeout > 0:
                         # Graceful shutdown: SIGTERM → wait → SIGKILL
                         try:
                             os.killpg(pgid, _signal.SIGTERM)
