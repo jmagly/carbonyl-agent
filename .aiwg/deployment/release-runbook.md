@@ -24,7 +24,7 @@ Only performed once, before the first release. Complete before attempting v0.1.0
    - **PyPI Project Name**: `carbonyl-agent`
    - **Owner**: `jmagly`
    - **Repository name**: `carbonyl-agent`
-   - **Workflow name**: `ci.yml`
+   - **Workflow name**: `release.yml`
    - **Environment name**: `release`
 3. Click **Add**. PyPI creates a pending trusted publisher that activates on first successful OIDC publish.
 
@@ -39,7 +39,7 @@ Only performed once, before the first release. Complete before attempting v0.1.0
 ### 0.4. Verify via TestPyPI (recommended before first prod publish)
 
 1. Configure a second pending publisher on [TestPyPI](https://test.pypi.org/manage/account/publishing/) with the same settings
-2. Add a `workflow_dispatch` trigger to `.github/workflows/ci.yml` that publishes to TestPyPI instead of PyPI
+2. Add a `workflow_dispatch` trigger to `.github/workflows/release.yml` that publishes to TestPyPI instead of PyPI
 3. Run the workflow manually, verify package appears at [https://test.pypi.org/project/carbonyl-agent/](https://test.pypi.org/project/carbonyl-agent/)
 4. In a clean venv: `pip install --index-url https://test.pypi.org/simple/ carbonyl-agent`
 
@@ -47,7 +47,7 @@ Only performed once, before the first release. Complete before attempting v0.1.0
 
 - [ ] PyPI pending publisher created
 - [ ] GitHub `release` environment exists
-- [ ] `.github/workflows/ci.yml` `publish` job uses `pypa/gh-action-pypi-publish@release/v1` with `id-token: write` permission
+- [ ] `.github/workflows/release.yml` `publish` job uses `pypa/gh-action-pypi-publish@release/v1` with `id-token: write` permission
 - [ ] (Optional) TestPyPI dry-run succeeded
 
 ## 1. Pre-Release Checklist
@@ -107,12 +107,16 @@ Pre-1.0 note: breaking changes in 0.x bump MINOR rather than MAJOR, per semver �
 
 ## 3. Automated PyPI Publish
 
-On tag push to GitHub, `.github/workflows/ci.yml` runs:
+CI (lint, typecheck, test, audit) runs on Gitea — see `.gitea/workflows/ci.yml`. PyPI publish is a separate, narrowly-scoped GitHub workflow because PyPI's trusted-publisher OIDC integration only supports GitHub Actions, GitLab CI, Google Cloud, and ActiveState (not Gitea Actions).
 
-1. Full test matrix (unit + integration + smoke).
-2. Build `sdist` and `wheel` via `hatchling`.
-3. Upload artifacts.
-4. `publish` job uses OIDC Trusted Publisher to push to `https://pypi.org/project/carbonyl-agent/`.
+On tag push to GitHub (mirrored from Gitea), `.github/workflows/release.yml` runs:
+
+1. Verify tag matches `pyproject.toml` version (fail-fast on mismatch).
+2. Build `sdist` and `wheel` via `hatch build`.
+3. `twine check` validates the artifacts.
+4. `publish` job uses OIDC Trusted Publisher to push to `https://pypi.org/project/carbonyl-agent/` — no API token stored.
+
+**Pre-flight expectation**: Gitea CI must already be green for the commit being tagged. The release workflow does not re-run the test suite — it trusts Gitea CI.
 
 **Monitor** the workflow at `https://github.com/jmagly/carbonyl-agent/actions`. Do not delete the tag while the publish is in flight.
 
