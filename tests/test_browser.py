@@ -219,3 +219,53 @@ class TestPersonaGracefulShutdown:
         b.close(graceful_timeout=0)
         signals_sent = [call.args[1] for call in mock_killpg.call_args_list]
         assert _signal.SIGTERM not in signals_sent
+
+
+class TestWaitForRenderSettle:
+    """Issue #48: deterministic readiness probe so visual-capture tests don't
+    rely on wall-clock drain() heuristics."""
+
+    def _make_browser_with_text_sequence(self, sequence):
+        """Build a browser whose drain() is a no-op and whose page_text() walks
+        a pre-canned sequence of strings (last value sticks once exhausted)."""
+        b = CarbonylBrowser()
+        idx = {"i": 0}
+
+        def _drain(_seconds):
+            idx["i"] = min(idx["i"] + 1, len(sequence) - 1)
+
+        def _text():
+            return sequence[idx["i"]]
+
+        b.drain = _drain  # type: ignore[method-assign]
+        b.page_text = _text  # type: ignore[method-assign]
+        return b
+
+    def test_returns_true_when_buffer_settles(self):
+        b = self._make_browser_with_text_sequence(["a", "ab", "abc", "abc", "abc", "abc"])
+        assert b.wait_for_render_settle(timeout=2.0, idle_ms=50, poll_ms=10) is True
+
+    def test_returns_false_when_buffer_never_settles(self):
+        # Each drain() advances the index; supply a sequence so long the index
+        # never catches up to a duplicate within the timeout window.
+        b = CarbonylBrowser()
+        counter = {"i": 0}
+
+        def _drain(_s):
+            counter["i"] += 1
+
+        def _text():
+            return f"frame-{counter['i']}"
+
+        b.drain = _drain  # type: ignore[method-assign]
+        b.page_text = _text  # type: ignore[method-assign]
+        assert b.wait_for_render_settle(timeout=0.3, idle_ms=100, poll_ms=10) is False
+
+    def test_validates_arguments(self):
+        b = CarbonylBrowser()
+        with pytest.raises(ValueError):
+            b.wait_for_render_settle(timeout=0)
+        with pytest.raises(ValueError):
+            b.wait_for_render_settle(idle_ms=0)
+        with pytest.raises(ValueError):
+            b.wait_for_render_settle(poll_ms=0)

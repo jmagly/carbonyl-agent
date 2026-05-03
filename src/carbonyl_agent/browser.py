@@ -407,6 +407,63 @@ class CarbonylBrowser:
             except pexpect.EOF:
                 break
 
+    def wait_for_render_settle(
+        self,
+        timeout: float = 5.0,
+        idle_ms: int = 200,
+        poll_ms: int = 50,
+    ) -> bool:
+        """Wait until the rendered terminal buffer has been stable for
+        ``idle_ms`` continuous milliseconds, or until ``timeout`` elapses.
+
+        Returns ``True`` if the buffer settled, ``False`` if ``timeout``
+        was hit first. Designed for visual-capture tests (#48) where a
+        wall-clock ``drain()`` is too racy: callers can do
+        ``b.open(url); b.wait_for_render_settle(); scrot(...)`` and
+        deterministically capture a stable frame.
+
+        The "settled" signal is the hash of :meth:`page_text` not changing
+        across successive ``poll_ms`` polls. Each poll also pumps the PTY
+        so newly-arriving bytes get folded into the screen — there is no
+        need to call :meth:`drain` first.
+
+        Daemon-connected mode polls via the daemon's ``page_text`` RPC.
+
+        Tuning:
+
+        - ``timeout`` — overall budget. Default 5s is generous for cold
+          page loads; CI may pass 10s for known-slow fixtures.
+        - ``idle_ms`` — how long the buffer must be unchanged to count
+          as settled. Default 200ms catches Carbonyl's 5fps render
+          cadence (one frame every ~200ms). Lower values risk
+          declaring the page settled mid-paint.
+        - ``poll_ms`` — sampling interval. Smaller = more responsive
+          but more CPU. Default 50ms gives 4 samples per ``idle_ms``
+          window at the default settings.
+        """
+        if poll_ms <= 0 or idle_ms <= 0 or timeout <= 0:
+            raise ValueError("poll_ms, idle_ms, and timeout must all be > 0")
+        deadline = time.time() + timeout
+        last_hash: int | None = None
+        stable_since: float | None = None
+        idle_s = idle_ms / 1000.0
+        poll_s = poll_ms / 1000.0
+        while time.time() < deadline:
+            # Pump the PTY for one poll interval so newly-arriving bytes
+            # land in the screen buffer before we hash it.
+            self.drain(poll_s)
+            current = hash(self.page_text())
+            now = time.time()
+            if current == last_hash:
+                if stable_since is None:
+                    stable_since = now
+                elif now - stable_since >= idle_s:
+                    return True
+            else:
+                last_hash = current
+                stable_since = now
+        return False
+
     def _ensure_uinput(self) -> Any:
         """Lazy-create the UinputEmitter. Called only when input_backend == 'uinput'."""
         if self._uinput_emitter is None:
