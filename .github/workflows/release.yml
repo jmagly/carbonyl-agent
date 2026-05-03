@@ -55,3 +55,40 @@ jobs:
           path: dist/
       - name: Publish to PyPI via trusted publisher (OIDC)
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    # Mirrors the Gitea release to GitHub so both registries show the
+    # same release notes for the tag. Runs after publish so PyPI is the
+    # source of truth on release artefacts (#18).
+    runs-on: ubuntu-latest
+    needs: [publish]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Pull the section between "## [VERSION]" (or "## VERSION") and the next "## " heading
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[?"ver"\\]?" { in_section=1; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "No CHANGELOG section for $VERSION; using tag annotation instead." > release-notes.md
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: carbonyl-agent ${{ steps.notes.outputs.version }}
+          body_path: release-notes.md
+          files: dist/*
+          fail_on_unmatched_files: true

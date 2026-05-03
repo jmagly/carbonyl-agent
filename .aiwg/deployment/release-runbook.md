@@ -111,12 +111,20 @@ CI (lint, typecheck, test, audit) runs on Gitea — see `.gitea/workflows/ci.yml
 
 On tag push to GitHub (mirrored from Gitea), `.github/workflows/release.yml` runs:
 
-1. Verify tag matches `pyproject.toml` version (fail-fast on mismatch).
-2. Build `sdist` and `wheel` via `hatch build`.
-3. `twine check` validates the artifacts.
-4. `publish` job uses OIDC Trusted Publisher to push to `https://pypi.org/project/carbonyl-agent/` — no API token stored.
+1. **build** — Verify tag matches `pyproject.toml` version (fail-fast on mismatch); build `sdist` and `wheel` via `hatch build`; `twine check` validates the artifacts.
+2. **publish** — uses OIDC Trusted Publisher to push to `https://pypi.org/project/carbonyl-agent/` — no API token stored.
+3. **github-release** — mirrors the Gitea release to GitHub: extracts the matching `CHANGELOG.md` section, creates the GitHub release with the same notes, and uploads the sdist + wheel as release assets (#18).
 
 **Pre-flight expectation**: Gitea CI must already be green for the commit being tagged. The release workflow does not re-run the test suite — it trusts Gitea CI.
+
+### 3.1. Tag mirror (Gitea → GitHub)
+
+The runbook §2 instructs you to push the tag to **Gitea origin first**, then to **GitHub**. There are two ways to keep these in sync:
+
+- **Manual**: per §2, `git push origin v$VERSION` then `git push github v$VERSION`. Always works; no admin config required.
+- **Automated**: configure Gitea push-mirror at `https://git.integrolabs.net/roctinam/carbonyl-agent/settings#push-mirror-settings`. Add `https://github.com/jmagly/carbonyl-agent.git` with a token that has `contents:write` on the GitHub repo. Once enabled, `git push origin` propagates tags to GitHub automatically (~60 s). Recommended once the GitHub PAT is provisioned.
+
+Either path triggers `.github/workflows/release.yml` on the GitHub side.
 
 **Monitor** the workflow at `https://github.com/jmagly/carbonyl-agent/actions`. Do not delete the tag while the publish is in flight.
 
@@ -160,7 +168,7 @@ If any step fails, treat it as a **production incident** and proceed to §6 Roll
 ## 5. Announcements
 
 - **Gitea Release**: create a release from the tag at `https://git.integrolabs.net/roctinam/carbonyl-agent/releases`. Paste the `CHANGELOG.md` section for this version as the release body.
-- **GitHub Release**: mirror the same release at `https://github.com/jmagly/carbonyl-agent/releases`. Link back to the Gitea release as the upstream source.
+- **GitHub Release**: created automatically by `release.yml`'s `github-release` job (#18) — uses the same `CHANGELOG.md` section and uploads sdist + wheel as assets. Verify it appears at `https://github.com/jmagly/carbonyl-agent/releases`; if absent (e.g. job failed), create it manually mirroring the Gitea release.
 - Update the `README.md` badge / install snippet if this is the first release.
 
 ## 6. Rollback Procedure
