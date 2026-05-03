@@ -367,3 +367,46 @@ class TestPing:
         c.protocol_version = 0
         # Never connected
         assert c.ping() is False
+
+
+class TestWaitForRenderSettle:
+    """Issue #50: same readiness probe as CarbonylBrowser, lifted onto
+    DaemonClient so daemon-mode visual-capture tests don't re-implement
+    the polling loop inline."""
+
+    def _patch_client(self, client, sequence):
+        idx = {"i": 0}
+
+        def _drain(_seconds):
+            idx["i"] = min(idx["i"] + 1, len(sequence) - 1)
+
+        def _text():
+            return sequence[idx["i"]]
+
+        client.drain = _drain  # type: ignore[method-assign]
+        client.page_text = _text  # type: ignore[method-assign]
+
+    def test_returns_true_when_buffer_settles(self, client):
+        self._patch_client(client, ["a", "ab", "abc", "abc", "abc", "abc"])
+        assert client.wait_for_render_settle(timeout=2.0, idle_ms=50, poll_ms=10) is True
+
+    def test_returns_false_when_buffer_never_settles(self, client):
+        counter = {"i": 0}
+
+        def _drain(_s):
+            counter["i"] += 1
+
+        def _text():
+            return f"frame-{counter['i']}"
+
+        client.drain = _drain  # type: ignore[method-assign]
+        client.page_text = _text  # type: ignore[method-assign]
+        assert client.wait_for_render_settle(timeout=0.3, idle_ms=100, poll_ms=10) is False
+
+    def test_validates_arguments(self, client):
+        with pytest.raises(ValueError):
+            client.wait_for_render_settle(timeout=0)
+        with pytest.raises(ValueError):
+            client.wait_for_render_settle(idle_ms=0)
+        with pytest.raises(ValueError):
+            client.wait_for_render_settle(poll_ms=0)

@@ -267,6 +267,36 @@ class DaemonClient:
         """Return [{row, text}, ...] for the full raw screen buffer."""
         return self._rpc({"cmd": "raw_lines"})["result"]  # type: ignore[no-any-return]
 
+    def wait_for_render_settle(
+        self,
+        timeout: float = 5.0,
+        idle_ms: int = 200,
+        poll_ms: int = 50,
+    ) -> bool:
+        """Wait until the rendered page is stable for ``idle_ms`` ms.
+
+        Same signature and semantics as
+        :meth:`carbonyl_agent.browser.CarbonylBrowser.wait_for_render_settle`
+        but polls via the daemon's ``page_text`` and ``drain`` RPCs.
+
+        Lifted onto ``DaemonClient`` (#50) so daemon-mode visual-capture
+        tests don't have to re-implement the polling loop inline. The
+        canonical implementation lives in
+        :func:`carbonyl_agent.browser._render_settle_loop`.
+
+        Returns ``True`` if the buffer settled, ``False`` if ``timeout``
+        was hit first.
+        """
+        from carbonyl_agent.browser import _render_settle_loop
+
+        return _render_settle_loop(
+            drain_fn=self.drain,
+            page_text_fn=self.page_text,
+            timeout=timeout,
+            idle_ms=idle_ms,
+            poll_ms=poll_ms,
+        )
+
     def ping(self) -> bool:
         """Return True if the daemon answers a ``hello`` handshake right now.
 

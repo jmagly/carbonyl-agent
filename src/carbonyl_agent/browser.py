@@ -198,6 +198,45 @@ def extract_text(screen: Any) -> str:
     return "\n".join(deduped)
 
 
+def _render_settle_loop(
+    drain_fn: Any,
+    page_text_fn: Any,
+    timeout: float,
+    idle_ms: int,
+    poll_ms: int,
+) -> bool:
+    """Shared polling loop for ``wait_for_render_settle``.
+
+    Both :meth:`CarbonylBrowser.wait_for_render_settle` and
+    :meth:`carbonyl_agent.daemon.DaemonClient.wait_for_render_settle`
+    delegate here so the settle semantics live in one place (#50).
+
+    ``drain_fn(seconds)`` pumps newly-arriving bytes into the screen
+    buffer for one poll interval. ``page_text_fn()`` returns the
+    current rendered text whose hash is the stability signal.
+    """
+    if poll_ms <= 0 or idle_ms <= 0 or timeout <= 0:
+        raise ValueError("poll_ms, idle_ms, and timeout must all be > 0")
+    deadline = time.time() + timeout
+    last_hash: int | None = None
+    stable_since: float | None = None
+    idle_s = idle_ms / 1000.0
+    poll_s = poll_ms / 1000.0
+    while time.time() < deadline:
+        drain_fn(poll_s)
+        current = hash(page_text_fn())
+        now = time.time()
+        if current == last_hash:
+            if stable_since is None:
+                stable_since = now
+            elif now - stable_since >= idle_s:
+                return True
+        else:
+            last_hash = current
+            stable_since = now
+    return False
+
+
 class CarbonylBrowser:
     def __init__(
         self,
@@ -441,28 +480,13 @@ class CarbonylBrowser:
           but more CPU. Default 50ms gives 4 samples per ``idle_ms``
           window at the default settings.
         """
-        if poll_ms <= 0 or idle_ms <= 0 or timeout <= 0:
-            raise ValueError("poll_ms, idle_ms, and timeout must all be > 0")
-        deadline = time.time() + timeout
-        last_hash: int | None = None
-        stable_since: float | None = None
-        idle_s = idle_ms / 1000.0
-        poll_s = poll_ms / 1000.0
-        while time.time() < deadline:
-            # Pump the PTY for one poll interval so newly-arriving bytes
-            # land in the screen buffer before we hash it.
-            self.drain(poll_s)
-            current = hash(self.page_text())
-            now = time.time()
-            if current == last_hash:
-                if stable_since is None:
-                    stable_since = now
-                elif now - stable_since >= idle_s:
-                    return True
-            else:
-                last_hash = current
-                stable_since = now
-        return False
+        return _render_settle_loop(
+            drain_fn=self.drain,
+            page_text_fn=self.page_text,
+            timeout=timeout,
+            idle_ms=idle_ms,
+            poll_ms=poll_ms,
+        )
 
     def _ensure_uinput(self) -> Any:
         """Lazy-create the UinputEmitter. Called only when input_backend == 'uinput'."""
