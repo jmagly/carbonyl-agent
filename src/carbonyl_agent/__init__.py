@@ -35,6 +35,11 @@ from carbonyl_agent.daemon import (  # noqa: F401
     start_daemon,
     stop_daemon,
 )
+from carbonyl_agent.profile import (  # noqa: F401
+    PersonaMeta,
+    ProfileManager,
+    list_personas,
+)
 from carbonyl_agent.screen_inspector import ScreenInspector  # noqa: F401
 from carbonyl_agent.session import SessionManager  # noqa: F401
 from carbonyl_agent.uinput_emitter import (  # noqa: F401
@@ -63,4 +68,8 @@ __all__ = [
     "UinputEmitter",
     "UinputUnavailableError",
     "UnsupportedKeyError",
+    # Per-persona profile management (#41)
+    "ProfileManager",
+    "PersonaMeta",
+    "list_personas",
 ]

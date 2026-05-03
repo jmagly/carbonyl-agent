@@ -140,6 +140,30 @@ sm.restore("base", "post-login")   # replaces profile with snapshot
 
 See `SessionManager` for the full API: `list`, `destroy`, `exists`, `is_live`, `clean_stale_lock`.
 
+### Persona profiles
+
+`persona=` is a higher-level alternative to `session=` keyed on a stable persona identity. Profiles live under `CARBONYL_AGENT_PROFILES_DIR` (default `~/.config/carbonyl-agent/profiles/`), separate from the runtime session store, and ship with public `purge_profile` / `export_profile` / `import_profile` operations:
+
+```python
+from carbonyl_agent import CarbonylBrowser
+
+b = CarbonylBrowser(persona="my_throwaway")
+b.open("https://example.com")
+b.drain(5.0)
+b.close()                                     # cookies, localStorage persist
+
+# Backup / CI seeding
+b.export_profile("/backups/my_throwaway.tar.gz")
+b.import_profile("/backups/my_throwaway.tar.gz")
+
+# Rotate the persona — wipe its state but keep the name registered
+b.purge_profile()
+```
+
+A file lock prevents accidental dual-open of the same persona; a second open raises `RuntimeError` naming the holding PID. Profiles are portable across `input_backend="pty"` and `input_backend="uinput"` — recording happens at the metadata level only.
+
+`persona=` and `session=` are mutually exclusive on the constructor; pick one per browser instance.
+
 ---
 
 ## Daemon Mode

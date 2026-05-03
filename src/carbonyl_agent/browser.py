@@ -209,6 +209,8 @@ class CarbonylBrowser:
         extra_flags: list[str] | None = None,
         base_flags: list[str] | None = None,
         input_backend: str = "pty",
+        persona: str | None = None,
+        profiles_dir: str | None = None,
     ):
         """
         Args:
@@ -281,9 +283,17 @@ class CarbonylBrowser:
             raise ValueError(
                 f"input_backend must be 'pty' or 'uinput', got {input_backend!r}"
             )
+        if persona is not None and session is not None:
+            raise ValueError(
+                "persona= and session= are mutually exclusive; persona is the "
+                "persona-keyed profile API, session is the legacy SessionManager API."
+            )
         self.cols = cols
         self.rows = rows
         self._session = session
+        self._persona = persona
+        self._profiles_dir = profiles_dir
+        self._profile_manager: Any | None = None
         self._viewport = viewport
         self.input_backend = input_backend
         self._screen: Any = pyte.Screen(cols, rows)
@@ -324,6 +334,16 @@ class CarbonylBrowser:
             profile = sm.profile_dir(self._session)
             args.append(f"--user-data-dir={profile}")
             log(f"session: {self._session!r}  profile: {profile}")
+
+        if self._persona:
+            from carbonyl_agent.profile import ProfileManager
+
+            pm = ProfileManager(self._persona, profiles_dir=self._profiles_dir)
+            pm.acquire_lock()
+            self._profile_manager = pm
+            pm.record_input_backend(self.input_backend)
+            args.append(f"--user-data-dir={pm.profile_dir}")
+            log(f"persona: {self._persona!r}  profile: {pm.profile_dir}")
 
         args.append(url)
 
@@ -731,6 +751,7 @@ class CarbonylBrowser:
         if self._daemon_client:
             self._daemon_client.close_daemon()
             self._daemon_client = None
+            self._release_profile()
             return
         if self._child:
             try:
@@ -754,6 +775,57 @@ class CarbonylBrowser:
                     self._child.terminate(force=True)
             except Exception:
                 pass
+        self._release_profile()
+
+    # ------------------------------------------------------------------
+    # Persona profile passthrough
+    # ------------------------------------------------------------------
+
+    def _release_profile(self) -> None:
+        if self._profile_manager is not None:
+            try:
+                self._profile_manager.release_lock()
+            except Exception:
+                pass
+            self._profile_manager = None
+
+    def _ensure_profile_manager(self) -> Any:
+        if not self._persona:
+            raise RuntimeError(
+                "purge_profile/export_profile/import_profile require persona= "
+                "to have been passed at construction."
+            )
+        from carbonyl_agent.profile import ProfileManager
+
+        return self._profile_manager or ProfileManager(
+            self._persona, profiles_dir=self._profiles_dir
+        )
+
+    def purge_profile(self) -> None:
+        """Wipe this persona's stored browser state.
+
+        Refuses while the browser is open — call :meth:`close` first.
+        """
+        if self._child or self._daemon_client:
+            raise RuntimeError(
+                "Cannot purge an open profile; call close() first."
+            )
+        self._ensure_profile_manager().purge_profile()
+
+    def export_profile(self, path: str) -> str:
+        """Write the persona's profile state to ``path`` as a tar.gz."""
+        return str(self._ensure_profile_manager().export_profile(path))
+
+    def import_profile(self, path: str) -> None:
+        """Replace the persona's profile state from a tar.gz at ``path``.
+
+        Refuses while the browser is open — call :meth:`close` first.
+        """
+        if self._child or self._daemon_client:
+            raise RuntimeError(
+                "Cannot import into an open profile; call close() first."
+            )
+        self._ensure_profile_manager().import_profile(path)
 
 
 def search_duckduckgo(
