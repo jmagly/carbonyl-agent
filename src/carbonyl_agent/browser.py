@@ -818,8 +818,26 @@ class CarbonylBrowser:
         the daemon process and the browser it holds.
 
         For directly-spawned browsers, sends SIGTERM first (when a session
-        or persona is in use) to let Chromium flush session cookies to disk,
-        then SIGKILL if it doesn't exit within ``graceful_timeout`` seconds.
+        or persona is in use) to let Chromium flush in-memory state to
+        disk, then SIGKILL if it doesn't exit within ``graceful_timeout``
+        seconds.
+
+        **Persistence timing under graceful shutdown** (#51):
+
+        - **localStorage** flushes within ~5 s — leveldb writes are
+          synchronous on ``setItem``, so the default ``graceful_timeout``
+          of 5 s is sufficient.
+        - **Cookies** require **~30 s** before they appear in the
+          on-disk SQLite store. Chromium's network service flushes the
+          cookie store on a periodic 30 s schedule
+          (``kCommitIntervalMs`` in ``SQLitePersistentCookieStore``);
+          SIGTERM does not currently force an eager flush in the
+          Carbonyl build, so callers that need cookie persistence must
+          either drain ≥ 30 s before calling ``close()`` or wait for the
+          stretch fix tracked in #51.
+
+        Visual-capture / persistence tests should hold the browser open
+        for the appropriate window above before calling ``close()``.
         """
         # Tear down the uinput emitter first so its virtual devices are
         # destroyed even if Chromium shutdown errors.
