@@ -269,3 +269,28 @@ class TestWaitForRenderSettle:
             b.wait_for_render_settle(idle_ms=0)
         with pytest.raises(ValueError):
             b.wait_for_render_settle(poll_ms=0)
+
+
+class TestContextManager:
+    """Issue #24: __enter__/__exit__ so resources are cleaned up on
+    exception, not just on explicit close()."""
+
+    def test_returns_self_on_enter(self):
+        b = CarbonylBrowser()
+        with b as ctx:
+            assert ctx is b
+
+    def test_close_called_on_exit(self):
+        b = CarbonylBrowser()
+        b.close = MagicMock()  # type: ignore[method-assign]
+        with b:
+            pass
+        b.close.assert_called_once()
+
+    def test_close_called_on_exception(self):
+        b = CarbonylBrowser()
+        b.close = MagicMock()  # type: ignore[method-assign]
+        with pytest.raises(RuntimeError, match="boom"):
+            with b:
+                raise RuntimeError("boom")
+        b.close.assert_called_once()

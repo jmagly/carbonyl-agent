@@ -876,6 +876,18 @@ class CarbonylBrowser:
                 pass
         self._release_profile()
 
+    def __enter__(self) -> "CarbonylBrowser":
+        """Context manager entry — returns ``self``.
+
+        Enables ``with CarbonylBrowser(...) as b:`` so ``close()`` runs on
+        exception or normal exit (#24). Browser is NOT auto-opened — call
+        :meth:`open` or :meth:`navigate` inside the block.
+        """
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
     # ------------------------------------------------------------------
     # Persona profile passthrough
     # ------------------------------------------------------------------

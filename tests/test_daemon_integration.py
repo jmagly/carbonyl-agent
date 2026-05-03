@@ -410,3 +410,57 @@ class TestWaitForRenderSettle:
             client.wait_for_render_settle(idle_ms=0)
         with pytest.raises(ValueError):
             client.wait_for_render_settle(poll_ms=0)
+
+
+class TestContextManager:
+    """Issue #24: DaemonClient as context manager — connect on enter,
+    disconnect (NOT close_daemon) on exit so the daemon keeps serving
+    other clients."""
+
+    def test_enter_returns_self_and_connects(self, daemon_server):
+        from carbonyl_agent.daemon import DaemonClient
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = None
+        c.backend = None
+        c.protocol_version = 0
+        with c as ctx:
+            assert ctx is c
+            assert c._sock is not None
+        assert c._sock is None  # disconnected on exit
+
+    def test_disconnect_called_on_exception(self, daemon_server):
+        from carbonyl_agent.daemon import DaemonClient
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = None
+        c.backend = None
+        c.protocol_version = 0
+        with pytest.raises(RuntimeError, match="boom"):
+            with c:
+                assert c._sock is not None
+                raise RuntimeError("boom")
+        assert c._sock is None
+
+    def test_does_not_close_daemon_on_exit(self, client, daemon_server):
+        # Use the existing connected client, then verify the daemon is
+        # still alive after a context-manager exit (i.e. exit calls
+        # disconnect, not close_daemon).
+        with client:
+            pass
+        # Daemon socket should still be servable; new connection works
+        from carbonyl_agent.daemon import DaemonClient
+        c2 = DaemonClient.__new__(DaemonClient)
+        c2._sock_path = daemon_server["sock"]
+        c2._sock = None
+        c2._buf = ""
+        c2._require_backend = None
+        c2.backend = None
+        c2.protocol_version = 0
+        c2.connect()
+        assert c2.ping() is True
+        c2.disconnect()

@@ -83,12 +83,16 @@ carbonyl-agent install --checksum <sha256-hex>
 ```python
 from carbonyl_agent import CarbonylBrowser
 
-b = CarbonylBrowser()
-b.open("https://example.com")
-b.drain(8.0)
-print(b.page_text())
-b.close()
+with CarbonylBrowser() as b:
+    b.open("https://example.com")
+    b.drain(8.0)
+    print(b.page_text())
+# close() runs automatically on exit, even on exception
 ```
+
+`CarbonylBrowser` and `DaemonClient` both implement the context-manager
+protocol (#24) — preferred for any script where an unhandled exception
+should still tear the browser down cleanly.
 
 ### Public API
 
@@ -188,22 +192,25 @@ from carbonyl_agent import DaemonClient, start_daemon, stop_daemon
 # Start (forks a background process)
 start_daemon("myapp", "https://example.com")
 
-# Connect from any number of short-lived scripts
-client = DaemonClient("myapp")
-client.connect()
-client.drain(5.0)
-text = client.page_text()
-client.disconnect()     # leave the daemon running
+# Connect from any number of short-lived scripts. The context manager
+# disconnects the local socket on exit but leaves the daemon running.
+with DaemonClient("myapp") as client:
+    client.drain(5.0)
+    text = client.page_text()
 
 # ... later, from another script ...
-client = DaemonClient("myapp")
-client.connect()
-client.navigate("https://example.com/login")
-client.disconnect()
+with DaemonClient("myapp") as client:
+    client.navigate("https://example.com/login")
+    client.wait_for_render_settle()        # #50: same probe as CarbonylBrowser
 
 # Shut down the daemon + browser
 stop_daemon("myapp")
 ```
+
+Multiple short-lived clients can share one long-running daemon — that's
+the whole point. The browser keeps its in-memory cookies / localStorage
+across clients, so a login script and a scraping script can run as two
+separate Python processes against the same authenticated session.
 
 ### Daemon CLI
 
@@ -238,6 +245,55 @@ si.print_grid(marks=[(46, 45)])         # overlay a coordinate marker
 matches = b.find_text("Continue")       # [{col, row, end_col}, ...]
 print(si.annotate(marks=[(m["col"], m["row"]) for m in matches]))
 ```
+
+`ScreenInspector` also exposes `region(top, left, bottom, right)` for
+extracting a rectangular slice of the rendered grid — useful when the
+page has multiple lookalike controls and you need to scope `find_text`
+to a known panel.
+
+---
+
+## Error Handling
+
+The SDK raises specific exceptions you can catch by category instead of
+matching on string messages:
+
+```python
+from carbonyl_agent import (
+    CarbonylBrowser, DaemonClient, BackendMismatchError, is_daemon_live,
+)
+
+# Binary not found at install / first spawn
+try:
+    b = CarbonylBrowser()
+    b.open("https://example.com")
+except FileNotFoundError as exc:
+    # Run `carbonyl-agent install` or set CARBONYL_BIN
+    print(f"runtime missing: {exc}")
+
+# Daemon connect when nothing is listening
+if not is_daemon_live("myapp"):
+    raise RuntimeError("start the daemon first: carbonyl-agent daemon start myapp")
+
+# Backend contract enforcement (#40) — fail fast when a uinput-only
+# script connects to a pty-only daemon
+try:
+    client = DaemonClient("myapp", require_backend="uinput")
+    client.connect()
+except BackendMismatchError as exc:
+    print(f"daemon has wrong input backend: {exc}")
+
+# Render-readiness without wall-clock guessing (#48 / #50)
+with CarbonylBrowser() as b:
+    b.open("https://slow-site.example.com")
+    if not b.wait_for_render_settle(timeout=10.0):
+        raise TimeoutError("page never settled within 10s")
+```
+
+For the persona profile lock (raised when two processes try to open the
+same persona): `RuntimeError` is raised with the holding PID in the
+message so the second caller can decide whether to wait, kill, or pick
+a different persona.
 
 ---
 

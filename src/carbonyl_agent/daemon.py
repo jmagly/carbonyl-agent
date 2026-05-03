@@ -321,6 +321,22 @@ class DaemonClient:
             pass
         self.disconnect()
 
+    def __enter__(self) -> "DaemonClient":
+        """Context manager entry — connects if not already connected.
+
+        Enables ``with DaemonClient(name) as c:`` so the local socket is
+        always cleaned up on exception or normal exit (#24). Only the
+        client's connection is closed on exit; the daemon itself keeps
+        running. Call :meth:`close_daemon` explicitly to shut down the
+        daemon.
+        """
+        if self._sock is None:
+            self.connect()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.disconnect()
+
 
 # ---------------------------------------------------------------------------
 # Daemon server
