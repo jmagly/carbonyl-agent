@@ -1,0 +1,205 @@
+name: Release
+
+# Tag-triggered Gitea release for carbonyl-agent.
+#
+# Builds sdist + wheel via hatch, computes SHA-256 sums, optionally
+# bundles the pdoc API reference, then creates (or updates) a Gitea
+# release at the v* tag and uploads every asset. Idempotent: re-running
+# against the same tag replaces existing same-name assets.
+#
+# This workflow is independent of the GitHub PyPI publish path
+# (.github/workflows/release.yml) — Gitea is the primary remote and
+# can ship releases on its own without the PyPI step landing.
+#
+# Triggers:
+#   - push of a v* tag           → automatic
+#   - workflow_dispatch with tag → manual re-run / fix-up
+#
+# Token: secrets.RELEASE_TOKEN (preferred) or falls back to the auto-
+# provided github.token (Gitea Actions injects one with package:write
+# scope by default; release upload requires repository:write).
+#
+# Refs: roctinam/carbonyl-agent#11, #18
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing v* tag to publish (no leading refs/tags/)'
+        required: true
+      include_docs:
+        description: 'Bundle pdoc API reference as a release asset'
+        required: false
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+
+jobs:
+  release:
+    name: Publish ${{ github.event.inputs.tag || github.ref_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Resolve tag, version, token
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          [ -n "$TAG" ] || { echo "ERROR: no tag resolved" >&2; exit 1; }
+          VERSION="${TAG#v}"
+          INCLUDE_DOCS="${{ github.event.inputs.include_docs || 'true' }}"
+          echo "TAG=${TAG}"               >> "$GITHUB_ENV"
+          echo "VERSION=${VERSION}"       >> "$GITHUB_ENV"
+          echo "INCLUDE_DOCS=${INCLUDE_DOCS}" >> "$GITHUB_ENV"
+          echo "[release] tag=${TAG} version=${VERSION} include_docs=${INCLUDE_DOCS}"
+
+      - name: Resolve release token
+        run: |
+          # Prefer an explicit RELEASE_TOKEN if set; fall back to the
+          # auto-injected github.token (Gitea Actions). Either must
+          # carry repository:write to upload assets.
+          if [ -n "${{ secrets.RELEASE_TOKEN }}" ]; then
+            echo "::add-mask::${{ secrets.RELEASE_TOKEN }}"
+            echo "RELEASE_TOKEN=${{ secrets.RELEASE_TOKEN }}" >> "$GITHUB_ENV"
+            echo "[release] using RELEASE_TOKEN secret"
+          else
+            echo "RELEASE_TOKEN=${{ github.token }}" >> "$GITHUB_ENV"
+            echo "[release] using auto-provided github.token"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify tag matches pyproject.toml version
+        run: |
+          PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [ "${VERSION}" != "${PYPROJECT_VERSION}" ]; then
+            echo "::error::Tag v${VERSION} does not match pyproject.toml version ${PYPROJECT_VERSION}"
+            exit 1
+          fi
+
+      - name: Install build tooling
+        run: pip install hatch twine
+
+      - name: Build sdist + wheel
+        run: |
+          hatch build
+          twine check dist/*
+
+      - name: Stage assets
+        run: |
+          STAGE="${GITHUB_WORKSPACE}/.release-stage"
+          rm -rf "${STAGE}" && mkdir -p "${STAGE}"
+          cp dist/*.tar.gz dist/*.whl "${STAGE}/"
+
+          # SHA-256 sidecars for every artefact (consumers verify before install).
+          ( cd "${STAGE}" && for f in *.tar.gz *.whl; do
+              [ -f "$f" ] && sha256sum "$f" > "${f}.sha256"
+            done )
+
+          # Optionally bundle pdoc API reference as a single tarball asset.
+          if [ "${INCLUDE_DOCS}" = "true" ]; then
+            pip install -e ".[docs]"
+            ./scripts/build-docs.sh
+            tar -czf "${STAGE}/carbonyl-agent-${VERSION}-docs.tar.gz" -C docs api
+            ( cd "${STAGE}" && sha256sum "carbonyl-agent-${VERSION}-docs.tar.gz" > "carbonyl-agent-${VERSION}-docs.tar.gz.sha256" )
+          fi
+
+          ls -lh "${STAGE}"
+          echo "STAGE=${STAGE}" >> "$GITHUB_ENV"
+
+      - name: Resolve release notes from CHANGELOG.md
+        run: |
+          BODY_FILE="${GITHUB_WORKSPACE}/.release-body.md"
+          # Pull the section between "## [VERSION]" or "## VERSION" and the next "## " heading.
+          awk -v ver="${VERSION}" '
+            $0 ~ "^## \\[?"ver"\\]?" { in_section=1; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ' CHANGELOG.md > "${BODY_FILE}"
+
+          if [ ! -s "${BODY_FILE}" ]; then
+            {
+              printf '# carbonyl-agent %s\n\n' "${VERSION}"
+              printf 'Tag-triggered release. See CHANGELOG.md for the full history.\n\n'
+              printf '## Artefacts\n\n'
+              printf '- `carbonyl_agent-%s-py3-none-any.whl` — wheel\n' "${VERSION}"
+              printf '- `carbonyl_agent-%s.tar.gz` — sdist\n' "${VERSION}"
+              printf '- `*.sha256` — checksums for each artefact\n'
+              if [ "${INCLUDE_DOCS}" = "true" ]; then
+                printf '- `carbonyl-agent-%s-docs.tar.gz` — pdoc API reference\n' "${VERSION}"
+              fi
+            } > "${BODY_FILE}"
+          fi
+          echo "BODY_FILE=${BODY_FILE}" >> "$GITHUB_ENV"
+
+      - name: Create or reuse Gitea release
+        run: |
+          API="https://git.integrolabs.net/api/v1/repos/${GITHUB_REPOSITORY}/releases"
+
+          existing="$(curl -sf -H "Authorization: token ${RELEASE_TOKEN}" \
+            "${API}/tags/${TAG}" 2>/dev/null || true)"
+          if [ -n "$existing" ]; then
+            RELEASE_ID="$(echo "$existing" | jq '.id')"
+            echo "[release] Gitea release '${TAG}' already exists (id=${RELEASE_ID}); reusing"
+          else
+            BODY="$(jq -Rs '.' < "${BODY_FILE}")"
+            PRERELEASE="$(echo "${TAG}" | grep -qE '\-(alpha|beta|rc)' && echo true || echo false)"
+            resp="$(curl -s -w '\n__HTTP__%{http_code}' \
+              -X POST "${API}" \
+              -H "Authorization: token ${RELEASE_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"tag_name\": \"${TAG}\",
+                \"name\": \"carbonyl-agent ${VERSION}\",
+                \"body\": ${BODY},
+                \"draft\": false,
+                \"prerelease\": ${PRERELEASE}
+              }")"
+            code="${resp##*__HTTP__}"; body="${resp%__HTTP__*}"
+            if [ "$code" != "201" ] && [ "$code" != "200" ]; then
+              echo "ERROR: create-release HTTP ${code}: ${body}" >&2
+              exit 1
+            fi
+            RELEASE_ID="$(echo "$body" | jq '.id')"
+            echo "[release] created Gitea release id=${RELEASE_ID}"
+          fi
+          echo "RELEASE_ID=${RELEASE_ID}" >> "$GITHUB_ENV"
+
+      - name: Upload all staged assets to Gitea release
+        run: |
+          API="https://git.integrolabs.net/api/v1/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets"
+          for asset in "${STAGE}"/*; do
+            name="$(basename "${asset}")"
+            existing_id="$(curl -sf -H "Authorization: token ${RELEASE_TOKEN}" "${API}" \
+              | jq -r ".[] | select(.name == \"${name}\") | .id" 2>/dev/null || true)"
+            if [ -n "${existing_id}" ]; then
+              curl -sf -X DELETE -H "Authorization: token ${RELEASE_TOKEN}" "${API}/${existing_id}"
+              echo "[release] replaced existing asset ${name}"
+            fi
+            curl -sf -X POST "${API}" \
+              -H "Authorization: token ${RELEASE_TOKEN}" \
+              -F "attachment=@${asset};filename=${name}" > /dev/null
+            echo "[release] uploaded ${name}"
+          done
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf "${GITHUB_WORKSPACE}/.release-stage" \
+                 "${GITHUB_WORKSPACE}/.release-body.md" 2>/dev/null || true
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "==> Gitea release published"
+          echo "    URL:      https://git.integrolabs.net/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          echo "    Assets:   $(ls "${STAGE}" 2>/dev/null | wc -l || echo n/a)"
+          echo "    Includes: sdist, wheel, sha256 sidecars$([ "${INCLUDE_DOCS}" = "true" ] && echo ", docs" || true)"
