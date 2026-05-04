@@ -29,6 +29,11 @@ docs = [
     "pdoc>=14.0",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+    "e2e: end-to-end tests that require a real Carbonyl runtime binary and outbound network access (#15)",
+]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true

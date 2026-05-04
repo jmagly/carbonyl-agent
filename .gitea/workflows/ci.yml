@@ -51,6 +51,25 @@ jobs:
       - run: pip install -e . pip-audit
       - run: pip-audit
 
+  e2e:
+    # End-to-end tests against a real Carbonyl runtime (#15).
+    # Advisory in Iteration 2 — failures don't block CI; promoted to
+    # blocking in Iteration 3 once the matrix is stable. Pinned to a
+    # single matrix cell (ubuntu + py3.12) because each run costs ~2 min
+    # of network + browser spawn time.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: Install Carbonyl runtime
+        run: carbonyl-agent install
+      - name: Run E2E suite
+        run: pytest tests/e2e/ -v --tb=short
+
   bench:
     # Advisory, non-blocking (#22). Surfaces regressions but never fails CI.
     # Real-binary benches land with #15.

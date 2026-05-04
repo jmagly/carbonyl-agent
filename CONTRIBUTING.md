@@ -46,6 +46,10 @@ mypy --strict src/carbonyl_agent/
 # Dependency audit
 pip-audit
 
+# End-to-end tests (#15) — require a real Carbonyl binary + network
+carbonyl-agent install                    # one-time
+pytest tests/e2e/ -v                      # ~2 min wall-clock
+
 # Performance benchmarks (#22)
 pip install -e ".[bench]"
 pytest tests/benchmarks/ --benchmark-only
