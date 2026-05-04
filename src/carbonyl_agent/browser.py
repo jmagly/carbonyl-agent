@@ -30,6 +30,10 @@ from typing import Any
 import pexpect
 import pyte
 
+from carbonyl_agent._logging import get_logger
+
+_log = get_logger(__name__)
+
 # Terminal dimensions Carbonyl will render to
 COLS = 220
 ROWS = 50
@@ -976,7 +980,14 @@ def search_duckduckgo(
 
 
 def log(msg: str) -> None:
-    print(f"[carbonyl] {msg}", file=sys.stderr, flush=True)
+    """Backwards-compatible INFO-level shim (#14).
+
+    Existing call sites continue to work; new code should call the
+    module logger directly (``_log.debug(...)`` etc.) for finer level
+    control. Configure verbosity with ``CARBONYL_DEBUG=1`` or
+    ``CARBONYL_LOG_LEVEL=DEBUG``.
+    """
+    _log.info(msg)
 
 
 def main() -> None:

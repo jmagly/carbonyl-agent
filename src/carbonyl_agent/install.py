@@ -236,6 +236,12 @@ def main() -> None:
         prog="carbonyl-agent",
         description="Carbonyl browser automation SDK",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable DEBUG-level logging (also: CARBONYL_DEBUG=1 / "
+             "CARBONYL_LOG_LEVEL=DEBUG)",
+    )
     sub = parser.add_subparsers(dest="command")
 
     p_install = sub.add_parser("install", help="Download and install the Carbonyl runtime")
@@ -294,6 +300,10 @@ def main() -> None:
     p_dattach.add_argument("session")
 
     args = parser.parse_args()
+
+    if getattr(args, "debug", False):
+        from carbonyl_agent._logging import enable_debug_logging
+        enable_debug_logging()
 
     if args.command == "install":
         sys.exit(cmd_install(args))

@@ -48,8 +48,11 @@ _ROOT = _HERE.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from carbonyl_agent._logging import get_logger
 from carbonyl_agent.browser import CarbonylBrowser, log
 from carbonyl_agent.session import _DEFAULT_SESSION_DIR, SessionManager
+
+_log = get_logger(__name__)
 
 _SOCK_SUFFIX = ".sock"
 _PID_KEY = "daemon_pid"
@@ -346,7 +349,7 @@ class _BrowserHandler(socketserver.StreamRequestHandler):
     """Handle one client connection, dispatching JSON commands to the browser."""
 
     def handle(self) -> None:
-        log(f"daemon: client connected from {self.client_address}")
+        _log.debug("client connected from %s", self.client_address)
         buf = b""
         try:
             while True:
@@ -361,6 +364,7 @@ class _BrowserHandler(socketserver.StreamRequestHandler):
                         continue
                     try:
                         req = json.loads(line)
+                        _log.debug("rpc cmd=%s", req.get("cmd"))
                         resp = self._dispatch(req)
                     except Exception as exc:
                         resp = {"ok": False, "error": str(exc)}
@@ -369,7 +373,7 @@ class _BrowserHandler(socketserver.StreamRequestHandler):
                     if req.get("cmd") == "close":
                         return
         except Exception as exc:
-            log(f"daemon: handler error: {exc}")
+            _log.error("handler error: %s", exc)
 
     def _dispatch(self, req: dict[str, Any]) -> dict[str, Any]:
         browser: CarbonylBrowser = self.server.browser  # type: ignore[attr-defined]
