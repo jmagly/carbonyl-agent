@@ -55,6 +55,9 @@ case "$RUN_MODE" in
       echo "  Run: sudo scripts/setup-uinput-host.sh"
       exit 1
     fi
+    echo "[run] NOTE: nonroot mode disables in-container udevd (#52);" >&2
+    echo "[run]   uinput.click() works but type_text/mouse_path won't reach Chromium." >&2
+    echo "[run]   For Layer 1 trust tests, use CARBONYL_RUN_MODE=root." >&2
     ;;
   root)
     ;;

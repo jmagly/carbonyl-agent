@@ -37,7 +37,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       xauth \
       xinit \
       x11-xserver-utils \
+      x11-utils \
+      udev \
       && rm -rf /var/lib/apt/lists/*
+
+# x11-utils → xinput, useful both for the entrypoint's hot-plug verification
+# step and for in-container debugging.
+# udev      → systemd-udevd + udevadm. Needed so Xorg can hot-plug-detect the
+# uinput virtual devices that UinputEmitter creates at test time (#52).
+# Without udev running in the container's netns, Xorg never receives KOBJECT
+# UEVENT notifications for runtime-created /dev/input/event* devices and
+# motion/keyboard events from those devices never reach Chromium.
 
 # Capture tooling — scrot for single frames, ffmpeg for streams,
 # x11vnc for remote operator display.

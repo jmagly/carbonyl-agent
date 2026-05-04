@@ -19,6 +19,52 @@ XORG_DISPLAY="${XORG_DISPLAY:-:99}"
 XORG_LOG="/tmp/xorg.log"
 XORG_READY_TIMEOUT="${XORG_READY_TIMEOUT:-10}"  # seconds
 
+# --- udev daemon for Xorg hot-plug (#52) -----------------------------------
+# Xorg uses libudev's NETLINK_KOBJECT_UEVENT subscription to detect input
+# devices that appear after Xorg has already started — including the
+# uinput virtual devices that UinputEmitter creates at test time. The
+# subscription is per-netns: container netns gets uevents only for
+# devices created by a udevd running inside the same netns.
+#
+# Without a container-side udevd, runtime-created uinput devices never
+# register with Xorg and KEY_*/ABS_X/ABS_Y events go nowhere. (Mouse
+# button events sometimes leak through because Carbonyl's libcarbonyl
+# bridge has its own button-event path; treat that as accidental, not
+# a workaround.)
+#
+# udevd needs root to bind kernel netlink and manage device nodes. When
+# the container runs in non-root mode (CARBONYL_RUN_MODE=nonroot), udev
+# can't start and uinput-trust tests that depend on hot-plug will be
+# affected. Log clearly so it's not a silent failure mode.
+
+UDEVD_BIN="/lib/systemd/systemd-udevd"
+UDEV_LOG="/tmp/udevd.log"
+
+if [[ -x "$UDEVD_BIN" ]] && [[ "$(id -u)" == "0" ]]; then
+  if ! pgrep -x systemd-udevd >/dev/null 2>&1; then
+    echo "[entrypoint] starting systemd-udevd for X hot-plug" >&2
+    "$UDEVD_BIN" --daemon > "$UDEV_LOG" 2>&1 || {
+      echo "[entrypoint] WARNING: systemd-udevd failed to start; runtime input hot-plug disabled" >&2
+    }
+    # Settle initial device tree so /run/udev/data/ is populated before
+    # Xorg subscribes. udevadm trigger fires synthetic add events for
+    # existing nodes; udevadm settle waits for the queue to drain.
+    udevadm trigger --action=add 2>/dev/null || true
+    udevadm settle --timeout=2 2>/dev/null || true
+  fi
+  echo "[entrypoint] udev hot-plug enabled — uinput devices will register dynamically with X" >&2
+else
+  if [[ "$(id -u)" != "0" ]]; then
+    echo "[entrypoint] WARNING: running as $(id -un) (uid $(id -u)); udev cannot start." >&2
+    echo "  Runtime-created uinput devices will NOT register with Xorg, so" >&2
+    echo "  uinput keyboard / motion events will not reach Chromium (#52)." >&2
+    echo "  Click events may still work via Carbonyl's button-event path." >&2
+    echo "  Fix: rerun with CARBONYL_RUN_MODE=root (or --user 0)." >&2
+  else
+    echo "[entrypoint] WARNING: $UDEVD_BIN not found; install 'udev' package" >&2
+  fi
+fi
+
 # --- Resolve CPU vs GPU mode -----------------------------------------------
 
 if [[ "$MODE" == "auto" ]]; then
@@ -101,6 +147,15 @@ export DISPLAY="$XORG_DISPLAY"
 export CARBONYL_GL_FLAGS="$CHROMIUM_GL_FLAGS"
 
 echo "[entrypoint] Xorg ready on $DISPLAY (mode=$MODE, pid=$XORG_PID)" >&2
+
+# Quick sanity check: xinput list works against the running X server.
+# If this fails, X is up but its IPC is broken — we fail loudly so the
+# operator knows before tests start emitting.
+if command -v xinput >/dev/null 2>&1; then
+  if ! xinput list >/dev/null 2>&1; then
+    echo "[entrypoint] WARNING: xinput list failed against $DISPLAY — input subsystem may be misconfigured" >&2
+  fi
+fi
 
 # --- /dev/uinput accessibility check ---------------------------------------
 # Common gotcha: Docker's --device passthrough preserves the host node's

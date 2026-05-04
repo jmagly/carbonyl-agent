@@ -73,6 +73,19 @@ CARBONYL_RUN_MODE=root ./run.sh   # force root mode (default on hosts without ud
 - **No udev rule** → `--user 0` (root in container), `--device=/dev/uinput`. Zero host setup; works anywhere.
 - **Udev rule installed** (via `sudo scripts/setup-uinput-host.sh`) → non-root `agent` user, `--group-add <host-input-gid>`. Tighter isolation.
 
+### Mode trade-off (Xorg input hot-plug)
+
+Trusted-input QA tests that drive Chromium with `UinputEmitter`'s **runtime-created** keyboard / pointer devices need Xorg to see hot-plug events for those devices. Xorg hot-plug uses `NETLINK_KOBJECT_UEVENT`, which is per-network-namespace, so a udev daemon must run **inside the container's netns** to deliver those events. udev needs root to bind kernel netlink.
+
+| Mode | `uinput.click()` | `uinput.mouse_path()` | `uinput.type_text()` |
+|---|---|---|---|
+| **root** (default if no host udev rule) | ✅ | ✅ | ✅ |
+| **nonroot** (host udev rule installed) | ✅ | ❌ | ❌ |
+
+If your QA suite includes Layer 1 trust regressions (`test_keystroke_trust`, `test_click_preceded_by_move` and similar — `roctinam/carbonyl-agent#52`), use **root mode**. The container starts a `systemd-udevd` from the entrypoint when launched with `--user 0`, which lets Xorg dynamically register every uinput device the SDK creates.
+
+If your suite only exercises mouse-button events (Layer 6 profile persistence, click-trust tests), nonroot mode remains correct and hot-plug isn't needed.
+
 ### Compose
 
 ```bash
