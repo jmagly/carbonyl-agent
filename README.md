@@ -133,26 +133,52 @@ b.close()
 
 ### Fork and snapshot
 
-Fork a logged-in session for parallel scraping, or snapshot to pin a known-good state:
+Fork a logged-in session for parallel scraping, or snapshot to pin a known-good state. The full lifecycle — seed once, fork to N workers, snapshot the seed before each campaign, restore on drift — works without re-authentication:
 
 ```python
-from carbonyl_agent import SessionManager
+from concurrent.futures import ThreadPoolExecutor
+from carbonyl_agent import CarbonylBrowser, SessionManager
 
 sm = SessionManager()
+
+# 1. Seed: spawn an interactive session, log in, accept cookies, then close.
+#    Everything that hits disk during this run becomes the base profile.
 sm.create("base")
-# ... log in, accept cookies, etc. ...
+with CarbonylBrowser(session="base") as b:
+    b.open("https://example.com/login")
+    b.drain(8.0)
+    # ... interactive login, manual or scripted ...
 
-# Fork: two independent profiles that both start logged in
-sm.fork("base", "worker-1")
-sm.fork("base", "worker-2")
-
-# Snapshot / restore: roll back after A/B testing
+# 2. Snapshot the seed BEFORE forking, so you can roll back if a worker
+#    pollutes the base by accident.
 sm.snapshot("base", "post-login")
-# ... session drifts ...
-sm.restore("base", "post-login")   # replaces profile with snapshot
+
+# 3. Fork to N workers. Each fork is a deep copy — independent cookies,
+#    independent localStorage, but starts logged in.
+for i in range(4):
+    sm.fork("base", f"worker-{i}")
+
+# 4. Run workers in parallel. Each spawn uses its own profile dir, so
+#    the four browsers don't fight over Chromium's profile lock.
+def scrape(name):
+    with CarbonylBrowser(session=name) as b:
+        b.open("https://example.com/dashboard")
+        b.wait_for_render_settle(timeout=10.0)
+        return b.page_text()
+
+with ThreadPoolExecutor(max_workers=4) as pool:
+    results = list(pool.map(scrape, [f"worker-{i}" for i in range(4)]))
+
+# 5. Restore the base from snapshot — wipes any drift accumulated during
+#    workflow above (e.g. cookies the login flow refreshed).
+sm.restore("base", "post-login")
+
+# 6. Cleanup: workers are throwaway after a campaign. Snapshot + base survive.
+for i in range(4):
+    sm.destroy(f"worker-{i}")
 ```
 
-See `SessionManager` for the full API: `list`, `destroy`, `exists`, `is_live`, `clean_stale_lock`.
+The full API is `create`, `fork`, `snapshot`, `restore`, `list`, `destroy`, `exists`, `is_live`, `clean_stale_lock`. All operations are atomic against the session JSON metadata file — a crashed `fork` won't leave a half-copied profile registered as live.
 
 ### Persona profiles
 
