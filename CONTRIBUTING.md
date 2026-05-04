@@ -45,6 +45,15 @@ mypy --strict src/carbonyl_agent/
 
 # Dependency audit
 pip-audit
+
+# Performance benchmarks (#22)
+pip install -e ".[bench]"
+pytest tests/benchmarks/ --benchmark-only
+
+# API reference docs (#17)
+pip install -e ".[docs]"
+./scripts/build-docs.sh           # writes docs/api/*.html
+./scripts/build-docs.sh --serve   # preview at http://localhost:8080
 ```
 
 ## Code Style

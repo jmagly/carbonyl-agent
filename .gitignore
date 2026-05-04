@@ -35,3 +35,9 @@ target/
 **/target/
 # Library crates: don't commit Cargo.lock
 crates/*/Cargo.lock
+
+# Generated API docs (#17) — built on demand or in CI, not committed
+docs/api/
+
+# Benchmark JSON output (#22) — produced by pytest-benchmark / CI artifact
+.benchmarks/

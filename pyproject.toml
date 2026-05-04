@@ -25,6 +25,9 @@ dev = [
 bench = [
     "pytest-benchmark>=4.0",
 ]
+docs = [
+    "pdoc>=14.0",
+]
 
 [tool.mypy]
 python_version = "3.11"

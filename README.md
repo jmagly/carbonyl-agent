@@ -105,6 +105,16 @@ from carbonyl_agent import (
 )
 ```
 
+Full API reference is auto-generated from docstrings (#17):
+
+```bash
+pip install -e ".[docs]"
+./scripts/build-docs.sh           # writes to docs/api/
+./scripts/build-docs.sh --serve   # local preview at http://localhost:8080
+```
+
+CI uploads the docs as an `api-docs-<sha>` artifact on every build.
+
 ---
 
 ## Session Persistence
