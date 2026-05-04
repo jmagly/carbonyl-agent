@@ -265,12 +265,15 @@ to a known panel.
 
 ## Error Handling
 
-The SDK raises specific exceptions you can catch by category instead of
-matching on string messages:
+All carbonyl-agent exceptions inherit from `CarbonylError` so you can
+catch the whole family with one block, or match on a specific subtype
+when you want different recovery per failure mode:
 
 ```python
 from carbonyl_agent import (
-    CarbonylBrowser, DaemonClient, BackendMismatchError, is_daemon_live,
+    CarbonylBrowser, DaemonClient, is_daemon_live,
+    CarbonylError, BackendMismatchError, BrowserCrashed,
+    DaemonConnectionError, RenderTimeoutError,
 )
 
 # Binary not found at install / first spawn
@@ -281,24 +284,35 @@ except FileNotFoundError as exc:
     # Run `carbonyl-agent install` or set CARBONYL_BIN
     print(f"runtime missing: {exc}")
 
-# Daemon connect when nothing is listening
-if not is_daemon_live("myapp"):
-    raise RuntimeError("start the daemon first: carbonyl-agent daemon start myapp")
-
 # Backend contract enforcement (#40) — fail fast when a uinput-only
 # script connects to a pty-only daemon
+if not is_daemon_live("myapp"):
+    raise DaemonConnectionError("start the daemon first: carbonyl-agent daemon start myapp")
 try:
     client = DaemonClient("myapp", require_backend="uinput")
     client.connect()
 except BackendMismatchError as exc:
     print(f"daemon has wrong input backend: {exc}")
 
-# Render-readiness without wall-clock guessing (#48 / #50)
+# Render-readiness — opt into exception-style control flow (#23)
 with CarbonylBrowser() as b:
     b.open("https://slow-site.example.com")
-    if not b.wait_for_render_settle(timeout=10.0):
-        raise TimeoutError("page never settled within 10s")
+    try:
+        b.wait_for_render_settle(timeout=10.0, raise_on_timeout=True)
+    except RenderTimeoutError as exc:
+        print(f"giving up: {exc}")
+
+# Catch-all for any SDK error
+try:
+    do_work()
+except CarbonylError as exc:
+    log.error("SDK failure: %s", exc)
 ```
+
+Backwards compatibility: `DaemonConnectionError`, `BackendMismatchError`,
+and `UinputUnavailableError` still inherit from `RuntimeError` via
+multiple inheritance, so existing `except RuntimeError` blocks keep
+working. `RenderTimeoutError` similarly subclasses `TimeoutError`.
 
 For the persona profile lock (raised when two processes try to open the
 same persona): `RuntimeError` is raised with the holding PID in the

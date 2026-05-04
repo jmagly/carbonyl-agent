@@ -37,6 +37,12 @@ from carbonyl_agent.daemon import (  # noqa: F401
     start_daemon,
     stop_daemon,
 )
+from carbonyl_agent.exceptions import (  # noqa: F401
+    BrowserCrashed,
+    CarbonylError,
+    DaemonConnectionError,
+    RenderTimeoutError,
+)
 from carbonyl_agent.profile import (  # noqa: F401
     PersonaMeta,
     ProfileManager,
@@ -62,6 +68,11 @@ __all__ = [
     "sock_path",
     "DEFAULT_SOCKET_DIR",
     "BackendMismatchError",
+    # Exception hierarchy (#23)
+    "CarbonylError",
+    "BrowserCrashed",
+    "DaemonConnectionError",
+    "RenderTimeoutError",
     # Chromium flag groups (composable)
     "DEFAULT_HEADLESS_FLAGS",
     "BASE_CHROMIUM_FLAGS",

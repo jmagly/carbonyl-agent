@@ -64,9 +64,20 @@ _BACKEND_KEY = "input_backend"
 PROTOCOL_VERSION = 1
 
 
-class BackendMismatchError(RuntimeError):
+from carbonyl_agent.exceptions import (
+    CarbonylError,
+    DaemonConnectionError,
+)
+
+
+class BackendMismatchError(CarbonylError, RuntimeError):
     """Raised when ``DaemonClient(require_backend=...)`` is set and the
-    daemon's actual ``input_backend`` doesn't match (#40)."""
+    daemon's actual ``input_backend`` doesn't match (#40).
+
+    Re-based under :class:`CarbonylError` in #23. Still inherits from
+    ``RuntimeError`` for backwards compatibility — pre-#23 callers that
+    matched ``except RuntimeError`` continue to work.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +222,7 @@ class DaemonClient:
 
     def _rpc(self, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
         if not self._sock:
-            raise RuntimeError("Not connected to daemon")
+            raise DaemonConnectionError("Not connected to daemon")
         # For drain commands, extend timeout beyond the drain duration
         if payload.get("cmd") == "drain" and timeout is None:
             timeout = payload.get("seconds", 2.0) + 10.0
@@ -224,7 +235,7 @@ class DaemonClient:
         while True:
             chunk = self._sock.recv(65536)
             if not chunk:
-                raise RuntimeError("Daemon closed connection")
+                raise DaemonConnectionError("Daemon closed connection")
             resp_buf += chunk
             if b"\n" in resp_buf:
                 break
@@ -232,7 +243,7 @@ class DaemonClient:
         self._sock.settimeout(10.0)
         resp: dict[str, Any] = json.loads(resp_buf.split(b"\n")[0])
         if not resp.get("ok"):
-            raise RuntimeError(f"Daemon error: {resp.get('error')}")
+            raise DaemonConnectionError(f"Daemon error: {resp.get('error')}")
         return resp
 
     # Mirror the CarbonylBrowser API
@@ -275,6 +286,8 @@ class DaemonClient:
         timeout: float = 5.0,
         idle_ms: int = 200,
         poll_ms: int = 50,
+        *,
+        raise_on_timeout: bool = False,
     ) -> bool:
         """Wait until the rendered page is stable for ``idle_ms`` ms.
 
@@ -288,17 +301,26 @@ class DaemonClient:
         :func:`carbonyl_agent.browser._render_settle_loop`.
 
         Returns ``True`` if the buffer settled, ``False`` if ``timeout``
-        was hit first.
+        was hit first. Pass ``raise_on_timeout=True`` to raise
+        :class:`carbonyl_agent.exceptions.RenderTimeoutError` instead
+        of returning ``False`` (#23).
         """
         from carbonyl_agent.browser import _render_settle_loop
 
-        return _render_settle_loop(
+        ok = _render_settle_loop(
             drain_fn=self.drain,
             page_text_fn=self.page_text,
             timeout=timeout,
             idle_ms=idle_ms,
             poll_ms=poll_ms,
         )
+        if not ok and raise_on_timeout:
+            from carbonyl_agent.exceptions import RenderTimeoutError
+            raise RenderTimeoutError(
+                f"page did not settle within {timeout}s "
+                f"(idle_ms={idle_ms}, poll_ms={poll_ms})"
+            )
+        return ok
 
     def ping(self) -> bool:
         """Return True if the daemon answers a ``hello`` handshake right now.

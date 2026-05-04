@@ -132,11 +132,17 @@ _NAMED_KEYS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-class UinputUnavailableError(RuntimeError):
+from carbonyl_agent.exceptions import CarbonylError
+
+
+class UinputUnavailableError(CarbonylError, RuntimeError):
     """Raised when ``python-uinput`` is missing or ``/dev/uinput`` is not
     writable. The message includes remediation steps for the most common
     setup failures (kernel module not loaded, user not in input group,
     container missing ``--device=/dev/uinput``).
+
+    Re-based under :class:`carbonyl_agent.exceptions.CarbonylError` in
+    #23. Still inherits from ``RuntimeError`` for backwards compatibility.
     """
 
 

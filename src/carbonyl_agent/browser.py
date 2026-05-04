@@ -455,6 +455,8 @@ class CarbonylBrowser:
         timeout: float = 5.0,
         idle_ms: int = 200,
         poll_ms: int = 50,
+        *,
+        raise_on_timeout: bool = False,
     ) -> bool:
         """Wait until the rendered terminal buffer has been stable for
         ``idle_ms`` continuous milliseconds, or until ``timeout`` elapses.
@@ -483,14 +485,26 @@ class CarbonylBrowser:
         - ``poll_ms`` — sampling interval. Smaller = more responsive
           but more CPU. Default 50ms gives 4 samples per ``idle_ms``
           window at the default settings.
+        - ``raise_on_timeout`` — when ``True``, raise
+          :class:`carbonyl_agent.exceptions.RenderTimeoutError` on
+          timeout instead of returning ``False`` (#23). Useful when the
+          caller wants exception-based control flow rather than checking
+          a boolean.
         """
-        return _render_settle_loop(
+        ok = _render_settle_loop(
             drain_fn=self.drain,
             page_text_fn=self.page_text,
             timeout=timeout,
             idle_ms=idle_ms,
             poll_ms=poll_ms,
         )
+        if not ok and raise_on_timeout:
+            from carbonyl_agent.exceptions import RenderTimeoutError
+            raise RenderTimeoutError(
+                f"page did not settle within {timeout}s "
+                f"(idle_ms={idle_ms}, poll_ms={poll_ms})"
+            )
+        return ok
 
     def _ensure_uinput(self) -> Any:
         """Lazy-create the UinputEmitter. Called only when input_backend == 'uinput'."""
