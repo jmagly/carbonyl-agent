@@ -161,9 +161,18 @@ class SessionManager:
         )
 
     def profile_dir(self, name: str) -> Path:
-        """Return the --user-data-dir path for this session (creates dirs)."""
+        """Return the --user-data-dir path for this session (creates dirs).
+
+        If a stale Chromium ``SingletonLock`` (pointing at a PID that is no
+        longer alive on this host) exists in the profile, it is removed before
+        returning. This prevents a previously-crashed Carbonyl run from
+        blocking the next open of the same session.
+        """
         p = self._profile_dir(name)
         p.mkdir(parents=True, exist_ok=True)
+        lock = p / _SINGLETON_LOCK
+        if (lock.exists() or lock.is_symlink()) and self._is_stale_lock(lock):
+            lock.unlink(missing_ok=True)
         return p
 
     def list(self, *, include_snapshots: bool = True) -> list[dict[str, Any]]:

@@ -373,7 +373,6 @@ class CarbonylBrowser:
             sm = _session_manager()
             if not sm.exists(self._session):
                 sm.create(self._session)
-            sm.clean_stale_lock(self._session)
             profile = sm.profile_dir(self._session)
             args.append(f"--user-data-dir={profile}")
             log(f"session: {self._session!r}  profile: {profile}")

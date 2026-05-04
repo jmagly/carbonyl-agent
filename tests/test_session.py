@@ -1,4 +1,7 @@
 """Tests for carbonyl_agent.session.SessionManager."""
+import os
+import socket
+
 import pytest
 
 from carbonyl_agent.session import SessionManager
@@ -137,3 +140,72 @@ class TestForkAndSnapshot:
         s = sm.get(snap_name)
         assert s.meta.snapshot_of == "src"
         assert s.meta.forked_from == "src"
+
+
+# --- Stale-lock auto-cleanup ---
+
+def _find_dead_pid() -> int:
+    """Return a PID that is guaranteed not to be running on this host."""
+    # Spawn a no-op subprocess, wait for it, return its (now reaped) PID.
+    pid = os.fork()
+    if pid == 0:
+        os._exit(0)
+    os.waitpid(pid, 0)
+    # waitpid reaped the zombie; the PID is now free. Race-wise the kernel
+    # could reuse it before our test reads it, but on Linux PIDs are recycled
+    # only after wrapping past the maximum, so this is reliable for tests.
+    return pid
+
+
+class TestStaleLockAutoCleanup:
+    def test_profile_dir_removes_stale_singleton_lock(self, sm):
+        """profile_dir() must auto-clean a SingletonLock whose PID is dead."""
+        sm.create("crashed")
+        profile = sm.profile_dir("crashed")
+        lock = profile / "SingletonLock"
+        dead_pid = _find_dead_pid()
+        lock.symlink_to(f"{socket.gethostname()}-{dead_pid}")
+        assert lock.is_symlink()
+
+        # Fetching the profile again should auto-clean the stale lock.
+        sm.profile_dir("crashed")
+        assert not lock.exists() and not lock.is_symlink()
+
+    def test_profile_dir_keeps_live_singleton_lock(self, sm):
+        """profile_dir() must NOT remove a SingletonLock whose PID is alive."""
+        sm.create("running")
+        profile = sm.profile_dir("running")
+        lock = profile / "SingletonLock"
+        # os.getpid() is the test process — guaranteed alive.
+        lock.symlink_to(f"{socket.gethostname()}-{os.getpid()}")
+
+        sm.profile_dir("running")
+        assert lock.is_symlink()
+
+    def test_profile_dir_no_lock_is_noop(self, sm):
+        """profile_dir() works normally when no SingletonLock exists."""
+        sm.create("clean")
+        profile = sm.profile_dir("clean")
+        assert profile.is_dir()
+        assert not (profile / "SingletonLock").exists()
+
+    def test_is_live_false_after_auto_cleanup(self, sm):
+        """After profile_dir() cleans a stale lock, is_live() reports False."""
+        sm.create("ghost")
+        profile = sm.profile_dir("ghost")
+        lock = profile / "SingletonLock"
+        dead_pid = _find_dead_pid()
+        lock.symlink_to(f"{socket.gethostname()}-{dead_pid}")
+
+        sm.profile_dir("ghost")  # triggers auto-clean
+        assert sm.is_live("ghost") is False
+
+    def test_profile_dir_handles_malformed_lock(self, sm):
+        """Malformed SingletonLock target is treated as stale and removed."""
+        sm.create("malformed")
+        profile = sm.profile_dir("malformed")
+        lock = profile / "SingletonLock"
+        lock.symlink_to("not-a-valid-target")
+
+        sm.profile_dir("malformed")
+        assert not lock.exists() and not lock.is_symlink()
