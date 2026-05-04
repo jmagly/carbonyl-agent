@@ -411,6 +411,18 @@ unreachable.
 3. `carbonyl` on `$PATH`
 4. Docker fallback (requires `CARBONYL_ALLOW_DOCKER=1`)
 
+### Runtime compatibility matrix (#21)
+
+CI runs the full E2E suite (`tests/e2e/`) against multiple Carbonyl runtime tags so SDK-vs-runtime drift is caught before it reaches users.
+
+| Tag | Status | Notes |
+|---|---|---|
+| `runtime-dd69bef0ea4b2512` | **Supported** (current pin in `.carbonyl-runtime-version`) | Default for `carbonyl-agent install` |
+| `runtime-3f5e5a96aa10c4ac` | **Backwards-compat tested** | Prior runtime; CI verifies SDK still works against it |
+| Older `runtime-*` tags | Best-effort | Not in CI; expected to work but not guaranteed |
+
+Pin a specific runtime in your project by writing the hash into `.carbonyl-runtime-version` (one `runtime-hash=<hash>` line). The `carbonyl-agent install` command reads it. Override on the command line with `--tag runtime-<hash>` for a one-off install.
+
 ### Docker fallback (opt-in)
 
 When no local binary is installed, the SDK can fall back to `docker run fathyb/carbonyl` — but this is opt-in for supply-chain safety:

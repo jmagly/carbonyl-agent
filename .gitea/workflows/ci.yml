@@ -53,20 +53,43 @@ jobs:
 
   e2e:
     # End-to-end tests against a real Carbonyl runtime (#15).
-    # Advisory in Iteration 2 — failures don't block CI; promoted to
-    # blocking in Iteration 3 once the matrix is stable. Pinned to a
-    # single matrix cell (ubuntu + py3.12) because each run costs ~2 min
-    # of network + browser spawn time.
+    #
+    # Matrix dimension: runtime version (#21). Each cell installs a
+    # different runtime tag and runs the full e2e suite, so SDK-vs-
+    # runtime drift surfaces here before users hit it. Cells:
+    #   - pinned   → whatever .carbonyl-runtime-version says (current
+    #                supported version; what `carbonyl-agent install`
+    #                resolves by default)
+    #   - previous → known-good prior runtime for backwards-compat
+    #                regression detection
+    #
+    # Both cells advisory (continue-on-error) per #15 acceptance —
+    # promoted to blocking in Iteration 3 once cell stability is proven.
+    # Single python+os cell (ubuntu + py3.12) because each run costs
+    # ~2 min of network + browser spawn time.
     runs-on: ubuntu-latest
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: pinned
+            install_args: ""
+            label: ".carbonyl-runtime-version (current)"
+          - runtime: previous
+            install_args: "--tag runtime-3f5e5a96aa10c4ac"
+            label: "runtime-3f5e5a96aa10c4ac (prior)"
+    name: e2e (${{ matrix.label }})
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
-      - name: Install Carbonyl runtime
-        run: carbonyl-agent install
+      - name: Install Carbonyl runtime (${{ matrix.label }})
+        run: carbonyl-agent install ${{ matrix.install_args }}
+      - name: Print resolved runtime
+        run: carbonyl-agent status
       - name: Run E2E suite
         run: pytest tests/e2e/ -v --tb=short
 
