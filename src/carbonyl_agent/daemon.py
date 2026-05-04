@@ -172,16 +172,44 @@ class DaemonClient:
         session_dir: Path | None = None,
         *,
         require_backend: str | None = None,
+        auto_reconnect: bool = False,
+        max_reconnect_attempts: int = 3,
+        reconnect_backoff: float = 0.5,
     ) -> None:
+        """
+        Args:
+            auto_reconnect: When True, transient socket failures during
+                ``_rpc`` (connection refused, broken pipe, daemon closed
+                the connection) trigger an automatic reconnect + retry.
+                Default False — the legacy behaviour where transient
+                errors surface immediately as :class:`DaemonConnectionError`.
+                Opt in for long-running clients that need to survive
+                a daemon restart in the background. (#23)
+            max_reconnect_attempts: Number of reconnect attempts before
+                giving up. Only consulted when ``auto_reconnect`` is True.
+            reconnect_backoff: Initial backoff in seconds. Doubles per
+                attempt, capped at 5.0 s.
+        """
         if require_backend is not None and require_backend not in ("pty", "uinput"):
             raise ValueError(
                 f"require_backend must be 'pty' or 'uinput' or None, "
                 f"got {require_backend!r}"
             )
+        if max_reconnect_attempts < 1:
+            raise ValueError(
+                f"max_reconnect_attempts must be >= 1, got {max_reconnect_attempts}"
+            )
+        if reconnect_backoff <= 0:
+            raise ValueError(
+                f"reconnect_backoff must be > 0, got {reconnect_backoff}"
+            )
         self._sock_path = _sock_path(session_name, session_dir)
         self._sock: socket.socket | None = None
         self._buf = ""
         self._require_backend = require_backend
+        self._auto_reconnect = auto_reconnect
+        self._max_reconnect_attempts = max_reconnect_attempts
+        self._reconnect_backoff = reconnect_backoff
         # Populated by the connect-time handshake.
         self.backend: str | None = None
         self.protocol_version: int = 0
@@ -192,9 +220,12 @@ class DaemonClient:
         s.connect(str(self._sock_path))
         self._sock = s
         # Handshake. Older daemons (pre-#40) don't know "hello" — treat as
-        # protocol version 0, PTY backend.
+        # protocol version 0, PTY backend. Use _rpc_once (not _rpc) so the
+        # handshake bypasses the auto-reconnect loop — the loop calls
+        # connect() and recursing through the retry logic during a fresh
+        # connect would loop on a persistently-broken transport.
         try:
-            resp = self._rpc({"cmd": "hello"})
+            resp = self._rpc_once({"cmd": "hello"})
             payload = resp.get("result") or {}
             self.backend = payload.get("input_backend", "pty")
             self.protocol_version = int(payload.get("protocol_version", 1))
@@ -221,6 +252,47 @@ class DaemonClient:
             self._sock = None
 
     def _rpc(self, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
+        # Without auto-reconnect, this is a single attempt — preserves the
+        # exact pre-#23 behaviour for callers that don't opt in. Defensive
+        # getattr so test fixtures using DaemonClient.__new__() (bypass
+        # __init__) still work.
+        if not getattr(self, "_auto_reconnect", False):
+            return self._rpc_once(payload, timeout)
+
+        # With auto-reconnect, retry transient socket failures with
+        # exponential backoff. Semantic errors (BackendMismatch,
+        # daemon-side error responses) bypass retry.
+        last_exc: Exception | None = None
+        attempts = 1 + self._max_reconnect_attempts
+        for attempt in range(attempts):
+            try:
+                return self._rpc_once(payload, timeout)
+            except DaemonConnectionError as exc:
+                msg = str(exc)
+                if "Daemon error:" in msg:
+                    # Server processed the request and returned an error —
+                    # not a transport failure, retrying won't help.
+                    raise
+                last_exc = exc
+            except (ConnectionRefusedError, BrokenPipeError, ConnectionResetError, socket.timeout) as exc:
+                last_exc = exc
+
+            if attempt + 1 >= attempts:
+                break
+            self.disconnect()
+            backoff = min(self._reconnect_backoff * (2 ** attempt), 5.0)
+            time.sleep(backoff)
+            try:
+                self.connect()
+            except (ConnectionRefusedError, FileNotFoundError, OSError) as exc:
+                last_exc = exc
+                continue
+
+        raise DaemonConnectionError(
+            f"all {attempts} reconnect attempts exhausted: {last_exc}"
+        ) from last_exc
+
+    def _rpc_once(self, payload: dict[str, Any], timeout: float | None = None) -> dict[str, Any]:
         if not self._sock:
             raise DaemonConnectionError("Not connected to daemon")
         # For drain commands, extend timeout beyond the drain duration

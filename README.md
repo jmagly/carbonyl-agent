@@ -222,6 +222,28 @@ the whole point. The browser keeps its in-memory cookies / localStorage
 across clients, so a login script and a scraping script can run as two
 separate Python processes against the same authenticated session.
 
+### Auto-reconnect for long-running clients (#23)
+
+For clients that need to survive a daemon restart in the background
+(supervisor restart, host suspend/resume), opt into transparent
+reconnect:
+
+```python
+with DaemonClient("myapp", auto_reconnect=True,
+                  max_reconnect_attempts=5,
+                  reconnect_backoff=0.5) as client:
+    # If the daemon dies and a supervisor brings it back, the next
+    # _rpc call will reconnect with exponential backoff (0.5s, 1s,
+    # 2s, 4s, 5s) before giving up. Daemon-side errors (semantic)
+    # still surface immediately — only transient transport failures
+    # trigger retry.
+    text = client.page_text()
+```
+
+Default is `auto_reconnect=False`, preserving the existing fail-fast
+behaviour. Opt in only when you've decided your client should outlive
+its daemon process.
+
 ### Daemon CLI
 
 ```bash

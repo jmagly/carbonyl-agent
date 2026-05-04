@@ -412,6 +412,118 @@ class TestWaitForRenderSettle:
             client.wait_for_render_settle(poll_ms=0)
 
 
+class TestAutoReconnect:
+    """Issue #23 — DaemonClient(auto_reconnect=True) survives transient
+    socket failures by reconnecting and retrying transparently."""
+
+    def test_constructor_validates_retry_args(self):
+        from carbonyl_agent.daemon import DaemonClient
+        with pytest.raises(ValueError, match="max_reconnect_attempts"):
+            DaemonClient("x", max_reconnect_attempts=0)
+        with pytest.raises(ValueError, match="reconnect_backoff"):
+            DaemonClient("x", reconnect_backoff=0)
+
+    def test_default_no_retry_preserves_legacy_behavior(self, daemon_server):
+        """Without opt-in, a transient failure surfaces immediately."""
+        from carbonyl_agent.daemon import DaemonClient, DaemonConnectionError
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = None
+        c.backend = None
+        c.protocol_version = 0
+        c._auto_reconnect = False
+        c._max_reconnect_attempts = 3
+        c._reconnect_backoff = 0.5
+        # _rpc with no socket → DaemonConnectionError immediately, no retry
+        with pytest.raises(DaemonConnectionError, match="Not connected"):
+            c._rpc({"cmd": "page_text"})
+
+    def test_retries_after_transient_failure(self, daemon_server, monkeypatch):
+        """Inject a transient broken-pipe on first call; reconnect must
+        succeed on retry against the live daemon."""
+        from carbonyl_agent.daemon import DaemonClient
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = None
+        c.backend = None
+        c.protocol_version = 0
+        c._auto_reconnect = True
+        c._max_reconnect_attempts = 3
+        c._reconnect_backoff = 0.01  # fast for tests
+        c.connect()
+
+        # Inject a one-shot BrokenPipeError on the next _rpc_once call
+        original_rpc_once = c._rpc_once
+        call_count = {"n": 0}
+
+        def flaky_rpc_once(payload, timeout=None):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise BrokenPipeError("simulated transient failure")
+            return original_rpc_once(payload, timeout)
+
+        monkeypatch.setattr(c, "_rpc_once", flaky_rpc_once)
+        # Reassign original after monkeypatch wraps fresh attr lookups
+        c._rpc_once = flaky_rpc_once  # type: ignore[method-assign]
+
+        # _rpc should retry, reconnect, and the second call should succeed
+        result = c._rpc({"cmd": "page_text"})
+        assert result["ok"] is True
+        assert call_count["n"] >= 2
+        c.disconnect()
+
+    def test_does_not_retry_daemon_side_errors(self, daemon_server):
+        """Server-side errors (daemon dispatched the command and returned
+        ok=false) should NOT trigger reconnect — retrying would just
+        reproduce the same error."""
+        from carbonyl_agent.daemon import DaemonClient, DaemonConnectionError
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = None
+        c.backend = None
+        c.protocol_version = 0
+        c._auto_reconnect = True
+        c._max_reconnect_attempts = 3
+        c._reconnect_backoff = 0.01
+        c.connect()
+
+        # Send an unknown command — daemon returns {ok: false, error: "..."}
+        # → DaemonConnectionError("Daemon error: ..."). Should NOT retry.
+        with pytest.raises(DaemonConnectionError, match="Daemon error"):
+            c._rpc({"cmd": "totally-not-a-real-command"})
+        c.disconnect()
+
+    def test_exhausts_attempts_then_raises(self, daemon_server, monkeypatch):
+        """When the failure persists, raise after exhausting attempts."""
+        from carbonyl_agent.daemon import DaemonClient, DaemonConnectionError
+        c = DaemonClient.__new__(DaemonClient)
+        c._sock_path = daemon_server["sock"]
+        c._sock = None
+        c._buf = ""
+        c._require_backend = None
+        c.backend = None
+        c.protocol_version = 0
+        c._auto_reconnect = True
+        c._max_reconnect_attempts = 2
+        c._reconnect_backoff = 0.01
+        c.connect()
+
+        def always_fails(payload, timeout=None):
+            raise BrokenPipeError("permanent failure")
+
+        c._rpc_once = always_fails  # type: ignore[method-assign]
+
+        with pytest.raises(DaemonConnectionError, match="reconnect attempts exhausted"):
+            c._rpc({"cmd": "page_text"})
+        c.disconnect()
+
+
 class TestContextManager:
     """Issue #24: DaemonClient as context manager — connect on enter,
     disconnect (NOT close_daemon) on exit so the daemon keeps serving
