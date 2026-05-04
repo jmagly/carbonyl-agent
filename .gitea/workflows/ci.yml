@@ -50,3 +50,21 @@ jobs:
           python-version: "3.12"
       - run: pip install -e . pip-audit
       - run: pip-audit
+
+  bench:
+    # Advisory, non-blocking (#22). Surfaces regressions but never fails CI.
+    # Real-binary benches land with #15.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,bench]"
+      - run: pytest tests/benchmarks/ --benchmark-only --benchmark-json=bench.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-${{ github.sha }}
+          path: bench.json

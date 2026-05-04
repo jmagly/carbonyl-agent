@@ -22,6 +22,9 @@ dev = [
     "pytest>=8.0",
     "hypothesis>=6.0",
 ]
+bench = [
+    "pytest-benchmark>=4.0",
+]
 
 [tool.mypy]
 python_version = "3.11"
