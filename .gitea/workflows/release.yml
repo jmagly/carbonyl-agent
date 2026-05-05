@@ -166,7 +166,9 @@ jobs:
             echo "[release] Gitea release '${TAG}' already exists (id=${RELEASE_ID}); reusing"
           else
             BODY="$(jq -Rs '.' < "${BODY_FILE}")"
-            PRERELEASE="$(echo "${TAG}" | grep -qE '\-(alpha|beta|rc)' && echo true || echo false)"
+            # Match PEP 440 prerelease segments (0.1.0a1, 0.1.0b1, 0.1.0rc1)
+            # and the dash-separated forms (-alpha, -beta, -rc1, -dev*).
+            PRERELEASE="$(echo "${TAG}" | grep -qE '([0-9]+(a|b|rc)[0-9]+|-(alpha|beta|rc|dev))' && echo true || echo false)"
             resp="$(curl -s -w '\n__HTTP__%{http_code}' \
               -X POST "${API}" \
               -H "Authorization: token ${RELEASE_TOKEN}" \
