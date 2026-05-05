@@ -10,6 +10,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# These tests exercise the python-uinput integration — the library is an
+# optional runtime dependency (not listed in pyproject.toml), available on
+# Linux hosts that have the python-uinput pip package installed. Skip the
+# whole module when the underlying library isn't available, so CI runs in
+# minimal containers (e.g. python:3.12-slim) don't fail here.
+pytest.importorskip("uinput", reason="python-uinput library not installed")
+
 from carbonyl_agent import uinput_emitter
 from carbonyl_agent.uinput_emitter import (
     UinputEmitter,

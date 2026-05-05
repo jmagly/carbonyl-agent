@@ -83,6 +83,11 @@ jobs:
 
       - name: pip-audit
         run: |
+          # Upgrade pip first — the python:3.12-slim image ships with an
+          # older pip that has its own CVEs (CVE-2025-8869 fixed in 25.3,
+          # CVE-2026-1703 fixed in 26.0). CVE-2026-3219 has no fix
+          # available at time of writing, so we ignore it explicitly so
+          # the audit signal stays focused on project deps.
           docker run --rm \
             -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
             -w /workspace \
@@ -91,8 +96,9 @@ jobs:
             python:3.12-slim \
             bash -c '
               set -euxo pipefail
+              pip install -q --upgrade pip
               pip install -q -e . pip-audit
-              pip-audit
+              pip-audit --ignore-vuln CVE-2026-3219
             '
 
   e2e:
