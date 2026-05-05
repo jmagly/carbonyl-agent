@@ -1,12 +1,14 @@
 # ADR-006: Async Daemon Mode via `asyncio` Unix-Socket Server
 
-**Status**: Proposed
-**Date**: 2026-05-04
-**Version**: 0.1 (Draft)
+**Status**: Rejected (2026-05-05)
+**Date**: 2026-05-04 (drafted), 2026-05-05 (rejected)
+**Version**: 0.1 (Draft, retained as historical record)
 **Deciders**: Joseph Magly (sole maintainer)
 **Supersedes**: none
-**Refines**: ADR-002 (transport unchanged; concurrency model replaced)
-**Related issues**: #19 (US-019 implementation), #23 (recovery hooks the async client must honour)
+**Refines**: ADR-002 (transport unchanged; concurrency model replaced) — N/A, see rejection rationale
+**Related issues**: #19 (closed as won't-do, 2026-05-05), #23 (recovery hooks the async client would have honoured)
+
+> **Rejection rationale (2026-05-05).** carbonyl-agent stays single-actor. Multi-browser concurrency is owned by `carbonyl-fleet` (Rust) — the language and runtime built for it. Adding a parallel async surface to this Python SDK doubles the maintenance burden for a marginal UX win on a layer that is fundamentally single-actor (one PTY, one `pyte.Screen`). The body of this ADR remains as the analysis trail; do not implement it.
 
 > Note: the implementation issue (#19) refers to "ADR-005". That number was claimed by #42 (wreq TLS-fingerprint client) before this work was written up. This ADR is therefore numbered **ADR-006**.
 
