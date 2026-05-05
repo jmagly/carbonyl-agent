@@ -20,6 +20,11 @@ name: Release
 # scope by default; release upload requires repository:write).
 #
 # Refs: roctinam/carbonyl-agent#11, #18
+#
+# Runner: titan (host-mode runner with docker access). All build steps
+# run inside `docker run python:3.12-slim` so the toolchain is hermetic
+# and the workflow doesn't depend on whichever ubuntu-latest runner
+# happens to be free (some lack node, which breaks actions/checkout@v4).
 
 on:
   push:
@@ -39,11 +44,11 @@ on:
 jobs:
   release:
     name: Publish ${{ github.event.inputs.tag || github.ref_name }}
-    runs-on: ubuntu-latest
+    runs-on: titan
     timeout-minutes: 15
 
     steps:
-      - name: Resolve tag, version, token
+      - name: Resolve tag, version, token, include_docs
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           [ -n "$TAG" ] || { echo "ERROR: no tag resolved" >&2; exit 1; }
@@ -54,8 +59,6 @@ jobs:
           echo "INCLUDE_DOCS=${INCLUDE_DOCS}" >> "$GITHUB_ENV"
           echo "[release] tag=${TAG} version=${VERSION} include_docs=${INCLUDE_DOCS}"
 
-      - name: Resolve release token
-        run: |
           # Prefer an explicit RELEASE_TOKEN if set; fall back to the
           # auto-injected github.token (Gitea Actions). Either must
           # carry repository:write to upload assets.
@@ -68,56 +71,68 @@ jobs:
             echo "[release] using auto-provided github.token"
           fi
 
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
-          fetch-depth: 0
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Verify tag matches pyproject.toml version
+      - name: Checkout (manual git clone at tag)
         run: |
-          PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          if [ "${VERSION}" != "${PYPROJECT_VERSION}" ]; then
-            echo "::error::Tag v${VERSION} does not match pyproject.toml version ${PYPROJECT_VERSION}"
-            exit 1
-          fi
+          rm -rf "${GITHUB_WORKSPACE}/.repo-clone" 2>/dev/null || true
+          git clone \
+            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git" \
+            "${GITHUB_WORKSPACE}/.repo-clone"
+          cd "${GITHUB_WORKSPACE}/.repo-clone"
+          git fetch --tags --quiet
+          git checkout "${TAG}"
 
-      - name: Install build tooling
-        run: pip install hatch twine
-
-      - name: Build sdist + wheel
+      - name: Build sdist + wheel inside python:3.12-slim
         run: |
-          hatch build
-          twine check dist/*
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
+            -w /workspace \
+            -e PIP_DISABLE_PIP_VERSION_CHECK=1 \
+            -e PIP_ROOT_USER_ACTION=ignore \
+            -e VERSION="${VERSION}" \
+            -e INCLUDE_DOCS="${INCLUDE_DOCS}" \
+            python:3.12-slim \
+            bash -c '
+              set -euxo pipefail
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends git build-essential >/dev/null
 
-      - name: Stage assets
-        run: |
-          STAGE="${GITHUB_WORKSPACE}/.release-stage"
-          rm -rf "${STAGE}" && mkdir -p "${STAGE}"
-          cp dist/*.tar.gz dist/*.whl "${STAGE}/"
+              # Verify tag matches pyproject.toml version
+              PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open(\"pyproject.toml\",\"rb\"))[\"project\"][\"version\"])")
+              if [ "${VERSION}" != "${PYPROJECT_VERSION}" ]; then
+                echo "ERROR: tag v${VERSION} does not match pyproject.toml version ${PYPROJECT_VERSION}" >&2
+                exit 1
+              fi
 
-          # SHA-256 sidecars for every artefact (consumers verify before install).
-          ( cd "${STAGE}" && for f in *.tar.gz *.whl; do
-              [ -f "$f" ] && sha256sum "$f" > "${f}.sha256"
-            done )
+              pip install -q hatch twine
+              hatch build
+              twine check dist/*
 
-          # Optionally bundle pdoc API reference as a single tarball asset.
-          if [ "${INCLUDE_DOCS}" = "true" ]; then
-            pip install -e ".[docs]"
-            ./scripts/build-docs.sh
-            tar -czf "${STAGE}/carbonyl-agent-${VERSION}-docs.tar.gz" -C docs api
-            ( cd "${STAGE}" && sha256sum "carbonyl-agent-${VERSION}-docs.tar.gz" > "carbonyl-agent-${VERSION}-docs.tar.gz.sha256" )
-          fi
+              STAGE=/workspace/.release-stage
+              rm -rf "${STAGE}" && mkdir -p "${STAGE}"
+              cp dist/*.tar.gz dist/*.whl "${STAGE}/"
 
-          ls -lh "${STAGE}"
-          echo "STAGE=${STAGE}" >> "$GITHUB_ENV"
+              # SHA-256 sidecars
+              ( cd "${STAGE}" && for f in *.tar.gz *.whl; do
+                  [ -f "$f" ] && sha256sum "$f" > "${f}.sha256"
+                done )
+
+              # Optional pdoc bundle
+              if [ "${INCLUDE_DOCS}" = "true" ]; then
+                pip install -q -e ".[docs]"
+                ./scripts/build-docs.sh
+                tar -czf "${STAGE}/carbonyl-agent-${VERSION}-docs.tar.gz" -C docs api
+                ( cd "${STAGE}" && sha256sum "carbonyl-agent-${VERSION}-docs.tar.gz" > "carbonyl-agent-${VERSION}-docs.tar.gz.sha256" )
+              fi
+
+              ls -lh "${STAGE}"
+            '
+          # Workspace path the host can see
+          echo "STAGE=${GITHUB_WORKSPACE}/.repo-clone/.release-stage" >> "$GITHUB_ENV"
 
       - name: Resolve release notes from CHANGELOG.md
         run: |
           BODY_FILE="${GITHUB_WORKSPACE}/.release-body.md"
+          cd "${GITHUB_WORKSPACE}/.repo-clone"
           # Pull the section between "## [VERSION]" or "## VERSION" and the next "## " heading.
           awk -v ver="${VERSION}" '
             $0 ~ "^## \\[?"ver"\\]?" { in_section=1; next }
@@ -193,7 +208,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -rf "${GITHUB_WORKSPACE}/.release-stage" \
+          rm -rf "${GITHUB_WORKSPACE}/.repo-clone" \
                  "${GITHUB_WORKSPACE}/.release-body.md" 2>/dev/null || true
 
       - name: Summary
@@ -201,5 +216,4 @@ jobs:
           echo ""
           echo "==> Gitea release published"
           echo "    URL:      https://git.integrolabs.net/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
-          echo "    Assets:   $(ls "${STAGE}" 2>/dev/null | wc -l || echo n/a)"
-          echo "    Includes: sdist, wheel, sha256 sidecars$([ "${INCLUDE_DOCS}" = "true" ] && echo ", docs" || true)"
+          echo "    Includes: sdist, wheel, sha256 sidecars$([ "${INCLUDE_DOCS}" = "true" ] && echo ', docs' || true)"
