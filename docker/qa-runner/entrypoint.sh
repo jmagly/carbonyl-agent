@@ -50,7 +50,7 @@ if [[ -x "$UDEVD_BIN" ]] && [[ "$(id -u)" == "0" ]]; then
     # Xorg subscribes. udevadm trigger fires synthetic add events for
     # existing nodes; udevadm settle waits for the queue to drain.
     udevadm trigger --action=add 2>/dev/null || true
-    udevadm settle --timeout=2 2>/dev/null || true
+    udevadm settle --timeout=10 2>/dev/null || true
   fi
   echo "[entrypoint] udev hot-plug enabled — uinput devices will register dynamically with X" >&2
 else
