@@ -133,50 +133,6 @@ jobs:
               pip-audit --ignore-vuln CVE-2026-3219
             '
 
-  e2e:
-    # End-to-end tests against a real Carbonyl runtime (#15).
-    # Advisory (continue-on-error) per #15 acceptance.
-    runs-on: titan
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runtime: pinned
-            install_args: ""
-            label: ".carbonyl-runtime-version (current)"
-          - runtime: previous
-            install_args: "--tag runtime-3f5e5a96aa10c4ac"
-            label: "runtime-3f5e5a96aa10c4ac (prior)"
-    name: e2e (${{ matrix.label }})
-    steps:
-      - name: Checkout (manual git clone)
-        run: |
-          rm -rf "${GITHUB_WORKSPACE}/.repo-clone" 2>/dev/null || true
-          git clone --depth 1 --branch "${GITHUB_REF_NAME:-main}" \
-            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git" \
-            "${GITHUB_WORKSPACE}/.repo-clone"
-          cd "${GITHUB_WORKSPACE}/.repo-clone"
-          git checkout "${GITHUB_SHA:-HEAD}" 2>/dev/null || true
-
-      - name: e2e suite (${{ matrix.label }})
-        run: |
-          docker run --rm \
-            -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
-            -w /workspace \
-            -e PIP_DISABLE_PIP_VERSION_CHECK=1 \
-            -e PIP_ROOT_USER_ACTION=ignore \
-            python:3.12-slim \
-            bash -c '
-              set -euxo pipefail
-              apt-get update -qq
-              apt-get install -y -qq --no-install-recommends git build-essential ca-certificates curl >/dev/null
-              pip install -q -e ".[dev]"
-              carbonyl-agent install ${{ matrix.install_args }}
-              carbonyl-agent status
-              pytest tests/e2e/ -v --tb=short
-            '
-
   bench:
     # Advisory, non-blocking (#22). Surfaces regressions but never fails CI.
     runs-on: titan

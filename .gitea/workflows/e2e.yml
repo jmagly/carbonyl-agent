@@ -1,0 +1,85 @@
+name: e2e
+
+# End-to-end tests against a real Carbonyl runtime (#15) + multi-runtime
+# matrix (#21).
+#
+# Why this is a separate workflow: e2e needs the Chromium runtime libs
+# (libnss3, libgbm1, X server, etc.) — the python:3.12-slim image used by
+# ci.yml does not have them. Until the carbonyl-agent-qa-runner image is
+# stably published and wired in here, e2e will not pass on every push.
+# Pulling it out of ci.yml means CI can go green on routine changes
+# without e2e flake masking the signal.
+#
+# Triggered by:
+#   - workflow_dispatch (primary — manual run when you actually want e2e)
+#   - schedule (nightly cron, advisory)
+#   - push when e2e harness or runtime pin changes (so binary upgrades
+#     surface drift here before users hit it)
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime_tag:
+        description: 'Runtime tag override (default: read .carbonyl-runtime-version)'
+        required: false
+        default: ''
+  schedule:
+    - cron: '0 7 * * *'  # 07:00 UTC nightly
+  push:
+    branches: [main]
+    paths:
+      - 'tests/e2e/**'
+      - '.carbonyl-runtime-version'
+      - '.gitea/workflows/e2e.yml'
+
+jobs:
+  e2e:
+    runs-on: titan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: pinned
+            install_args: ""
+            label: ".carbonyl-runtime-version (current)"
+          - runtime: previous
+            install_args: "--tag runtime-3f5e5a96aa10c4ac"
+            label: "runtime-3f5e5a96aa10c4ac (prior)"
+    name: e2e (${{ matrix.label }})
+    steps:
+      - name: Checkout (manual git clone)
+        run: |
+          rm -rf "${GITHUB_WORKSPACE}/.repo-clone" 2>/dev/null || true
+          git clone --depth 1 --branch "${GITHUB_REF_NAME:-main}" \
+            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git" \
+            "${GITHUB_WORKSPACE}/.repo-clone"
+          cd "${GITHUB_WORKSPACE}/.repo-clone"
+          git checkout "${GITHUB_SHA:-HEAD}" 2>/dev/null || true
+
+      - name: e2e suite (${{ matrix.label }})
+        run: |
+          # Install Chromium runtime libraries inside the container so
+          # the Carbonyl binary can actually launch. python:3.12-slim
+          # does not ship them; we add them explicitly here rather than
+          # baking a custom image — keeps the workflow self-contained.
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
+            -w /workspace \
+            -e PIP_DISABLE_PIP_VERSION_CHECK=1 \
+            -e PIP_ROOT_USER_ACTION=ignore \
+            python:3.12-slim \
+            bash -c '
+              set -euxo pipefail
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends \
+                git build-essential ca-certificates curl \
+                libnss3 libgbm1 libasound2 libatk1.0-0 libcups2 libxss1 \
+                libxkbcommon0 libdrm2 libxcomposite1 libxdamage1 \
+                libxrandr2 libpango-1.0-0 libcairo2 libdbus-1-3 \
+                libxshmfence1 libgl1 fonts-liberation \
+                xvfb >/dev/null
+              pip install -q -e ".[dev]"
+              carbonyl-agent install ${{ matrix.install_args }}
+              carbonyl-agent status
+              xvfb-run -a pytest tests/e2e/ -v --tb=short
+            '
