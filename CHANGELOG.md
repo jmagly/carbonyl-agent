@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0a1] - 2026-05-05
+
+First test release of carbonyl-agent. The full feature set documented under
+[Unreleased] above is included verbatim — this prerelease tag exists to
+exercise the Gitea release pipeline (sdist + wheel + sha256 + pdoc bundle)
+end-to-end. The 0.1.0 GA cut, including PyPI publish via OIDC trusted
+publisher (#12), follows once the publisher is configured.
+
 ### Added
 - Daemon transport contract pinned and documented (#47). The daemon is a **Unix domain socket** server (not TCP/HTTP) at `<session_dir>/<session>.sock`, with `session_dir` defaulting to `~/.local/share/carbonyl/sessions` and overridable via `CARBONYL_SESSION_DIR` or the `session_dir=` kwarg. New public re-exports `from carbonyl_agent import sock_path, DEFAULT_SOCKET_DIR` so consumers (CI fixtures, debug tooling) stop poking at private constants. New `DaemonClient.ping() -> bool` performs a semantic `hello` round-trip (returns `False` on any error, never raises) for readiness probes that need more than `is_daemon_live`'s TCP-style socket check. Container deployments documented in README — daemon + clients must share a filesystem path for the socket.
 - `CarbonylBrowser.wait_for_render_settle(timeout=5.0, idle_ms=200, poll_ms=50)` — deterministic readiness probe for visual-capture tests. Pumps the PTY and hashes `page_text()` until the buffer has been stable for `idle_ms`, returning `True` on settle or `False` on timeout. Replaces wall-clock `drain()` heuristics; works in both direct and daemon-connected modes. (#48)
