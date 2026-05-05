@@ -20,10 +20,8 @@ acceptance.
 """
 from __future__ import annotations
 
-import json
 import socket
 import threading
-from unittest.mock import MagicMock
 
 import pyte
 import pytest
@@ -32,7 +30,6 @@ pytest.importorskip("pytest_benchmark")
 
 from carbonyl_agent.browser import _render_settle_loop, extract_text
 from carbonyl_agent.daemon import DaemonClient, _BrowserServer
-
 
 # ---------------------------------------------------------------------------
 # extract_text — pyte screen → string
