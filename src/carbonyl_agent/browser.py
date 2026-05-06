@@ -387,6 +387,14 @@ class CarbonylBrowser:
             args.append(f"--user-data-dir={pm.profile_dir}")
             log(f"persona: {self._persona!r}  profile: {pm.profile_dir}")
 
+        # In persona/session mode, shorten the cookie SQLite commit interval
+        # so cookies persist within the 5 s graceful_timeout instead of the
+        # upstream 30 s default. Requires the Carbonyl runtime patch
+        # `0026-Add-opt-in-eager-cookie-SQLite-flush-via-CLI.patch` (carbonyl#69);
+        # ignored as an unknown switch by older runtimes.
+        if self._session or self._persona:
+            args.append("--carbonyl-cookie-flush-interval-ms=1000")
+
         args.append(url)
 
         if binary:
@@ -844,14 +852,13 @@ class CarbonylBrowser:
         - **localStorage** flushes within ~5 s — leveldb writes are
           synchronous on ``setItem``, so the default ``graceful_timeout``
           of 5 s is sufficient.
-        - **Cookies** require **~30 s** before they appear in the
-          on-disk SQLite store. Chromium's network service flushes the
-          cookie store on a periodic 30 s schedule
-          (``kCommitIntervalMs`` in ``SQLitePersistentCookieStore``);
-          SIGTERM does not currently force an eager flush in the
-          Carbonyl build, so callers that need cookie persistence must
-          either drain ≥ 30 s before calling ``close()`` or wait for the
-          stretch fix tracked in #51.
+        - **Cookies**: in persona/session mode the SDK passes
+          ``--carbonyl-cookie-flush-interval-ms=1000`` (carbonyl#69),
+          shortening the SQLite commit cycle from 30 s to 1 s so cookies
+          persist within the default ``graceful_timeout``. On older
+          runtimes that lack the patch, the flag is a no-op and the
+          original 30 s window applies — drain ≥ 30 s before
+          ``close()`` in that case.
 
         Visual-capture / persistence tests should hold the browser open
         for the appropriate window above before calling ``close()``.
