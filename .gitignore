@@ -41,3 +41,9 @@ docs/api/
 
 # Benchmark JSON output (#22) — produced by pytest-benchmark / CI artifact
 .benchmarks/
+
+# AIWG runtime artifacts (transient agent state, never committed)
+.aiwg/working/
+.aiwg/ralph/
+.aiwg/ralph-external/
+.aiwg/activity.log
