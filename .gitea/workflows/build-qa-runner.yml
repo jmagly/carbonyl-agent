@@ -118,7 +118,19 @@ jobs:
 
       - name: Log in to Gitea container registry
         run: |
-          echo "${{ secrets.BUILD_REPO_TOKEN }}" | \
+          # Prefer BUILD_REPO_TOKEN if present; fall back to the auto-
+          # injected github.token (Gitea Actions provides one with
+          # package:write scope by default). Either must carry
+          # registry:write to push qa-runner image tags.
+          if [ -n "${{ secrets.BUILD_REPO_TOKEN }}" ]; then
+            TOKEN='${{ secrets.BUILD_REPO_TOKEN }}'
+            echo "[login] using BUILD_REPO_TOKEN secret"
+          else
+            TOKEN='${{ github.token }}'
+            echo "[login] using auto-provided github.token"
+          fi
+          echo "::add-mask::${TOKEN}"
+          printf '%s' "${TOKEN}" | \
             docker login "${REGISTRY}" \
               -u "${{ github.actor }}" \
               --password-stdin
