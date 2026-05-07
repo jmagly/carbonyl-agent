@@ -51,7 +51,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: titan
     steps:
       - uses: actions/checkout@v4
 
