@@ -16,6 +16,7 @@
 
 pub mod http;
 pub mod schema;
+pub mod validator;
 
 pub mod sampler {
     //! Joint-distribution sampler — Phase 3A.2.
@@ -23,18 +24,6 @@ pub mod sampler {
     //! Will consume the BrowserForge-derived corpus tracked in
     //! `roctinam/carbonyl-fingerprint-corpus` and emit statistically valid
     //! `Persona` bundles given constraint filters.
-}
-
-pub mod validator {
-    //! Consistency validator — Phase 3A.3.
-    //!
-    //! Enforces the rules in `SCHEMA.md` of the corpus repo:
-    //! - UA ↔ UA-CH agreement
-    //! - Chrome version ↔ JA4 / H2 Akamai reference match
-    //! - OS ↔ WebGL renderer plausibility
-    //! - OS ↔ fonts plausibility
-    //! - Locale ↔ timezone plausibility
-    //! - hardware_concurrency / device_memory bounds
 }
 
 pub mod applier {

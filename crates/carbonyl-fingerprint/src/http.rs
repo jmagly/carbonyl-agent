@@ -54,12 +54,13 @@ impl H2Settings {
         let entries_part = s.split('|').next().unwrap_or(s);
         let mut entries = Vec::new();
         for piece in entries_part.split(',').filter(|p| !p.is_empty()) {
-            let (id, val) = piece.split_once(':').ok_or_else(|| {
-                FingerprintError::InvalidField {
-                    field: "http2_akamai",
-                    reason: format!("settings piece `{piece}` missing `:`"),
-                }
-            })?;
+            let (id, val) =
+                piece
+                    .split_once(':')
+                    .ok_or_else(|| FingerprintError::InvalidField {
+                        field: "http2_akamai",
+                        reason: format!("settings piece `{piece}` missing `:`"),
+                    })?;
             let id: u16 = id.parse().map_err(|e| FingerprintError::InvalidField {
                 field: "http2_akamai",
                 reason: format!("settings id `{id}`: {e}"),
@@ -84,12 +85,10 @@ impl H2WindowUpdate {
         let mut parts = s.split('|');
         let _settings = parts.next();
         let window = parts.next().unwrap_or("0");
-        let v: u32 = window
-            .parse()
-            .map_err(|e| FingerprintError::InvalidField {
-                field: "http2_akamai",
-                reason: format!("window_update `{window}`: {e}"),
-            })?;
+        let v: u32 = window.parse().map_err(|e| FingerprintError::InvalidField {
+            field: "http2_akamai",
+            reason: format!("window_update `{window}`: {e}"),
+        })?;
         Ok(Self(v))
     }
 }
@@ -140,11 +139,8 @@ pub trait HttpClient {
     /// Set the TLS ClientHello fingerprint. `ja3` is optional because the
     /// canonical persona schema records JA4 only; backends that need JA3
     /// should derive it from the ALPN + cipher fields embedded in JA4.
-    fn set_tls_fingerprint(
-        &mut self,
-        ja3: Option<&str>,
-        ja4: &str,
-    ) -> Result<(), FingerprintError>;
+    fn set_tls_fingerprint(&mut self, ja3: Option<&str>, ja4: &str)
+        -> Result<(), FingerprintError>;
 
     /// Set ALPN advertised protocols (in order).
     fn set_alpn(&mut self, alpn: &[String]) -> Result<(), FingerprintError>;
@@ -197,7 +193,11 @@ pub trait HttpClient {
         }
         self.set_default_header(
             "sec-ch-ua-mobile",
-            if p.user_agent.ua_ch.mobile { "?1" } else { "?0" },
+            if p.user_agent.ua_ch.mobile {
+                "?1"
+            } else {
+                "?0"
+            },
         )?;
         self.set_default_header("sec-ch-ua-platform", &p.user_agent.ua_ch.platform)?;
 
@@ -239,10 +239,7 @@ mod tests {
             self.h2_settings = settings.clone();
             Ok(())
         }
-        fn set_h2_window_update(
-            &mut self,
-            update: H2WindowUpdate,
-        ) -> Result<(), FingerprintError> {
+        fn set_h2_window_update(&mut self, update: H2WindowUpdate) -> Result<(), FingerprintError> {
             self.h2_window = update;
             Ok(())
         }
@@ -250,11 +247,7 @@ mod tests {
             self.h2_priority = priority.clone();
             Ok(())
         }
-        fn set_default_header(
-            &mut self,
-            name: &str,
-            value: &str,
-        ) -> Result<(), FingerprintError> {
+        fn set_default_header(&mut self, name: &str, value: &str) -> Result<(), FingerprintError> {
             self.headers.push((name.to_string(), value.to_string()));
             Ok(())
         }
@@ -340,8 +333,7 @@ user_data_dir = "/tmp/persona-test-01"
 
     #[test]
     fn h2_window_update_parse_akamai() {
-        let w =
-            H2WindowUpdate::from_akamai("1:65536,2:0|15663105|0|m,a,s,p").expect("parse");
+        let w = H2WindowUpdate::from_akamai("1:65536,2:0|15663105|0|m,a,s,p").expect("parse");
         assert_eq!(w.0, 15_663_105);
     }
 
@@ -350,7 +342,10 @@ user_data_dir = "/tmp/persona-test-01"
         let err = H2Settings::from_akamai("garbage").expect_err("should fail");
         assert!(matches!(
             err,
-            FingerprintError::InvalidField { field: "http2_akamai", .. }
+            FingerprintError::InvalidField {
+                field: "http2_akamai",
+                ..
+            }
         ));
     }
 
@@ -360,7 +355,10 @@ user_data_dir = "/tmp/persona-test-01"
         let mut rec = Recorder::default();
         rec.apply_persona(&persona).expect("apply");
 
-        assert_eq!(rec.ja4.as_deref(), Some("t13d1516h2_8daaf6152771_02713d6af862"));
+        assert_eq!(
+            rec.ja4.as_deref(),
+            Some("t13d1516h2_8daaf6152771_02713d6af862")
+        );
         assert_eq!(rec.alpn, vec!["h2".to_string(), "http/1.1".to_string()]);
         assert_eq!(rec.h2_settings.entries.len(), 5);
         assert_eq!(rec.h2_window.0, 15_663_105);

@@ -215,8 +215,8 @@ user_data_dir = "/tmp/persona-test-01"
         assert_eq!(p.persona.platform.os_family, "Linux");
         assert_eq!(p.persona.device.hardware_concurrency, 8);
         assert_eq!(p.persona.network.alpn, vec!["h2", "http/1.1"]);
-        assert_eq!(p.persona.network.http3_enabled, false);
-        assert_eq!(p.persona.stale, false); // default
+        assert!(!p.persona.network.http3_enabled);
+        assert!(!p.persona.stale); // default
     }
 
     #[test]
