@@ -541,8 +541,17 @@ class CarbonylBrowser:
 
         Routing:
         - daemon-connected: forwards to daemon
-        - input_backend="uinput": emits via /dev/uinput (isTrusted=true)
-        - input_backend="pty": writes UTF-8 bytes to the PTY (isTrusted=false)
+        - input_backend="uinput": emits via /dev/uinput (isTrusted=true,
+          kernel-level realism — preferred for bot-detection-grade tests)
+        - input_backend="pty": writes UTF-8 bytes to the PTY. Carbonyl's
+          parser turns these into Event::KeyPress, which the libcarbonyl
+          bridge forwards via RenderWidgetHost::ForwardKeyboardEvent —
+          the same API DevTools Input.dispatchKeyEvent uses, producing
+          isTrusted=true in the DOM. Browser-injected pattern signature
+          may be detectable by sophisticated bot defenses; uinput beats
+          PTY for hostile-traffic adversaries but PTY is trusted enough
+          for everything that doesn't fingerprint kernel-level input
+          timing.
         """
         if self._daemon_client:
             self._daemon_client.send(text)
@@ -559,11 +568,15 @@ class CarbonylBrowser:
 
         Routing:
         - daemon-connected: forwards to daemon
-        - input_backend="uinput": EV_ABS via /dev/uinput (isTrusted=true)
-        - input_backend="pty": SGR mouse code 32 escape (isTrusted=false).
-          Carbonyl translates the SGR into a DOM ``mousemove`` event —
-          essential for sites that require mouse-movement entropy before
-          accepting interaction (e.g. Akamai Bot Manager sensor).
+        - input_backend="uinput": EV_ABS via /dev/uinput (isTrusted=true,
+          kernel-level realism)
+        - input_backend="pty": SGR mouse code 32 escape. Carbonyl parses
+          the SGR into Event::MouseMove and the bridge forwards it via
+          RenderWidgetHost::ForwardMouseEvent → isTrusted=true mousemove
+          in the DOM. Essential for sites that require movement entropy
+          before accepting interaction (e.g. Akamai Bot Manager sensor)
+          and trusted enough for any consumer that doesn't fingerprint
+          kernel-level pointer timing.
         """
         if self._daemon_client:
             self._daemon_client.mouse_move(col, row)
@@ -598,9 +611,14 @@ class CarbonylBrowser:
         Routing:
         - daemon-connected: forwards to daemon
         - input_backend="uinput": EV_KEY BTN_LEFT via /dev/uinput
-          (isTrusted=true). React-controlled buttons fire onClick.
-        - input_backend="pty": SGR mouse protocol press+release
-          (isTrusted=false). Cheaper but blocked by SPA bot detection.
+          (isTrusted=true, kernel-level realism). React-controlled
+          buttons fire onClick.
+        - input_backend="pty": SGR mouse protocol press+release. Carbonyl
+          parses these into Event::MouseDown/MouseUp, the bridge forwards
+          them via RenderWidgetHost::ForwardMouseEvent → isTrusted=true
+          mousedown/mouseup/click in the DOM. Use uinput when the
+          consumer adversary fingerprints input-timing patterns, PTY for
+          everything else.
         """
         if self._daemon_client:
             self._daemon_client.click(col, row)
@@ -673,9 +691,12 @@ class CarbonylBrowser:
 
         Routing:
         - daemon-connected: forwards to daemon
-        - input_backend="uinput": EV_KEY via /dev/uinput (isTrusted=true)
-        - input_backend="pty": ANSI escape sequence over the PTY
-          (isTrusted=false)
+        - input_backend="uinput": EV_KEY via /dev/uinput (isTrusted=true,
+          kernel-level realism)
+        - input_backend="pty": ANSI escape sequence over the PTY. Carbonyl
+          parses these into Event::KeyPress and forwards via
+          RenderWidgetHost::ForwardKeyboardEvent → isTrusted=true
+          keydown/keyup in the DOM.
         """
         if self._daemon_client:
             self._daemon_client.send_key(key)
