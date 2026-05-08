@@ -42,8 +42,17 @@ UDEV_LOG="/tmp/udevd.log"
 
 if [[ -x "$UDEVD_BIN" ]] && [[ "$(id -u)" == "0" ]]; then
   if ! pgrep -x systemd-udevd >/dev/null 2>&1; then
+    # CARBONYL_UDEVD_DEBUG=1 launches udevd with verbose logging so worker-
+    # level errors surface in /tmp/udevd.log. Defaults off in production
+    # (noisy) but enabled by carbonyl-agent#54 cycle 3 to investigate why
+    # workers never broadcast UDEV[] events despite a clean daemon start.
+    UDEVD_FLAGS=(--daemon)
+    if [[ "${CARBONYL_UDEVD_DEBUG:-0}" == "1" ]]; then
+      UDEVD_FLAGS+=(--debug)
+      echo "[entrypoint] systemd-udevd: debug logging enabled (CARBONYL_UDEVD_DEBUG=1)" >&2
+    fi
     echo "[entrypoint] starting systemd-udevd for X hot-plug" >&2
-    "$UDEVD_BIN" --daemon > "$UDEV_LOG" 2>&1 || {
+    "$UDEVD_BIN" "${UDEVD_FLAGS[@]}" > "$UDEV_LOG" 2>&1 || {
       echo "[entrypoint] WARNING: systemd-udevd failed to start; runtime input hot-plug disabled" >&2
     }
     # Settle initial device tree so /run/udev/data/ is populated before
