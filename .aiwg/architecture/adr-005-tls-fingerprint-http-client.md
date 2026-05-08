@@ -1,11 +1,11 @@
 # ADR-005: TLS-Fingerprint-Aware HTTP Client (`wreq`) for Non-Browser Egress
 
-**Status**: Proposed (awaiting sign-off — architect, security architect, eng lead)
-**Date**: 2026-05-06
-**Version**: 0.1 (Draft)
-**Deciders**: Joseph Magly (sole maintainer)
+**Status**: Accepted
+**Date**: 2026-05-06 (proposed) / 2026-05-08 (accepted)
+**Version**: 1.0 (Baselined)
+**Deciders**: Joseph Magly (sole maintainer — acting as architect, security architect, and eng lead)
 **Supersedes**: —
-**Issue**: #42 (gates #43 W3A, #44 W3B, #45 W3C; Phase 3 EPIC #34)
+**Issue**: #42 (closed on acceptance; unblocks #43 W3A, #44 W3B, #45 W3C; Phase 3 EPIC #34)
 
 ---
 
@@ -110,10 +110,10 @@ A `Persona` (W3A schema) maps to the `http` trait via the following fields. The 
 
 ## Acceptance criteria for ADR sign-off
 
-- [ ] Sign-off recorded by: architect, security architect, eng lead (issue #42 acceptance criterion).
-- [ ] Status flipped to `Accepted` and dated.
-- [ ] This ADR linked from #34 (Phase 3 EPIC) as "construction unblocked."
-- [ ] All bus-factor mitigation checklist items above converted to filed issues blocking #44 (so they cannot be silently skipped during W3B kickoff).
+- [x] Sign-off recorded by: architect, security architect, eng lead (sole maintainer acting in all three roles, 2026-05-08).
+- [x] Status flipped to `Accepted` and dated.
+- [x] This ADR linked from #34 (Phase 3 EPIC) as "construction unblocked."
+- [x] All bus-factor mitigation checklist items above converted to filed issues blocking #44 (so they cannot be silently skipped during W3B kickoff). Tracked in #59–#63 (filed alongside ADR acceptance).
 
 ## References
 
