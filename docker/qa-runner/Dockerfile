@@ -38,11 +38,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       xinit \
       x11-xserver-utils \
       x11-utils \
+      xinput \
       udev \
       && rm -rf /var/lib/apt/lists/*
 
-# x11-utils → xinput, useful both for the entrypoint's hot-plug verification
-# step and for in-container debugging.
+# xinput  → the actual `xinput` binary lives in its own package on Ubuntu
+# 24.04, separate from x11-utils (which ships xev/xdpyinfo/xprop). Needed
+# by the entrypoint hot-plug verification step and by carbonyl-agent#53
+# diagnostics. x11-utils stays for the rest of the X11 utilities.
 # udev      → systemd-udevd + udevadm. Needed so Xorg can hot-plug-detect the
 # uinput virtual devices that UinputEmitter creates at test time (#52).
 # Without udev running in the container's netns, Xorg never receives KOBJECT
