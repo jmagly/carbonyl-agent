@@ -14,10 +14,16 @@ Rust crate implementing the persona registry for the Carbonyl Trusted Automation
 | Module | Phase | Status |
 |--------|-------|--------|
 | `schema` | 3A.1 | ✅ Scaffold — Persona struct with TOML round-trip test |
+| `http` | 3A.1 | ✅ Trait surface — persona-binding contract per ADR-005 |
 | `sampler` | 3A.2 | 📋 Placeholder |
 | `validator` | 3A.3 | 📋 Placeholder |
 | `applier` | 3C | 📋 Placeholder |
 | `registry` | 3A.1 | 📋 Placeholder |
+
+The `http` module defines the trait backends implement (e.g. `wreq` in
+W3B / #44) so a `Persona` can be applied to an HTTP client. ADR-005
+specifies the persona-binding contract; this crate owns only the trait,
+never a concrete backend.
 
 ## Consumers
 
