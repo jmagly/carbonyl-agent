@@ -157,6 +157,22 @@ export CARBONYL_GL_FLAGS="$CHROMIUM_GL_FLAGS"
 
 echo "[entrypoint] Xorg ready on $DISPLAY (mode=$MODE, pid=$XORG_PID)" >&2
 
+# --- Re-trigger input udev events post-Xorg (carbonyl-agent#54 cycle 8) ----
+# Xorg's libudev hot-plug listener may not be receiving runtime add events
+# for /dev/input/* devices despite Option "AutoAddDevices" "true". Cycle 7
+# verified the udev pipeline works end-to-end (workers process, broadcast
+# UDEV[] events, /run/udev/data/ populated, /dev/input/eventN accessible
+# via bind-mount) but Phase D `xinput list` still doesn't show any input
+# devices — including the host's hardware visible through the bind mount.
+# Synthesize add events for the entire input subsystem so Xorg's listener
+# (whether or not it auto-subscribed at startup) receives a fresh
+# enumeration. Idempotent — safe to run unconditionally.
+if [[ "$(id -u)" == "0" ]] && command -v udevadm >/dev/null 2>&1; then
+  echo "[entrypoint] re-triggering input udev events post-Xorg-start" >&2
+  udevadm trigger --action=add --subsystem-match=input 2>/dev/null || true
+  udevadm settle --timeout=5 2>/dev/null || true
+fi
+
 # Quick sanity check: xinput list works against the running X server.
 # If this fails, X is up but its IPC is broken — we fail loudly so the
 # operator knows before tests start emitting.
