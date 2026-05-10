@@ -113,6 +113,12 @@ pub enum ValidationError {
          forbids cross-OS font leakage"
     )]
     LinuxForbiddenFont { font: String, reason: &'static str },
+
+    #[error(
+        "Linux persona advertises ANGLE/DirectX WebGL renderer `{renderer}` \
+         (ANGLE+OpenGL is fine on Linux; ANGLE+DirectX/Direct3D is Windows-only)"
+    )]
+    LinuxForbiddenWebGlRenderer { renderer: String },
 }
 
 /// Aggregate of all violations for a single persona. Empty == valid.
@@ -229,6 +235,10 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
 
     // Rule D: Linux personas must not advertise Windows-only fonts.
     check_linux_forbidden_windows_fonts(p, &mut errors);
+
+    // Rule E: Linux personas must not advertise an ANGLE/DirectX WebGL
+    // renderer (Windows-only ANGLE backend).
+    check_linux_forbidden_webgl_renderer(p, &mut errors);
 
     if errors.is_empty() {
         Ok(())
@@ -378,6 +388,33 @@ fn check_linux_forbidden_windows_fonts(
                 reason: "windows-only",
             });
         }
+    }
+}
+
+/// Detect ANGLE-on-DirectX renderer strings. Chrome's ANGLE layer can
+/// translate WebGL to multiple backends; on Windows it commonly targets
+/// Direct3D 9/11/12, and the renderer string carries that backend's name.
+/// On Linux, ANGLE typically targets OpenGL or Vulkan — those are
+/// acceptable. Only the Direct3D/DirectX combination is forbidden.
+fn is_angle_directx_renderer(renderer: &str) -> bool {
+    let lower = renderer.to_ascii_lowercase();
+    let has_angle = lower.contains("angle");
+    let has_directx =
+        lower.contains("directx") || lower.contains("direct3d") || lower.contains("d3d");
+    has_angle && has_directx
+}
+
+fn check_linux_forbidden_webgl_renderer(
+    p: &crate::schema::PersonaInner,
+    errors: &mut Vec<ValidationError>,
+) {
+    if !p.platform.os_family.eq_ignore_ascii_case("Linux") {
+        return;
+    }
+    if is_angle_directx_renderer(&p.webgl.renderer) {
+        errors.push(ValidationError::LinuxForbiddenWebGlRenderer {
+            renderer: p.webgl.renderer.clone(),
+        });
     }
 }
 
@@ -786,6 +823,61 @@ user_data_dir = "/tmp/persona-test-valid"
             }
         }
         assert!(saw_macos && saw_windows);
+    }
+
+    // --------- Rule E: Linux ↛ ANGLE/DirectX WebGL ---------
+
+    #[test]
+    fn rule_e_passes_with_angle_opengl_on_linux() {
+        let p = parse_valid();
+        // Fixture renderer: "ANGLE (..., OpenGL 4.6)" — ANGLE+OpenGL is OK.
+        assert!(p.persona.webgl.renderer.contains("ANGLE"));
+        assert!(p.persona.webgl.renderer.contains("OpenGL"));
+        assert!(validate(&p).is_ok());
+    }
+
+    #[test]
+    fn rule_e_fails_with_angle_direct3d_on_linux() {
+        let mut p = parse_valid();
+        p.persona.webgl.renderer =
+            "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Direct3D11 vs_5_0 ps_5_0)".to_string();
+        let report = validate(&p).expect_err("must fail");
+        assert!(report
+            .errors()
+            .iter()
+            .any(|e| matches!(e, ValidationError::LinuxForbiddenWebGlRenderer { .. })));
+    }
+
+    #[test]
+    fn rule_e_fails_with_angle_directx_on_linux() {
+        let mut p = parse_valid();
+        p.persona.webgl.renderer = "ANGLE (DirectX 11)".to_string();
+        let report = validate(&p).expect_err("must fail");
+        assert!(report
+            .errors()
+            .iter()
+            .any(|e| matches!(e, ValidationError::LinuxForbiddenWebGlRenderer { .. })));
+    }
+
+    #[test]
+    fn rule_e_skips_non_linux_personas() {
+        let mut p = parse_valid();
+        // Switch persona to Windows so rule B doesn't trip; align UA-CH too.
+        p.persona.platform.os_family = "Windows".to_string();
+        p.persona.user_agent.ua_ch.platform = "Windows".to_string();
+        // Now ANGLE+Direct3D is plausible — rule E should NOT fire.
+        p.persona.webgl.renderer = "ANGLE (NVIDIA Direct3D11)".to_string();
+
+        let result = validate(&p);
+        // We may still hit other errors for the Windows persona (e.g., font
+        // checks don't fire on Windows but we haven't asserted Windows
+        // plausibility yet). What matters is no LinuxForbiddenWebGlRenderer.
+        if let Err(report) = result {
+            assert!(!report
+                .errors()
+                .iter()
+                .any(|e| matches!(e, ValidationError::LinuxForbiddenWebGlRenderer { .. })));
+        }
     }
 
     // --------- ValidationReport plumbing ---------
