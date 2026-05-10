@@ -98,6 +98,15 @@ pub enum ValidationError {
         value: u32,
         max: u32,
     },
+
+    #[error(
+        "platform.os_family `{os_family}` does not equal user_agent.ua_ch.platform \
+         `{ua_ch_platform}` (SCHEMA.md OS-family equality rule)"
+    )]
+    PlatformOsMismatch {
+        os_family: String,
+        ua_ch_platform: String,
+    },
 }
 
 /// Aggregate of all violations for a single persona. Empty == valid.
@@ -206,6 +215,9 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
     // device_memory ≤ 8) per SCHEMA.md.
     check_hardware_bounds(p, &mut errors);
 
+    // Rule B: platform.os_family must equal user_agent.ua_ch.platform.
+    check_platform_os_family_matches_ua_ch(p, &mut errors);
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -289,6 +301,18 @@ fn check_hardware_bounds(p: &crate::schema::PersonaInner, errors: &mut Vec<Valid
             field: "device_memory",
             value: p.device.device_memory,
             max: MAX_DEVICE_MEMORY,
+        });
+    }
+}
+
+fn check_platform_os_family_matches_ua_ch(
+    p: &crate::schema::PersonaInner,
+    errors: &mut Vec<ValidationError>,
+) {
+    if p.platform.os_family != p.user_agent.ua_ch.platform {
+        errors.push(ValidationError::PlatformOsMismatch {
+            os_family: p.platform.os_family.clone(),
+            ua_ch_platform: p.user_agent.ua_ch.platform.clone(),
         });
     }
 }
@@ -567,6 +591,28 @@ user_data_dir = "/tmp/persona-test-valid"
                 value: 32,
                 max: 8,
             }
+        )));
+    }
+
+    // --------- Rule B: platform.os_family ↔ ua_ch.platform ---------
+
+    #[test]
+    fn rule_b_passes_when_os_family_matches_ua_ch_platform() {
+        let p = parse_valid();
+        // Fixture: both = "Linux".
+        assert_eq!(p.persona.platform.os_family, "Linux");
+        assert_eq!(p.persona.user_agent.ua_ch.platform, "Linux");
+        assert!(validate(&p).is_ok());
+    }
+
+    #[test]
+    fn rule_b_fails_when_os_family_differs_from_ua_ch_platform() {
+        let mut p = parse_valid();
+        p.persona.user_agent.ua_ch.platform = "Windows".to_string();
+        let report = validate(&p).expect_err("must fail");
+        assert!(report.errors().iter().any(|e| matches!(
+            e,
+            ValidationError::PlatformOsMismatch { ua_ch_platform, .. } if ua_ch_platform == "Windows"
         )));
     }
 
