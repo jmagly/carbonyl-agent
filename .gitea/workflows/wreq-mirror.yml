@@ -1,0 +1,56 @@
+name: wreq cold mirror
+
+# Refreshes the cold mirror of the wreq source tarball whenever the
+# pin in `.carbonyl-fingerprint-version` changes. Per ADR-005 § bus-
+# factor mitigation #2; tracked under roctinam/carbonyl-agent#60.
+#
+# Triggers:
+#   - push to main that touches `.carbonyl-fingerprint-version`
+#   - manual `workflow_dispatch` for one-off refreshes
+#
+# Pre-#44 the pin holds TBD-#44 and the script exits 0 silently;
+# this workflow is forward-looking infrastructure that activates the
+# moment a real wreq SHA lands in the pin file.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.carbonyl-fingerprint-version'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (download + checksum, no upload)'
+        type: boolean
+        default: false
+
+jobs:
+  refresh:
+    runs-on: titan
+    steps:
+      - name: Checkout (manual git clone)
+        run: |
+          rm -rf "${GITHUB_WORKSPACE}/.repo-clone" 2>/dev/null || true
+          git clone --depth 1 --branch "${GITHUB_REF_NAME:-main}" \
+            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git" \
+            "${GITHUB_WORKSPACE}/.repo-clone"
+          cd "${GITHUB_WORKSPACE}/.repo-clone"
+          git checkout "${GITHUB_SHA:-HEAD}" 2>/dev/null || true
+
+      - name: Refresh mirror
+        env:
+          # github.token from Gitea Actions has release-write scope on
+          # the running repo by default; sufficient for uploading to
+          # roctinam/carbonyl-agent releases. No external secret needed.
+          GITEA_TOKEN: ${{ github.token }}
+          MIRROR_REPO: ${{ github.repository }}
+          GITEA_HOST: git.integrolabs.net
+        run: |
+          cd "${GITHUB_WORKSPACE}/.repo-clone"
+
+          ARGS=()
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            ARGS+=(--dry-run)
+          fi
+
+          ./scripts/wreq-mirror-refresh.sh "${ARGS[@]}"
