@@ -14,7 +14,23 @@ from pathlib import Path
 
 import pytest
 
-from carbonyl_agent import (
+# Most tests in this file construct a Persona via Persona.from_toml(), which
+# validates by default through the carbonyl_fingerprint PyO3 extension. Skip
+# the whole file when the extension isn't built — CI without `maturin
+# develop` and contributors who don't need the Rust toolchain stay green.
+# The validate=False path doesn't need the extension, but for cohesion
+# (every Persona round-trip should exercise the same validator) we skip
+# uniformly.
+pytest.importorskip(
+    "carbonyl_fingerprint",
+    reason=(
+        "carbonyl_fingerprint extension not built; run "
+        "`maturin develop --manifest-path crates/carbonyl-fingerprint/Cargo.toml "
+        "--features python` to enable persona_apply tests"
+    ),
+)
+
+from carbonyl_agent import (  # noqa: E402  — must follow importorskip
     CarbonylBrowser,
     Persona,
     PersonaValidationError,

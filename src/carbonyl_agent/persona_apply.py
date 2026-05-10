@@ -178,7 +178,14 @@ class Persona:
         # Lazy import: the PyO3 extension is an optional install for
         # consumers that don't need persona handling.
         try:
-            import carbonyl_fingerprint as cf  # type: ignore[import-untyped]
+            # carbonyl_fingerprint is a soft runtime dep — installed via
+            # `maturin develop --features python` from the local crate.
+            # The combination of error codes covers all three states:
+            # - locally with extension built: `import-untyped` (no py.typed)
+            # - CI without maturin step: `import-not-found`
+            # - `unused-ignore` swallows the meta-error on whichever side
+            #   doesn't trigger
+            import carbonyl_fingerprint as cf  # type: ignore[import-not-found,import-untyped,unused-ignore]
         except ImportError as exc:  # pragma: no cover — guarded path
             raise RuntimeError(
                 "Persona validation requires the carbonyl_fingerprint "
@@ -190,7 +197,10 @@ class Persona:
         # representation. Cheap (~tens of microseconds) and avoids
         # duplicating parse logic across the FFI boundary.
         try:
-            import tomli_w
+            # tomli_w is optional — _dict_to_toml below is the runtime
+            # fallback. Locally it's typically installed; CI doesn't.
+            # `unused-ignore` swallows the meta-error when it IS installed.
+            import tomli_w  # type: ignore[import-not-found,unused-ignore]
 
             toml_str = tomli_w.dumps({"persona": self._data})
         except ImportError:
