@@ -27,17 +27,21 @@
 //!
 //! # Coverage (v1)
 //!
-//! Three rules from the SCHEMA.md table are enforced:
+//! All hard rules from the SCHEMA.md table are enforced *except*
+//! deterministic noise-seed derivation (TODO; see entry point):
 //!
 //! 1. `user_agent.full` contains `chrome_version` as a substring
 //! 2. `ua_ch.brands` contains `["Google Chrome", "<major>"]` matching
 //!    `chrome_version`'s major
 //! 3. `network.ja4` matches the canonical JA4 for `chrome_version`'s
 //!    major (looked up in the inline reference table below)
-//!
-//! Remaining rules (platform/UA-CH equality, OS↔WebGL, OS↔fonts,
-//! locale↔timezone, hardware bounds, deterministic noise seeds) land in
-//! follow-up commits on this issue.
+//! 4. `device.hardware_concurrency` ≤ 8 AND `device.device_memory` ≤ 8
+//! 5. `platform.os_family` == `user_agent.ua_ch.platform`
+//! 6. Linux personas MUST NOT advertise macOS-only fonts
+//! 7. Linux personas MUST NOT advertise Windows-only fonts
+//! 8. Linux personas MUST NOT advertise an ANGLE/DirectX WebGL renderer
+//! 9. `network.http2_akamai` matches the canonical Chrome H2 fingerprint
+//! 10. `locale.timezone` is plausible for `accept_language` (en-US, en-GB)
 
 use crate::schema::Persona;
 use thiserror::Error;
@@ -271,6 +275,24 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
     // Rule G: locale.timezone ↔ accept_language plausibility. Allowlist
     // covers en-US and en-GB only; other locales pass (out of scope).
     check_timezone_locale_plausibility(p, &mut errors);
+
+    // TODO(rule-H): Validate that canvas.noise_seed and audio.noise_seed
+    // are deterministic from persona.id, per SCHEMA.md.
+    //
+    // Skipped intentionally for this iteration: SCHEMA.md states the
+    // requirement ("deterministic from persona id; regenerate + compare")
+    // but does NOT specify the derivation algorithm (hash function, salt,
+    // domain-separation labels, output truncation). Inventing one here
+    // would diverge from whatever the eventual sampler chooses, locking
+    // the validator and sampler into a bespoke contract before that
+    // contract is designed.
+    //
+    // Lands when the sampler (W3A.2 / #43) defines its noise_seed
+    // derivation. At that point: factor the algorithm into
+    // `carbonyl_fingerprint::seeds::derive_noise_seed(id, kind)` and
+    // assert canvas/audio match. See no-adhoc-kdf rule —
+    // implementation will use HKDF-Expand with distinct info labels
+    // ("canvas-noise-v1", "audio-noise-v1").
 
     if errors.is_empty() {
         Ok(())
