@@ -1,0 +1,27 @@
+# Pinned wreq version for the carbonyl-fingerprint TLS-egress layer.
+# Mirrors the .carbonyl-runtime-version pattern from ADR-004.
+#
+# Format: one `key=value` line per setting. Comments and blank lines ignored.
+#
+#   wreq-version: crate semver (matches `wreq = "X.Y.Z"` in Cargo.toml)
+#   wreq-sha:     git SHA of the upstream commit pulled (40-char hex)
+#                 — verifies which exact source landed even if the
+#                 crate registry mutates underneath us.
+#   wreq-source:  upstream URL of record (for the cold mirror in #60).
+#
+# CI (`.gitea/workflows/check.yml`, after #44 lands the wreq dep) will
+# compare the resolved Cargo.lock SHA against `wreq-sha` and fail on
+# drift. Until #44 is in flight the pin sits as forward-looking
+# infrastructure; values below are TBD placeholders that #44 must
+# replace as its first task.
+#
+# Pin-bump procedure: see `docs/wreq-pin-bumps.md`.
+#
+# Refs:
+#   - ADR-005 § Bus-factor mitigation plan, item 1
+#   - roctinam/carbonyl-agent#59 (this file)
+#   - roctinam/carbonyl-agent#44 (consumer)
+
+wreq-version=TBD-#44
+wreq-sha=TBD-#44
+wreq-source=https://github.com/0x676e67/wreq

@@ -13,11 +13,13 @@ on:
     paths:
       - 'crates/**'
       - '.gitea/workflows/check.yml'
+      - '.carbonyl-fingerprint-version'
   pull_request:
     branches: [main]
     paths:
       - 'crates/**'
       - '.gitea/workflows/check.yml'
+      - '.carbonyl-fingerprint-version'
   workflow_dispatch:
 
 jobs:
@@ -65,3 +67,63 @@ jobs:
             -e CARGO_HOME=/tmp/cargo \
             rust:latest \
             cargo test --all-targets
+
+      # Verifies `.carbonyl-fingerprint-version` matches the resolved
+      # wreq SHA in Cargo.lock (per ADR-005 bus-factor mitigation #1,
+      # roctinam/carbonyl-agent#59). Skips silently when wreq is not
+      # yet a dep — pre-#44 the pin file is forward-looking
+      # infrastructure and Cargo.lock has nothing to compare against.
+      - name: wreq pin / lock alignment
+        run: |
+          cd "${GITHUB_WORKSPACE}/.repo-clone"
+
+          if [[ ! -f .carbonyl-fingerprint-version ]]; then
+            echo "ERROR: .carbonyl-fingerprint-version missing" >&2
+            exit 1
+          fi
+
+          PINNED_SHA="$(grep -E '^wreq-sha=' .carbonyl-fingerprint-version \
+            | head -1 | cut -d= -f2 | tr -d '[:space:]')"
+
+          LOCKFILE=crates/carbonyl-fingerprint/Cargo.lock
+          if [[ ! -f "${LOCKFILE}" ]]; then
+            echo "Cargo.lock not present at ${LOCKFILE}; skipping pin check"
+            exit 0
+          fi
+
+          # Extract the resolved wreq SHA. Match either git-source pkgs
+          # ('source = "git+...#<sha>"') or a registry placeholder.
+          RESOLVED_SHA="$(awk '
+            /^\[\[package\]\]/ { in_pkg=1; name=""; src="" }
+            in_pkg && /^name = "wreq"$/ { name="wreq" }
+            in_pkg && /^source = / { src=$0 }
+            in_pkg && /^$/ {
+              if (name == "wreq" && src ~ /git\+.*#/) {
+                sub(/.*#/, "", src)
+                sub(/"$/, "", src)
+                print src
+              }
+              in_pkg=0
+            }
+          ' "${LOCKFILE}")"
+
+          if [[ -z "${RESOLVED_SHA}" ]]; then
+            echo "wreq not yet a resolved dep in ${LOCKFILE}; pin check skipped (pre-#44 state)"
+            exit 0
+          fi
+
+          if [[ "${PINNED_SHA}" == "TBD-#44" ]]; then
+            echo "ERROR: wreq is now a resolved dep but the pin file still says TBD-#44." >&2
+            echo "Update .carbonyl-fingerprint-version with the real SHA per docs/wreq-pin-bumps.md." >&2
+            exit 1
+          fi
+
+          if [[ "${PINNED_SHA}" != "${RESOLVED_SHA}" ]]; then
+            echo "ERROR: wreq pin / lock drift detected." >&2
+            echo "  pin    (.carbonyl-fingerprint-version): ${PINNED_SHA}" >&2
+            echo "  lock   (${LOCKFILE}):                   ${RESOLVED_SHA}" >&2
+            echo "Run docs/wreq-pin-bumps.md to legitimize the bump or roll back." >&2
+            exit 1
+          fi
+
+          echo "wreq pin matches Cargo.lock (${RESOLVED_SHA})"
