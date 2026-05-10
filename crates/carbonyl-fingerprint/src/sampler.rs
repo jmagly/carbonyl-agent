@@ -35,6 +35,7 @@
 //! ```
 
 use crate::schema::Persona;
+use crate::seed;
 use crate::validator::{self, ValidationReport};
 use rand::Rng;
 use thiserror::Error;
@@ -102,9 +103,12 @@ impl Sampler {
 /// Every field a fresh persona must NOT inherit verbatim from the
 /// template. v1 randomizes:
 ///
-/// - `persona.id` — short hex tag
-/// - `persona.canvas.noise_seed` — random `u64`
-/// - `persona.audio.noise_seed` — random `u64`
+/// - `persona.id` — short hex tag, only true randomness in the
+///   per-instance set
+/// - `persona.canvas.noise_seed` — *derived* from the new id via
+///   [`seed::derive_canvas_noise`] (rule H)
+/// - `persona.audio.noise_seed` — *derived* from the new id via
+///   [`seed::derive_audio_noise`] (rule H)
 /// - `persona.profile.user_data_dir` — `/tmp/<id>`
 ///
 /// Everything else is template-driven so the persona matches the
@@ -112,10 +116,10 @@ impl Sampler {
 fn randomize_per_instance_fields<R: Rng + ?Sized>(persona: &mut Persona, rng: &mut R) {
     let id_suffix: u64 = rng.gen();
     let id = format!("persona-sampled-{id_suffix:016x}");
+    persona.persona.canvas.noise_seed = seed::derive_canvas_noise(&id);
+    persona.persona.audio.noise_seed = seed::derive_audio_noise(&id);
     persona.persona.profile.user_data_dir = format!("/tmp/{id}");
     persona.persona.id = id;
-    persona.persona.canvas.noise_seed = rng.gen();
-    persona.persona.audio.noise_seed = rng.gen();
 }
 
 fn template_for(class: PersonaClass) -> &'static str {

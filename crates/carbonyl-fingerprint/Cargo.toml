@@ -26,6 +26,8 @@ toml = "0.8"
 thiserror = "2"
 schemars = "0.8"
 rand = "0.8"
+sha2 = "0.10"
+hkdf = "0.12"
 pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
 
 [dev-dependencies]

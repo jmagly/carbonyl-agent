@@ -72,10 +72,10 @@ vendor_unmasked = "Intel Inc."
 renderer_unmasked = "Intel(R) UHD Graphics"
 
 [persona.canvas]
-noise_seed = 2134389534
+noise_seed = 2449990554173590707
 
 [persona.audio]
-noise_seed = 729608453
+noise_seed = 524190668593274066
 
 [persona.fonts]
 available = ["Arial", "DejaVu Sans"]

@@ -17,6 +17,7 @@
 pub mod http;
 pub mod sampler;
 pub mod schema;
+pub mod seed;
 pub mod validator;
 
 #[cfg(feature = "python")]

@@ -44,6 +44,7 @@
 //! 10. `locale.timezone` is plausible for `accept_language` (en-US, en-GB)
 
 use crate::schema::Persona;
+use crate::seed;
 use thiserror::Error;
 
 // ---------------------------------------------------------------------------
@@ -142,6 +143,37 @@ pub enum ValidationError {
         timezone: String,
         accept_language: String,
     },
+
+    #[error(
+        "{kind}.noise_seed for persona `{persona_id}` is non-deterministic: \
+         expected {expected} (HKDF-Expand from id) but found {actual} \
+         (SCHEMA.md rule H — noise seeds must be derivable from persona id)"
+    )]
+    NoiseSeedMismatch {
+        kind: NoiseSeedKind,
+        persona_id: String,
+        expected: u64,
+        actual: u64,
+    },
+}
+
+/// Which noise seed failed determinism. Carried in
+/// [`ValidationError::NoiseSeedMismatch`] so callers can route fixes
+/// (e.g., regenerate the canvas seed only) without parsing the
+/// `Display` text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoiseSeedKind {
+    Canvas,
+    Audio,
+}
+
+impl std::fmt::Display for NoiseSeedKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NoiseSeedKind::Canvas => f.write_str("canvas"),
+            NoiseSeedKind::Audio => f.write_str("audio"),
+        }
+    }
 }
 
 /// Aggregate of all violations for a single persona. Empty == valid.
@@ -276,23 +308,11 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
     // covers en-US and en-GB only; other locales pass (out of scope).
     check_timezone_locale_plausibility(p, &mut errors);
 
-    // TODO(rule-H): Validate that canvas.noise_seed and audio.noise_seed
-    // are deterministic from persona.id, per SCHEMA.md.
-    //
-    // Skipped intentionally for this iteration: SCHEMA.md states the
-    // requirement ("deterministic from persona id; regenerate + compare")
-    // but does NOT specify the derivation algorithm (hash function, salt,
-    // domain-separation labels, output truncation). Inventing one here
-    // would diverge from whatever the eventual sampler chooses, locking
-    // the validator and sampler into a bespoke contract before that
-    // contract is designed.
-    //
-    // Lands when the sampler (W3A.2 / #43) defines its noise_seed
-    // derivation. At that point: factor the algorithm into
-    // `carbonyl_fingerprint::seeds::derive_noise_seed(id, kind)` and
-    // assert canvas/audio match. See no-adhoc-kdf rule —
-    // implementation will use HKDF-Expand with distinct info labels
-    // ("canvas-noise-v1", "audio-noise-v1").
+    // Rule H: canvas.noise_seed and audio.noise_seed must be
+    // deterministically derivable from persona.id. The derivation
+    // contract lives in `crate::seed` (HKDF-Expand SHA-256 with a
+    // versioned salt and per-purpose info labels).
+    check_noise_seeds_deterministic(p, &mut errors);
 
     if errors.is_empty() {
         Ok(())
@@ -551,6 +571,31 @@ fn check_platform_os_family_matches_ua_ch(
     }
 }
 
+fn check_noise_seeds_deterministic(
+    p: &crate::schema::PersonaInner,
+    errors: &mut Vec<ValidationError>,
+) {
+    let expected_canvas = seed::derive_canvas_noise(&p.id);
+    if p.canvas.noise_seed != expected_canvas {
+        errors.push(ValidationError::NoiseSeedMismatch {
+            kind: NoiseSeedKind::Canvas,
+            persona_id: p.id.clone(),
+            expected: expected_canvas,
+            actual: p.canvas.noise_seed,
+        });
+    }
+
+    let expected_audio = seed::derive_audio_noise(&p.id);
+    if p.audio.noise_seed != expected_audio {
+        errors.push(ValidationError::NoiseSeedMismatch {
+            kind: NoiseSeedKind::Audio,
+            persona_id: p.id.clone(),
+            expected: expected_audio,
+            actual: p.audio.noise_seed,
+        });
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -623,10 +668,10 @@ vendor_unmasked = "Intel Inc."
 renderer_unmasked = "Intel(R) UHD Graphics"
 
 [persona.canvas]
-noise_seed = 2134389534
+noise_seed = 2449990554173590707
 
 [persona.audio]
-noise_seed = 729608453
+noise_seed = 524190668593274066
 
 [persona.fonts]
 available = ["Arial", "DejaVu Sans"]
@@ -1113,6 +1158,74 @@ user_data_dir = "/tmp/persona-test-valid"
                 .iter()
                 .any(|e| matches!(e, ValidationError::TimezoneLocaleImplausible { .. })));
         }
+    }
+
+    // --------- Rule H: deterministic noise seeds ---------
+
+    #[test]
+    fn rule_h_passes_with_canonically_derived_seeds() {
+        // VALID_PERSONA_TOML carries the seeds derived from the persona
+        // id "persona-test-valid"; validate() must not fire rule H.
+        let p = parse_valid();
+        validate(&p).expect("canonical fixture must validate");
+    }
+
+    #[test]
+    fn rule_h_fails_when_canvas_seed_drifts_from_id() {
+        let mut p = parse_valid();
+        p.persona.canvas.noise_seed = p.persona.canvas.noise_seed.wrapping_add(1);
+        let report = validate(&p).expect_err("mutated canvas seed must fail");
+        assert!(
+            report.errors().iter().any(|e| matches!(
+                e,
+                ValidationError::NoiseSeedMismatch {
+                    kind: NoiseSeedKind::Canvas,
+                    ..
+                }
+            )),
+            "expected NoiseSeedMismatch for canvas, got: {:?}",
+            report.errors()
+        );
+    }
+
+    #[test]
+    fn rule_h_fails_when_audio_seed_drifts_from_id() {
+        let mut p = parse_valid();
+        p.persona.audio.noise_seed = p.persona.audio.noise_seed.wrapping_add(1);
+        let report = validate(&p).expect_err("mutated audio seed must fail");
+        assert!(
+            report.errors().iter().any(|e| matches!(
+                e,
+                ValidationError::NoiseSeedMismatch {
+                    kind: NoiseSeedKind::Audio,
+                    ..
+                }
+            )),
+            "expected NoiseSeedMismatch for audio, got: {:?}",
+            report.errors()
+        );
+    }
+
+    #[test]
+    fn rule_h_fails_when_id_changes_without_reseeding() {
+        // Common tampering scenario: someone edits persona.id but
+        // forgets to regenerate seeds. Rule H must catch both seeds
+        // simultaneously.
+        let mut p = parse_valid();
+        p.persona.id = "persona-impersonator".to_string();
+        let report = validate(&p).expect_err("id drift must fail");
+        let kinds: Vec<NoiseSeedKind> = report
+            .errors()
+            .iter()
+            .filter_map(|e| match e {
+                ValidationError::NoiseSeedMismatch { kind, .. } => Some(*kind),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            kinds.contains(&NoiseSeedKind::Canvas) && kinds.contains(&NoiseSeedKind::Audio),
+            "expected both canvas + audio mismatches, got: {kinds:?}"
+        );
     }
 
     // --------- ValidationReport plumbing ---------
