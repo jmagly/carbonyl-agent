@@ -548,8 +548,7 @@ mod tests {
         fn set_default_header(&mut self, n: &str, v: &str) -> Result<(), FingerprintError> {
             // Replace existing entries — this impl deliberately deduplicates,
             // which a Vec-backed Recorder doesn't.
-            self.headers_in_order
-                .retain(|(name, _)| name.as_str() != n);
+            self.headers_in_order.retain(|(name, _)| name.as_str() != n);
             self.headers_in_order.push((n.to_string(), v.to_string()));
             Ok(())
         }
@@ -625,20 +624,13 @@ mod tests {
             fn set_h2_settings(&mut self, s: &H2Settings) -> Result<(), FingerprintError> {
                 self.0.set_h2_settings(s)
             }
-            fn set_h2_window_update(
-                &mut self,
-                w: H2WindowUpdate,
-            ) -> Result<(), FingerprintError> {
+            fn set_h2_window_update(&mut self, w: H2WindowUpdate) -> Result<(), FingerprintError> {
                 self.0.set_h2_window_update(w)
             }
             fn set_h2_priority(&mut self, p: &H2Priority) -> Result<(), FingerprintError> {
                 self.0.set_h2_priority(p)
             }
-            fn set_default_header(
-                &mut self,
-                n: &str,
-                v: &str,
-            ) -> Result<(), FingerprintError> {
+            fn set_default_header(&mut self, n: &str, v: &str) -> Result<(), FingerprintError> {
                 self.0.set_default_header(n, v)
             }
         }
@@ -692,20 +684,13 @@ mod tests {
             fn set_h2_settings(&mut self, s: &H2Settings) -> Result<(), FingerprintError> {
                 self.0.set_h2_settings(s)
             }
-            fn set_h2_window_update(
-                &mut self,
-                w: H2WindowUpdate,
-            ) -> Result<(), FingerprintError> {
+            fn set_h2_window_update(&mut self, w: H2WindowUpdate) -> Result<(), FingerprintError> {
                 self.0.set_h2_window_update(w)
             }
             fn set_h2_priority(&mut self, p: &H2Priority) -> Result<(), FingerprintError> {
                 self.0.set_h2_priority(p)
             }
-            fn set_default_header(
-                &mut self,
-                n: &str,
-                v: &str,
-            ) -> Result<(), FingerprintError> {
+            fn set_default_header(&mut self, n: &str, v: &str) -> Result<(), FingerprintError> {
                 // Mangle the User-Agent — every other header passes through.
                 let mangled = if n == "User-Agent" {
                     "WrongAgent/0.0".to_string()
