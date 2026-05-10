@@ -119,6 +119,16 @@ pub enum ValidationError {
          (ANGLE+OpenGL is fine on Linux; ANGLE+DirectX/Direct3D is Windows-only)"
     )]
     LinuxForbiddenWebGlRenderer { renderer: String },
+
+    #[error(
+        "network.http2_akamai `{actual}` does not match canonical Chrome {major} \
+         H2 fingerprint `{expected}` (corpus reference)"
+    )]
+    H2AkamaiMismatch {
+        major: u32,
+        expected: String,
+        actual: String,
+    },
 }
 
 /// Aggregate of all violations for a single persona. Empty == valid.
@@ -174,12 +184,13 @@ impl std::error::Error for ValidationReport {}
 struct ChromeReference {
     major: u32,
     ja4: &'static str,
-    // `h2_akamai` and `alpn` will be added as the H2 rule lands.
+    h2_akamai: &'static str,
 }
 
 const CHROME_REFERENCES: &[ChromeReference] = &[ChromeReference {
     major: 147,
     ja4: "t13d1516h2_8daaf6152771_02713d6af862",
+    h2_akamai: "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p",
 }];
 
 fn lookup_chrome_reference(major: u32) -> Option<&'static ChromeReference> {
@@ -221,6 +232,14 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
     // Rule 3: network.ja4 must match canonical JA4 for chrome major.
     if let Some(major) = chrome_major {
         check_ja4_matches_chrome_reference(p, major, &mut errors);
+    }
+
+    // Rule F: network.http2_akamai must match canonical H2 fingerprint
+    // for chrome major. Reuses the same lookup table; if the major is
+    // unknown, rule 3 has already pushed UnknownChromeReference and we
+    // skip emitting a duplicate.
+    if let Some(major) = chrome_major {
+        check_h2_akamai_matches_chrome_reference(p, major, &mut errors);
     }
 
     // Rule A: device hardware bounds (hardware_concurrency ≤ 8,
@@ -299,6 +318,25 @@ fn check_ja4_matches_chrome_reference(
             major,
             expected: reference.ja4.to_string(),
             actual: p.network.ja4.clone(),
+        });
+    }
+}
+
+fn check_h2_akamai_matches_chrome_reference(
+    p: &crate::schema::PersonaInner,
+    major: u32,
+    errors: &mut Vec<ValidationError>,
+) {
+    // Don't double-report unknown major — rule 3 already did.
+    let Some(reference) = lookup_chrome_reference(major) else {
+        return;
+    };
+
+    if p.network.http2_akamai != reference.h2_akamai {
+        errors.push(ValidationError::H2AkamaiMismatch {
+            major,
+            expected: reference.h2_akamai.to_string(),
+            actual: p.network.http2_akamai.clone(),
         });
     }
 }
@@ -878,6 +916,57 @@ user_data_dir = "/tmp/persona-test-valid"
                 .iter()
                 .any(|e| matches!(e, ValidationError::LinuxForbiddenWebGlRenderer { .. })));
         }
+    }
+
+    // --------- Rule F: Chrome ↔ H2 Akamai reference ---------
+
+    #[test]
+    fn rule_f_passes_with_canonical_h2_akamai() {
+        let p = parse_valid();
+        // Fixture pins the canonical Chrome 147 H2 fingerprint.
+        assert!(validate(&p).is_ok());
+    }
+
+    #[test]
+    fn rule_f_fails_on_h2_akamai_mismatch() {
+        let mut p = parse_valid();
+        p.persona.network.http2_akamai =
+            "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|p,a,s,m".to_string();
+        let report = validate(&p).expect_err("must fail");
+        assert!(report
+            .errors()
+            .iter()
+            .any(|e| matches!(e, ValidationError::H2AkamaiMismatch { major: 147, .. })));
+    }
+
+    #[test]
+    fn rule_f_does_not_double_report_unknown_chrome_major() {
+        let mut p = parse_valid();
+        p.persona.chrome_version = "999.0.0.0".to_string();
+        // Realign UA + brands so only rules 3/F can fire.
+        p.persona.user_agent.full = p
+            .persona
+            .user_agent
+            .full
+            .replace("147.0.7727.94", "999.0.0.0");
+        for (name, ver) in p.persona.user_agent.ua_ch.brands.iter_mut() {
+            if name == "Google Chrome" || name == "Chromium" {
+                *ver = "999".to_string();
+            }
+        }
+
+        let report = validate(&p).expect_err("must fail");
+        // Exactly one UnknownChromeReference, no H2AkamaiMismatch.
+        let unknown_count = report
+            .errors()
+            .iter()
+            .filter(|e| matches!(e, ValidationError::UnknownChromeReference(_)))
+            .count();
+        assert_eq!(unknown_count, 1);
+        assert!(!report
+            .errors()
+            .iter()
+            .any(|e| matches!(e, ValidationError::H2AkamaiMismatch { .. })));
     }
 
     // --------- ValidationReport plumbing ---------
