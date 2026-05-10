@@ -107,6 +107,12 @@ pub enum ValidationError {
         os_family: String,
         ua_ch_platform: String,
     },
+
+    #[error(
+        "Linux persona advertises forbidden font `{font}` ({reason}); SCHEMA.md \
+         forbids cross-OS font leakage"
+    )]
+    LinuxForbiddenFont { font: String, reason: &'static str },
 }
 
 /// Aggregate of all violations for a single persona. Empty == valid.
@@ -218,6 +224,9 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
     // Rule B: platform.os_family must equal user_agent.ua_ch.platform.
     check_platform_os_family_matches_ua_ch(p, &mut errors);
 
+    // Rule C: Linux personas must not advertise macOS-only fonts.
+    check_linux_forbidden_macos_fonts(p, &mut errors);
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -302,6 +311,37 @@ fn check_hardware_bounds(p: &crate::schema::PersonaInner, errors: &mut Vec<Valid
             value: p.device.device_memory,
             max: MAX_DEVICE_MEMORY,
         });
+    }
+}
+
+/// Fonts shipped only with macOS that should never appear on a Linux
+/// persona's available list. Sourced from Apple system font inventories.
+const MACOS_ONLY_FONTS: &[&str] = &[
+    "Helvetica Neue",
+    "San Francisco",
+    "Lucida Grande",
+    "Apple Color Emoji",
+    "Menlo",
+    "Monaco",
+];
+
+fn check_linux_forbidden_macos_fonts(
+    p: &crate::schema::PersonaInner,
+    errors: &mut Vec<ValidationError>,
+) {
+    if !p.platform.os_family.eq_ignore_ascii_case("Linux") {
+        return;
+    }
+    for font in &p.fonts.available {
+        if MACOS_ONLY_FONTS
+            .iter()
+            .any(|f| f.eq_ignore_ascii_case(font))
+        {
+            errors.push(ValidationError::LinuxForbiddenFont {
+                font: font.clone(),
+                reason: "macos-only",
+            });
+        }
     }
 }
 
@@ -614,6 +654,47 @@ user_data_dir = "/tmp/persona-test-valid"
             e,
             ValidationError::PlatformOsMismatch { ua_ch_platform, .. } if ua_ch_platform == "Windows"
         )));
+    }
+
+    // --------- Rule C: Linux ↛ macOS fonts ---------
+
+    #[test]
+    fn rule_c_passes_on_linux_with_neutral_fonts() {
+        let p = parse_valid();
+        // Fixture has Arial + DejaVu Sans only.
+        assert!(validate(&p).is_ok());
+    }
+
+    #[test]
+    fn rule_c_fails_when_linux_persona_lists_helvetica_neue() {
+        let mut p = parse_valid();
+        p.persona.fonts.available.push("Helvetica Neue".to_string());
+        let report = validate(&p).expect_err("must fail");
+        assert!(report.errors().iter().any(|e| matches!(
+            e,
+            ValidationError::LinuxForbiddenFont { font, reason: "macos-only" } if font == "Helvetica Neue"
+        )));
+    }
+
+    #[test]
+    fn rule_c_fails_for_each_macos_only_font_present() {
+        let mut p = parse_valid();
+        p.persona.fonts.available.push("Menlo".to_string());
+        p.persona.fonts.available.push("San Francisco".to_string());
+        let report = validate(&p).expect_err("must fail");
+        let macos_fonts: Vec<_> = report
+            .errors()
+            .iter()
+            .filter_map(|e| match e {
+                ValidationError::LinuxForbiddenFont {
+                    font,
+                    reason: "macos-only",
+                } => Some(font.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(macos_fonts.contains(&"Menlo".to_string()));
+        assert!(macos_fonts.contains(&"San Francisco".to_string()));
     }
 
     // --------- ValidationReport plumbing ---------
