@@ -88,6 +88,16 @@ pub enum ValidationError {
          CHROME_REFERENCES table in validator.rs"
     )]
     UnknownChromeReference(u32),
+
+    #[error(
+        "device.{field} = {value} exceeds plausibility bound {max} (SCHEMA.md \
+         hardware bounds rule)"
+    )]
+    HardwareBoundExceeded {
+        field: &'static str,
+        value: u32,
+        max: u32,
+    },
 }
 
 /// Aggregate of all violations for a single persona. Empty == valid.
@@ -192,6 +202,10 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
         check_ja4_matches_chrome_reference(p, major, &mut errors);
     }
 
+    // Rule A: device hardware bounds (hardware_concurrency ≤ 8,
+    // device_memory ≤ 8) per SCHEMA.md.
+    check_hardware_bounds(p, &mut errors);
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -251,6 +265,30 @@ fn check_ja4_matches_chrome_reference(
             major,
             expected: reference.ja4.to_string(),
             actual: p.network.ja4.clone(),
+        });
+    }
+}
+
+/// SCHEMA.md caps `hardware_concurrency` and `device_memory` at 8. Higher
+/// values fingerprint as workstation/server-class hardware, which is
+/// conspicuous for an automation persona pretending to be a consumer
+/// machine. The bound is inclusive.
+const MAX_HARDWARE_CONCURRENCY: u32 = 8;
+const MAX_DEVICE_MEMORY: u32 = 8;
+
+fn check_hardware_bounds(p: &crate::schema::PersonaInner, errors: &mut Vec<ValidationError>) {
+    if p.device.hardware_concurrency > MAX_HARDWARE_CONCURRENCY {
+        errors.push(ValidationError::HardwareBoundExceeded {
+            field: "hardware_concurrency",
+            value: p.device.hardware_concurrency,
+            max: MAX_HARDWARE_CONCURRENCY,
+        });
+    }
+    if p.device.device_memory > MAX_DEVICE_MEMORY {
+        errors.push(ValidationError::HardwareBoundExceeded {
+            field: "device_memory",
+            value: p.device.device_memory,
+            max: MAX_DEVICE_MEMORY,
         });
     }
 }
@@ -488,6 +526,47 @@ user_data_dir = "/tmp/persona-test-valid"
             ValidationError::UaChGoogleChromeBrandMismatch { .. }
                 | ValidationError::Ja4Mismatch { .. }
                 | ValidationError::UnknownChromeReference(_)
+        )));
+    }
+
+    // --------- Rule A: hardware bounds ---------
+
+    #[test]
+    fn rule_a_passes_at_boundary_eight() {
+        let p = parse_valid();
+        // Fixture pins both fields to 8 (the boundary). Already validates.
+        assert_eq!(p.persona.device.hardware_concurrency, 8);
+        assert_eq!(p.persona.device.device_memory, 8);
+        assert!(validate(&p).is_ok());
+    }
+
+    #[test]
+    fn rule_a_fails_when_hardware_concurrency_exceeds_eight() {
+        let mut p = parse_valid();
+        p.persona.device.hardware_concurrency = 16;
+        let report = validate(&p).expect_err("must fail");
+        assert!(report.errors().iter().any(|e| matches!(
+            e,
+            ValidationError::HardwareBoundExceeded {
+                field: "hardware_concurrency",
+                value: 16,
+                max: 8,
+            }
+        )));
+    }
+
+    #[test]
+    fn rule_a_fails_when_device_memory_exceeds_eight() {
+        let mut p = parse_valid();
+        p.persona.device.device_memory = 32;
+        let report = validate(&p).expect_err("must fail");
+        assert!(report.errors().iter().any(|e| matches!(
+            e,
+            ValidationError::HardwareBoundExceeded {
+                field: "device_memory",
+                value: 32,
+                max: 8,
+            }
         )));
     }
 
