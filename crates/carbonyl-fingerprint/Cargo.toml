@@ -8,11 +8,23 @@ repository = "https://git.integrolabs.net/roctinam/carbonyl-agent"
 
 [lib]
 name = "carbonyl_fingerprint"
+# `cdylib` enables building as a Python extension module via maturin when
+# the `python` feature is active. `rlib` keeps the crate usable as a
+# normal Rust dependency by sibling crates (e.g., carbonyl-fingerprint-py
+# wrappers, sampler, registry).
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+# Enable PyO3 bindings (`src/python.rs`). Build with:
+#   maturin develop --manifest-path crates/carbonyl-fingerprint/Cargo.toml --features python
+python = ["dep:pyo3"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 thiserror = "2"
+pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1"

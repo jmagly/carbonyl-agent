@@ -1,0 +1,51 @@
+# Maturin build config for the PyO3 bindings exposed by `src/python.rs`.
+# The root project's `pyproject.toml` (carbonyl-agent) uses hatchling for
+# the pure-Python SDK; this file is a separate, self-contained build
+# spec consumed when packaging the Rust extension as a wheel.
+#
+# Build / install into the active venv:
+#
+#   maturin develop --manifest-path crates/carbonyl-fingerprint/Cargo.toml --features python
+#
+# Build a release wheel:
+#
+#   maturin build --manifest-path crates/carbonyl-fingerprint/Cargo.toml --features python --release
+
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "carbonyl-fingerprint"
+version = "0.0.1a1"
+description = "PyO3 bindings for the carbonyl-fingerprint Rust crate (persona schema + validator)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Joseph Magly" },
+]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Software Development :: Libraries",
+    "Development Status :: 3 - Alpha",
+]
+
+[project.urls]
+Repository = "https://git.integrolabs.net/roctinam/carbonyl-agent"
+
+[tool.maturin]
+# `python` feature gate enables the pyo3 dependency + src/python.rs.
+features = ["python"]
+# Produced .so will be importable as `carbonyl_fingerprint` (matches
+# `[lib] name` in Cargo.toml and the `#[pymodule] fn carbonyl_fingerprint`
+# entry point).
+module-name = "carbonyl_fingerprint"
+# Build the Rust crate from this directory's Cargo.toml.
+manifest-path = "Cargo.toml"

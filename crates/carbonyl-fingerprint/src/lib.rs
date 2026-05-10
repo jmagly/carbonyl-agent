@@ -18,6 +18,9 @@ pub mod http;
 pub mod schema;
 pub mod validator;
 
+#[cfg(feature = "python")]
+pub mod python;
+
 pub mod sampler {
     //! Joint-distribution sampler — Phase 3A.2.
     //!
