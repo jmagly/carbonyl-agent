@@ -25,12 +25,15 @@ import sys
 import time
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pexpect
 import pyte
 
 from carbonyl_agent._logging import get_logger
+
+if TYPE_CHECKING:
+    from carbonyl_agent.persona_apply import Persona
 
 _log = get_logger(__name__)
 
@@ -252,7 +255,7 @@ class CarbonylBrowser:
         extra_flags: list[str] | None = None,
         base_flags: list[str] | None = None,
         input_backend: str = "pty",
-        persona: str | None = None,
+        persona: "str | Persona | None" = None,
         profiles_dir: str | None = None,
     ):
         """
@@ -331,12 +334,37 @@ class CarbonylBrowser:
                 "persona= and session= are mutually exclusive; persona is the "
                 "persona-keyed profile API, session is the legacy SessionManager API."
             )
+
+        # Persona may be either a profile-name string (legacy / W1.4) or a
+        # typed `carbonyl_agent.persona_apply.Persona` (W3C). The string
+        # form drives ProfileManager only; the typed form additionally
+        # injects Chromium flags via persona_to_chromium_flags() and
+        # auto-derives the profile name from `persona.id`.
+        from carbonyl_agent.persona_apply import (
+            Persona as _PersonaType,
+        )
+        from carbonyl_agent.persona_apply import (
+            persona_to_chromium_flags as _persona_flags,
+        )
+
+        self._persona_obj: _PersonaType | None = None
+        if isinstance(persona, _PersonaType):
+            self._persona_obj = persona
+            persona_name: str | None = persona.id
+        else:
+            persona_name = persona
+
         self.cols = cols
         self.rows = rows
         self._session = session
-        self._persona = persona
+        self._persona = persona_name
         self._profiles_dir = profiles_dir
         self._profile_manager: Any | None = None
+        # Default viewport to the persona's screen dimensions when not
+        # explicitly set. Persona-driven layout otherwise defeats half
+        # the point of declaring screen_width/height in the schema.
+        if viewport is None and self._persona_obj is not None:
+            viewport = self._persona_obj.viewport
         self._viewport = viewport
         self.input_backend = input_backend
         self._screen: Any = pyte.Screen(cols, rows)
@@ -344,9 +372,17 @@ class CarbonylBrowser:
         self._child: Any | None = None
         self._daemon_client: Any | None = None
         self._uinput_emitter: Any | None = None
+
+        # Flag composition order:
+        #   1. base_flags (or DEFAULT_HEADLESS_FLAGS)
+        #   2. persona-derived flags — UA, --lang, --accept-lang, DPR
+        #      (override the static UA in DEFAULT_HEADLESS_FLAGS)
+        #   3. extra_flags — caller's last word
         self._flags: list[str] = list(
             base_flags if base_flags is not None else DEFAULT_HEADLESS_FLAGS
         )
+        if self._persona_obj is not None:
+            self._flags = self._flags + _persona_flags(self._persona_obj)
         if extra_flags:
             self._flags = self._flags + list(extra_flags)
 
@@ -936,6 +972,15 @@ class CarbonylBrowser:
     # ------------------------------------------------------------------
     # Persona profile passthrough
     # ------------------------------------------------------------------
+
+    @property
+    def persona(self) -> "Persona | None":
+        """The typed :class:`carbonyl_agent.persona_apply.Persona` this
+        browser was constructed with, or ``None`` if no typed persona was
+        passed (the string-form ``persona="name"`` for profile keying does
+        not populate this property).
+        """
+        return self._persona_obj
 
     def _release_profile(self) -> None:
         if self._profile_manager is not None:

@@ -43,6 +43,11 @@ from carbonyl_agent.exceptions import (  # noqa: F401
     DaemonConnectionError,
     RenderTimeoutError,
 )
+from carbonyl_agent.persona_apply import (  # noqa: F401
+    Persona,
+    PersonaValidationError,
+    persona_to_chromium_flags,
+)
 from carbonyl_agent.profile import (  # noqa: F401
     PersonaMeta,
     ProfileManager,
@@ -87,4 +92,8 @@ __all__ = [
     "ProfileManager",
     "PersonaMeta",
     "list_personas",
+    # Persona → Chromium translator (W3C, #45)
+    "Persona",
+    "PersonaValidationError",
+    "persona_to_chromium_flags",
 ]
