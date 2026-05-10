@@ -17,6 +17,7 @@
 //! - [`python`] — PyO3 bindings (gated behind the `python` Cargo feature)
 
 pub mod http;
+pub mod refresher;
 pub mod registry;
 pub mod sampler;
 pub mod schema;
