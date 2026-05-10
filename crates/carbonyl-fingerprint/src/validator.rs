@@ -43,6 +43,7 @@
 //! 9. `network.http2_akamai` matches the canonical Chrome H2 fingerprint
 //! 10. `locale.timezone` is plausible for `accept_language` (en-US, en-GB)
 
+use crate::registry::ChromeRegistry;
 use crate::schema::Persona;
 use crate::seed;
 use thiserror::Error;
@@ -213,42 +214,41 @@ impl std::fmt::Display for ValidationReport {
 impl std::error::Error for ValidationReport {}
 
 // ---------------------------------------------------------------------------
-// Reference data — Chrome stable (canonical JA4 / H2 Akamai)
+// Reference data lookup
 // ---------------------------------------------------------------------------
 //
-// Populated from real captures via tls.peet.ws / Wireshark. Only versions
-// with verified ground truth are listed; unknown majors fail closed via
-// `UnknownChromeReference`.
-//
-// Sources:
-//   - Chrome 147: SCHEMA.md exemplar in carbonyl-fingerprint-corpus
-//
-// To extend: add a row, run conformance tests in W3B (#62) against the
-// real Chrome build to confirm, then commit. Do not invent JA4 values.
-
-struct ChromeReference {
-    major: u32,
-    ja4: &'static str,
-    h2_akamai: &'static str,
-}
-
-const CHROME_REFERENCES: &[ChromeReference] = &[ChromeReference {
-    major: 147,
-    ja4: "t13d1516h2_8daaf6152771_02713d6af862",
-    h2_akamai: "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p",
-}];
-
-fn lookup_chrome_reference(major: u32) -> Option<&'static ChromeReference> {
-    CHROME_REFERENCES.iter().find(|r| r.major == major)
-}
+// Reference data lives in [`ChromeRegistry`] (see crate::registry).
+// `validate()` uses the inline-default registry (Chrome 147 only — the
+// SCHEMA.md exemplar) so it is a no-config drop-in for callers that
+// don't have the corpus repo checked out. Callers that want
+// multi-major coverage build a registry with
+// `ChromeRegistry::from_corpus_dir` and pass it to
+// [`validate_with_registry`].
 
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
-/// Validate the persona against all v1 hard rules. Returns `Ok(())` iff
-/// every rule passes; `Err(report)` carries the full set of violations.
+/// Validate the persona against all v1 hard rules using the inline
+/// fallback registry (Chrome 147 only). Drop-in replacement for
+/// callers that don't have a corpus directory configured.
+///
+/// Equivalent to:
+/// ```ignore
+/// validate_with_registry(&persona, &ChromeRegistry::inline_default())
+/// ```
 pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
+    let registry = ChromeRegistry::inline_default();
+    validate_with_registry(persona, &registry)
+}
+
+/// Validate the persona against all v1 hard rules, looking up Chrome
+/// reference data (rules 3 / F) in the supplied [`ChromeRegistry`].
+/// Use [`ChromeRegistry::from_corpus_dir`] for multi-major coverage.
+pub fn validate_with_registry(
+    persona: &Persona,
+    registry: &ChromeRegistry,
+) -> Result<(), ValidationReport> {
     let mut errors: Vec<ValidationError> = Vec::new();
 
     let p = &persona.persona;
@@ -276,15 +276,15 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
 
     // Rule 3: network.ja4 must match canonical JA4 for chrome major.
     if let Some(major) = chrome_major {
-        check_ja4_matches_chrome_reference(p, major, &mut errors);
+        check_ja4_matches_chrome_reference(p, major, registry, &mut errors);
     }
 
     // Rule F: network.http2_akamai must match canonical H2 fingerprint
-    // for chrome major. Reuses the same lookup table; if the major is
+    // for chrome major. Reuses the same registry; if the major is
     // unknown, rule 3 has already pushed UnknownChromeReference and we
     // skip emitting a duplicate.
     if let Some(major) = chrome_major {
-        check_h2_akamai_matches_chrome_reference(p, major, &mut errors);
+        check_h2_akamai_matches_chrome_reference(p, major, registry, &mut errors);
     }
 
     // Rule A: device hardware bounds (hardware_concurrency ≤ 8,
@@ -361,9 +361,10 @@ fn check_ua_ch_brand_matches_major(
 fn check_ja4_matches_chrome_reference(
     p: &crate::schema::PersonaInner,
     major: u32,
+    registry: &ChromeRegistry,
     errors: &mut Vec<ValidationError>,
 ) {
-    let Some(reference) = lookup_chrome_reference(major) else {
+    let Some(reference) = registry.lookup(major) else {
         errors.push(ValidationError::UnknownChromeReference(major));
         return;
     };
@@ -371,7 +372,7 @@ fn check_ja4_matches_chrome_reference(
     if p.network.ja4 != reference.ja4 {
         errors.push(ValidationError::Ja4Mismatch {
             major,
-            expected: reference.ja4.to_string(),
+            expected: reference.ja4.clone(),
             actual: p.network.ja4.clone(),
         });
     }
@@ -380,17 +381,18 @@ fn check_ja4_matches_chrome_reference(
 fn check_h2_akamai_matches_chrome_reference(
     p: &crate::schema::PersonaInner,
     major: u32,
+    registry: &ChromeRegistry,
     errors: &mut Vec<ValidationError>,
 ) {
     // Don't double-report unknown major — rule 3 already did.
-    let Some(reference) = lookup_chrome_reference(major) else {
+    let Some(reference) = registry.lookup(major) else {
         return;
     };
 
     if p.network.http2_akamai != reference.h2_akamai {
         errors.push(ValidationError::H2AkamaiMismatch {
             major,
-            expected: reference.h2_akamai.to_string(),
+            expected: reference.h2_akamai.clone(),
             actual: p.network.http2_akamai.clone(),
         });
     }

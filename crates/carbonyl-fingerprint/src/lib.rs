@@ -9,12 +9,15 @@
 //! - [`schema`] — `Persona` struct and nested types; TOML (de)serialization
 //! - [`http`] — persona-binding trait for TLS-fingerprint-aware HTTP clients
 //!   (ADR-005; backend impls live in W3B / #44)
-//! - [`sampler`] — joint-distribution sampler (placeholder; Phase 3A.2)
-//! - [`validator`] — consistency rules (placeholder; Phase 3A.3)
+//! - [`sampler`] — joint-distribution sampler (W3A.2; v1 single-class)
+//! - [`validator`] — consistency rules (W3A.3; all 12 SCHEMA.md hard rules)
+//! - [`seed`] — deterministic noise-seed derivation (rule H, HKDF-Expand)
+//! - [`registry`] — corpus-backed Chrome reference loader (W3A.5; #68)
 //! - [`applier`] — persona → Carbonyl CLI flags + content-script bundle (placeholder; Phase 3C)
-//! - [`registry`] — in-process registry that loads personas from the corpus (placeholder)
+//! - [`python`] — PyO3 bindings (gated behind the `python` Cargo feature)
 
 pub mod http;
+pub mod registry;
 pub mod sampler;
 pub mod schema;
 pub mod seed;
@@ -31,11 +34,6 @@ pub mod applier {
     //! - Content-script bundle (UA-CH override, navigator.* overrides,
     //!   canvas/audio noise hooks)
     //! - `wreq` client config (via a companion crate)
-}
-
-pub mod registry {
-    //! In-process registry — loads personas by id. Thin wrapper over the
-    //! corpus filesystem layout.
 }
 
 pub use schema::Persona;
