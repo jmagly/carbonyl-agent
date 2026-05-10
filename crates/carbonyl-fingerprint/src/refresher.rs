@@ -15,8 +15,8 @@
 //!   passes [`crate::validator::validate_with_registry`]
 //!
 //! **A refresh MAY**:
-//! - Bump `chrome_version` to the latest non-stale major in the
-//!   registry
+//! - Bump `browser_version` to the latest non-stale major in the
+//!   registry (Chrome-only today; per-family registries TBD)
 //! - Update `user_agent.full` to embed the new version
 //! - Update `user_agent.ua_ch.brands` so the `Google Chrome` /
 //!   `Chromium` entries carry the new major
@@ -44,7 +44,7 @@
 //! ```
 
 use crate::registry::{ChromeReference, ChromeRegistry};
-use crate::schema::Persona;
+use crate::schema::{BrowserFamily, Persona};
 use crate::validator::{self, ValidationReport};
 use thiserror::Error;
 
@@ -78,8 +78,8 @@ pub enum RefreshOutcome {
 /// Field-by-field summary of what a refresh changed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RefreshDelta {
-    pub from_chrome_version: String,
-    pub to_chrome_version: String,
+    pub from_browser_version: String,
+    pub to_browser_version: String,
     pub from_ja4: String,
     pub to_ja4: String,
     pub from_h2_akamai: String,
@@ -89,21 +89,28 @@ pub struct RefreshDelta {
 /// Errors surfaced by [`Refresher::refresh`].
 #[derive(Debug, Error)]
 pub enum RefreshError {
-    #[error("persona.chrome_version `{0}` is not parseable as MAJOR.MINOR.BUILD.PATCH")]
-    ChromeVersionMalformed(String),
+    #[error("persona.browser_version `{0}` is not parseable as MAJOR.MINOR.BUILD.PATCH")]
+    BrowserVersionMalformed(String),
 
     #[error(
         "persona's UA full string `{ua_full}` does not contain its own \
-         chrome_version `{chrome_version}` — refresh cannot rewrite it \
+         browser_version `{browser_version}` — refresh cannot rewrite it \
          safely (caller should re-sample instead)"
     )]
     UserAgentNotRewritable {
         ua_full: String,
-        chrome_version: String,
+        browser_version: String,
     },
 
     #[error("registry has no Chrome entries at all — cannot refresh")]
     RegistryEmpty,
+
+    #[error(
+        "refresher does not yet support browser_family `{0}` — only Chrome is \
+         backed by a refresh registry today (W3A.6 follow-ups will add per-family \
+         registries for Firefox/Safari)"
+    )]
+    UnsupportedBrowserFamily(&'static str),
 
     #[error("post-refresh validation failed: {0}")]
     PostValidateFailed(ValidationReport),
@@ -139,6 +146,16 @@ impl<'r> CorpusRefresher<'r> {
 
 impl Refresher for CorpusRefresher<'_> {
     fn refresh(&self, persona: &mut Persona) -> Result<RefreshOutcome, RefreshError> {
+        // The corpus refresher only knows the Chrome registry. Per-family
+        // refreshers (Firefox, Safari) will land in W3A.6 follow-ups, each
+        // with its own registry type. For now, fail explicitly rather than
+        // silently corrupting a non-Chrome persona's UA / UA-CH / JA4.
+        if persona.persona.browser_family != BrowserFamily::Chrome {
+            return Err(RefreshError::UnsupportedBrowserFamily(
+                persona.persona.browser_family.as_str(),
+            ));
+        }
+
         if self.registry.is_empty() {
             return Err(RefreshError::RegistryEmpty);
         }
@@ -153,28 +170,28 @@ impl Refresher for CorpusRefresher<'_> {
         let id_before = persona.persona.id.clone();
         let canvas_before = persona.persona.canvas.noise_seed;
         let audio_before = persona.persona.audio.noise_seed;
-        let from_chrome_version = persona.persona.chrome_version.clone();
+        let from_browser_version = persona.persona.browser_version.clone();
         let from_ja4 = persona.persona.network.ja4.clone();
         let from_h2_akamai = persona.persona.network.http2_akamai.clone();
 
-        let from_major = parse_chrome_major(&from_chrome_version)
-            .ok_or_else(|| RefreshError::ChromeVersionMalformed(from_chrome_version.clone()))?;
+        let from_major = parse_chrome_major(&from_browser_version)
+            .ok_or_else(|| RefreshError::BrowserVersionMalformed(from_browser_version.clone()))?;
         let to_major = target.major;
 
-        // Bump chrome_version + UA full + UA-CH brands. The UA full
+        // Bump browser_version + UA full + UA-CH brands. The UA full
         // string format we trust is the SCHEMA.md exemplar shape:
-        // `... Chrome/<chrome_version> Safari/537.36`. We splice
-        // chrome_version verbatim, so the substring contract from
+        // `... Chrome/<browser_version> Safari/537.36`. We splice
+        // browser_version verbatim, so the substring contract from
         // validator rule 1 holds by construction.
         if !persona
             .persona
             .user_agent
             .full
-            .contains(&from_chrome_version)
+            .contains(&from_browser_version)
         {
             return Err(RefreshError::UserAgentNotRewritable {
                 ua_full: persona.persona.user_agent.full.clone(),
-                chrome_version: from_chrome_version,
+                browser_version: from_browser_version,
             });
         }
 
@@ -182,7 +199,7 @@ impl Refresher for CorpusRefresher<'_> {
             .persona
             .user_agent
             .full
-            .replace(&from_chrome_version, &target.version);
+            .replace(&from_browser_version, &target.version);
 
         // UA-CH brand bump: replace any "Google Chrome" or "Chromium"
         // entry's version field with `to_major.to_string()`. Other
@@ -194,7 +211,7 @@ impl Refresher for CorpusRefresher<'_> {
             }
         }
 
-        persona.persona.chrome_version = target.version.clone();
+        persona.persona.browser_version = target.version.clone();
         persona.persona.network.ja4 = target.ja4.clone();
         persona.persona.network.http2_akamai = target.h2_akamai.clone();
         persona.persona.network.alpn = target.alpn.clone();
@@ -223,8 +240,8 @@ impl Refresher for CorpusRefresher<'_> {
         }
 
         Ok(RefreshOutcome::Updated(RefreshDelta {
-            from_chrome_version,
-            to_chrome_version: persona.persona.chrome_version.clone(),
+            from_browser_version,
+            to_browser_version: persona.persona.browser_version.clone(),
             from_ja4,
             to_ja4: persona.persona.network.ja4.clone(),
             from_h2_akamai,
@@ -357,14 +374,31 @@ post_quantum = true
     // -------- UA-rewrite guard --------
 
     #[test]
-    fn refresh_errors_when_ua_full_does_not_contain_chrome_version() {
+    fn refresh_errors_when_ua_full_does_not_contain_browser_version() {
         let mut p = fresh_persona();
-        // Corrupt the UA so the chrome_version substring isn't present.
+        // Corrupt the UA so the browser_version substring isn't present.
         p.persona.user_agent.full = "Mozilla/5.0 (Custom UA without version)".to_string();
         let reg = registry_with_only_147();
         let r = CorpusRefresher::new(&reg);
         let err = r.refresh(&mut p).expect_err("must error");
         assert!(matches!(err, RefreshError::UserAgentNotRewritable { .. }));
+    }
+
+    #[test]
+    fn refresh_errors_for_non_chrome_family() {
+        // Per-family refreshers will land alongside per-family templates in
+        // W3A.6 follow-ups. Until then, the corpus refresher (Chrome-only)
+        // must reject non-Chrome personas explicitly rather than corrupting
+        // their UA / UA-CH / JA4 by treating them as Chrome.
+        let mut p = fresh_persona();
+        p.persona.browser_family = BrowserFamily::Firefox;
+        let reg = registry_with_only_147();
+        let r = CorpusRefresher::new(&reg);
+        let err = r.refresh(&mut p).expect_err("must error");
+        assert!(matches!(
+            err,
+            RefreshError::UnsupportedBrowserFamily("firefox")
+        ));
     }
 
     // -------- Round-trip: refresh then validate --------

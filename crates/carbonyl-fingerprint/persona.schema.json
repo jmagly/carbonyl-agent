@@ -40,6 +40,15 @@
         }
       }
     },
+    "BrowserFamily": {
+      "description": "Browser family this persona simulates. Drives per-family rule applicability in the validator, the refresher's UA-rewrite logic, and the sampler's template selection.",
+      "type": "string",
+      "enum": [
+        "chrome",
+        "firefox",
+        "safari"
+      ]
+    },
     "Canvas": {
       "type": "object",
       "required": [
@@ -172,9 +181,9 @@
       "required": [
         "audio",
         "behavior",
+        "browser_family",
+        "browser_version",
         "canvas",
-        "chrome_channel",
-        "chrome_version",
         "device",
         "fonts",
         "generator_version",
@@ -183,6 +192,7 @@
         "network",
         "platform",
         "profile",
+        "release_channel",
         "user_agent",
         "webgl"
       ],
@@ -193,14 +203,14 @@
         "behavior": {
           "$ref": "#/definitions/Behavior"
         },
+        "browser_family": {
+          "$ref": "#/definitions/BrowserFamily"
+        },
+        "browser_version": {
+          "type": "string"
+        },
         "canvas": {
           "$ref": "#/definitions/Canvas"
-        },
-        "chrome_channel": {
-          "type": "string"
-        },
-        "chrome_version": {
-          "type": "string"
         },
         "device": {
           "$ref": "#/definitions/Device"
@@ -232,6 +242,9 @@
         },
         "profile": {
           "$ref": "#/definitions/Profile"
+        },
+        "release_channel": {
+          "type": "string"
         },
         "stale": {
           "default": false,

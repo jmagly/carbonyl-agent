@@ -31,8 +31,9 @@ VALID_PERSONA_TOML = """
 [persona]
 id = "persona-test-valid"
 generator_version = "2026.04.18"
-chrome_version = "147.0.7727.94"
-chrome_channel = "stable"
+browser_family = "chrome"
+browser_version = "147.0.7727.94"
+release_channel = "stable"
 
 [persona.platform]
 os_family = "Linux"
@@ -141,7 +142,7 @@ def test_validate_toml_collects_multiple_violations() -> None:
     """Trip rules 1, 2, AND 4 simultaneously; expect ≥3 errors back."""
     bad = (
         VALID_PERSONA_TOML
-        # Rule 1: UA no longer contains chrome_version
+        # Rule 1: UA no longer contains browser_version
         .replace("Chrome/147.0.7727.94", "Chrome/146.0.0.0")
         # Rule 2: brand major drifts
         .replace('["Google Chrome", "147"]', '["Google Chrome", "146"]')

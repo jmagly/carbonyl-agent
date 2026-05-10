@@ -139,8 +139,9 @@ const DESKTOP_CHROME_STABLE_LINUX: &str = r#"
 [persona]
 id = "persona-template-desktop-chrome-stable-linux"
 generator_version = "2026.04.18"
-chrome_version = "147.0.7727.94"
-chrome_channel = "stable"
+browser_family = "chrome"
+browser_version = "147.0.7727.94"
+release_channel = "stable"
 
 [persona.platform]
 os_family = "Linux"
@@ -247,13 +248,17 @@ mod tests {
     fn sampled_persona_inherits_template_fingerprint_fields() {
         // Per-instance fields drift; fingerprint-bearing fields must
         // not. If a follow-up commit accidentally randomizes the JA4
-        // or chrome_version, this test catches it.
+        // or browser_version, this test catches it.
         let sampler = Sampler::new();
         let mut rng = deterministic_rng();
         let persona = sampler
             .sample(PersonaClass::DesktopChromeStableLinux, &mut rng)
             .unwrap();
-        assert_eq!(persona.persona.chrome_version, "147.0.7727.94");
+        assert_eq!(
+            persona.persona.browser_family,
+            crate::schema::BrowserFamily::Chrome
+        );
+        assert_eq!(persona.persona.browser_version, "147.0.7727.94");
         assert_eq!(
             persona.persona.network.ja4,
             "t13d1516h2_8daaf6152771_02713d6af862"

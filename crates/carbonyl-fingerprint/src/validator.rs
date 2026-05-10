@@ -30,11 +30,14 @@
 //! All hard rules from the SCHEMA.md table are enforced *except*
 //! deterministic noise-seed derivation (TODO; see entry point):
 //!
-//! 1. `user_agent.full` contains `chrome_version` as a substring
+//! 1. `user_agent.full` contains `browser_version` as a substring
+//!    (browser-agnostic — every family embeds its own version in the UA)
 //! 2. `ua_ch.brands` contains `["Google Chrome", "<major>"]` matching
-//!    `chrome_version`'s major
-//! 3. `network.ja4` matches the canonical JA4 for `chrome_version`'s
-//!    major (looked up in the inline reference table below)
+//!    `browser_version`'s Chrome major (Chrome-only — gated on
+//!    `browser_family == Chrome`; Firefox/Safari don't send UA-CH)
+//! 3. `network.ja4` matches the canonical JA4 for the persona's Chrome
+//!    major (Chrome-only — per-family JA4 reference tables land with
+//!    each family's W3A.6 follow-up PR)
 //! 4. `device.hardware_concurrency` ≤ 8 AND `device.device_memory` ≤ 8
 //! 5. `platform.os_family` == `user_agent.ua_ch.platform`
 //! 6. Linux personas MUST NOT advertise macOS-only fonts
@@ -44,7 +47,7 @@
 //! 10. `locale.timezone` is plausible for `accept_language` (en-US, en-GB)
 
 use crate::registry::ChromeRegistry;
-use crate::schema::Persona;
+use crate::schema::{BrowserFamily, Persona};
 use crate::seed;
 use thiserror::Error;
 
@@ -56,23 +59,23 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ValidationError {
     #[error(
-        "user_agent.full does not contain chrome_version `{chrome_version}` \
+        "user_agent.full does not contain browser_version `{browser_version}` \
          (got `{user_agent_full}`)"
     )]
-    UserAgentMissingChromeVersion {
-        chrome_version: String,
+    UserAgentMissingBrowserVersion {
+        browser_version: String,
         user_agent_full: String,
     },
 
     #[error(
-        "chrome_version `{0}` is not a valid SemVer-ish version (expected \
+        "browser_version `{0}` is not a valid Chrome version (expected \
          `MAJOR.MINOR.BUILD.PATCH` with numeric major)"
     )]
     ChromeVersionMalformed(String),
 
     #[error(
         "ua_ch.brands is missing a `[\"Google Chrome\", \"{expected_major}\"]` \
-         entry matching chrome_version major (got brands: {actual:?})"
+         entry matching browser_version major (got brands: {actual:?})"
     )]
     UaChGoogleChromeBrandMismatch {
         expected_major: u32,
@@ -253,38 +256,36 @@ pub fn validate_with_registry(
 
     let p = &persona.persona;
 
-    // Parse Chrome major up-front; downstream rules need it. If parsing
-    // fails we record the malformed-version error and skip rules that
-    // depend on it (rules 2 and 3).
-    let chrome_major = match parse_chrome_major(&p.chrome_version) {
-        Some(m) => Some(m),
-        None => {
-            errors.push(ValidationError::ChromeVersionMalformed(
-                p.chrome_version.clone(),
-            ));
-            None
+    // Rule 1 (browser-agnostic): user_agent.full must contain
+    // browser_version verbatim. Every browser embeds its own version
+    // string in the UA — Chrome `Chrome/MAJOR.MINOR.BUILD.PATCH`,
+    // Firefox `Firefox/MAJOR.MINOR`, Safari `Version/MAJOR.MINOR`. The
+    // substring contract holds across families.
+    check_user_agent_contains_browser_version(p, &mut errors);
+
+    // Rules 2/3/F are Chrome-specific:
+    //   - UA-CH `Google Chrome` brand
+    //   - JA4 reference table (Chrome registry)
+    //   - H2 Akamai reference table (Chrome registry)
+    // Firefox doesn't send UA-CH; Safari ships a different JA4/H2
+    // family. Per-family equivalents land alongside their reference
+    // captures in W3A.6 follow-up PRs.
+    if p.browser_family == BrowserFamily::Chrome {
+        let chrome_major = match parse_chrome_major(&p.browser_version) {
+            Some(m) => Some(m),
+            None => {
+                errors.push(ValidationError::ChromeVersionMalformed(
+                    p.browser_version.clone(),
+                ));
+                None
+            }
+        };
+
+        if let Some(major) = chrome_major {
+            check_ua_ch_brand_matches_major(p, major, &mut errors);
+            check_ja4_matches_chrome_reference(p, major, registry, &mut errors);
+            check_h2_akamai_matches_chrome_reference(p, major, registry, &mut errors);
         }
-    };
-
-    // Rule 1: user_agent.full must contain chrome_version verbatim.
-    check_user_agent_contains_chrome_version(p, &mut errors);
-
-    // Rule 2: UA-CH brands must include ["Google Chrome", "<major>"].
-    if let Some(major) = chrome_major {
-        check_ua_ch_brand_matches_major(p, major, &mut errors);
-    }
-
-    // Rule 3: network.ja4 must match canonical JA4 for chrome major.
-    if let Some(major) = chrome_major {
-        check_ja4_matches_chrome_reference(p, major, registry, &mut errors);
-    }
-
-    // Rule F: network.http2_akamai must match canonical H2 fingerprint
-    // for chrome major. Reuses the same registry; if the major is
-    // unknown, rule 3 has already pushed UnknownChromeReference and we
-    // skip emitting a duplicate.
-    if let Some(major) = chrome_major {
-        check_h2_akamai_matches_chrome_reference(p, major, registry, &mut errors);
     }
 
     // Rule A: device hardware bounds (hardware_concurrency ≤ 8,
@@ -325,13 +326,13 @@ pub fn validate_with_registry(
 // Rule implementations
 // ---------------------------------------------------------------------------
 
-fn check_user_agent_contains_chrome_version(
+fn check_user_agent_contains_browser_version(
     p: &crate::schema::PersonaInner,
     errors: &mut Vec<ValidationError>,
 ) {
-    if !p.user_agent.full.contains(&p.chrome_version) {
-        errors.push(ValidationError::UserAgentMissingChromeVersion {
-            chrome_version: p.chrome_version.clone(),
+    if !p.user_agent.full.contains(&p.browser_version) {
+        errors.push(ValidationError::UserAgentMissingBrowserVersion {
+            browser_version: p.browser_version.clone(),
             user_agent_full: p.user_agent.full.clone(),
         });
     }
@@ -629,8 +630,9 @@ mod tests {
 [persona]
 id = "persona-test-valid"
 generator_version = "2026.04.18"
-chrome_version = "147.0.7727.94"
-chrome_channel = "stable"
+browser_family = "chrome"
+browser_version = "147.0.7727.94"
+release_channel = "stable"
 
 [persona.platform]
 os_family = "Linux"
@@ -697,19 +699,19 @@ user_data_dir = "/tmp/persona-test-valid"
         toml::from_str(VALID_PERSONA_TOML).expect("VALID_PERSONA_TOML parses")
     }
 
-    // --------- Rule 1: UA ↔ chrome_version ---------
+    // --------- Rule 1: UA ↔ browser_version ---------
 
     #[test]
-    fn rule1_passes_when_ua_contains_chrome_version() {
+    fn rule1_passes_when_ua_contains_browser_version() {
         let p = parse_valid();
         assert!(validate(&p).is_ok(), "schema-derived persona must validate");
     }
 
     #[test]
-    fn rule1_fails_when_ua_omits_chrome_version() {
+    fn rule1_fails_when_ua_omits_browser_version() {
         let mut p = parse_valid();
         // Replace 147.0.7727.94 with 146.0.0.0 — UA now disagrees with
-        // chrome_version field.
+        // browser_version field.
         p.persona.user_agent.full = p
             .persona
             .user_agent
@@ -721,8 +723,8 @@ user_data_dir = "/tmp/persona-test-valid"
             report
                 .errors()
                 .iter()
-                .any(|e| matches!(e, ValidationError::UserAgentMissingChromeVersion { .. })),
-            "expected UserAgentMissingChromeVersion in {:?}",
+                .any(|e| matches!(e, ValidationError::UserAgentMissingBrowserVersion { .. })),
+            "expected UserAgentMissingBrowserVersion in {:?}",
             report.errors()
         );
     }
@@ -787,7 +789,7 @@ user_data_dir = "/tmp/persona-test-valid"
     #[test]
     fn rule3_fails_when_chrome_major_unknown() {
         let mut p = parse_valid();
-        p.persona.chrome_version = "999.0.0.0".to_string();
+        p.persona.browser_version = "999.0.0.0".to_string();
         // Also realign UA so we don't trip rule 1, and brand so we don't
         // trip rule 2. We're testing rule 3 specifically.
         p.persona.user_agent.full = p
@@ -808,12 +810,12 @@ user_data_dir = "/tmp/persona-test-valid"
         );
     }
 
-    // --------- chrome_version parsing ---------
+    // --------- browser_version parsing (Chrome family) ---------
 
     #[test]
     fn malformed_chrome_version_is_reported_and_skips_dependent_rules() {
         let mut p = parse_valid();
-        p.persona.chrome_version = "not-a-version".to_string();
+        p.persona.browser_version = "not-a-version".to_string();
         // Realign UA so rule 1 still passes (it does substring match —
         // any UA containing "not-a-version" works; but we just want the
         // malformed-version error to surface without crashing).
@@ -1072,7 +1074,7 @@ user_data_dir = "/tmp/persona-test-valid"
     #[test]
     fn rule_f_does_not_double_report_unknown_chrome_major() {
         let mut p = parse_valid();
-        p.persona.chrome_version = "999.0.0.0".to_string();
+        p.persona.browser_version = "999.0.0.0".to_string();
         // Realign UA + brands so only rules 3/F can fire.
         p.persona.user_agent.full = p
             .persona
@@ -1299,14 +1301,14 @@ user_data_dir = "/tmp/persona-test-valid"
         }
 
         /// For any valid Chrome 147 persona with the canonical JA4,
-        /// arbitrarily replacing chrome_version with a different major
+        /// arbitrarily replacing browser_version with a different major
         /// (and nothing else) trips rule 1 (UA mismatch) plus either
         /// rule 2 or rule 3 (or both); the report is non-empty.
         #[test]
         fn prop_chrome_major_drift_always_fails(major in 100u32..200u32) {
             proptest::prop_assume!(major != 147);
             let mut p = parse_valid();
-            p.persona.chrome_version = format!("{major}.0.0.0");
+            p.persona.browser_version = format!("{major}.0.0.0");
             let report = validate(&p).expect_err("major drift must fail");
             proptest::prop_assert!(!report.errors().is_empty());
         }

@@ -257,8 +257,9 @@ mod tests {
 [persona]
 id = "persona-test-01"
 generator_version = "2026.04.18"
-chrome_version = "147.0.7727.94"
-chrome_channel = "stable"
+browser_family = "chrome"
+browser_version = "147.0.7727.94"
+release_channel = "stable"
 
 [persona.platform]
 os_family = "Linux"

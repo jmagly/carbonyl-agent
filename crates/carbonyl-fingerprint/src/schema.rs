@@ -1,10 +1,46 @@
 //! Persona schema — mirrors `SCHEMA.md` in the corpus repo.
 //!
 //! This module is the canonical Rust representation of a persona TOML file.
-//! Schema version 1.0.0. Breaking changes bump the major.
+//! Schema version 2.0.0. Breaking changes bump the major.
+//!
+//! ## v2 changes (W3A.6 — `Refs: roctinam/carbonyl-agent#69`)
+//!
+//! - New `browser_family` field (enum: `chrome | firefox | safari`) on
+//!   `[persona]`. Required field; no default — every persona must declare
+//!   its family explicitly so per-family validator rules apply correctly.
+//! - `chrome_version` → `browser_version` (string format varies per
+//!   family: Chrome "MAJOR.MINOR.BUILD.PATCH", Firefox "MAJOR.MINOR",
+//!   Safari "MAJOR.MINOR")
+//! - `chrome_channel` → `release_channel` (still `stable | beta | dev`)
+//!
+//! Breaking by design: there is no serde alias path back to v1 field
+//! names. Personas authored against v1 must be regenerated through the
+//! sampler.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+/// Browser family this persona simulates. Drives per-family rule
+/// applicability in the validator, the refresher's UA-rewrite logic,
+/// and the sampler's template selection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum BrowserFamily {
+    Chrome,
+    Firefox,
+    Safari,
+}
+
+impl BrowserFamily {
+    /// Human-readable family label, e.g. for error messages.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BrowserFamily::Chrome => "chrome",
+            BrowserFamily::Firefox => "firefox",
+            BrowserFamily::Safari => "safari",
+        }
+    }
+}
 
 /// Frozen bundle of all fingerprintable signals for one automation persona.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -16,8 +52,9 @@ pub struct Persona {
 pub struct PersonaInner {
     pub id: String,
     pub generator_version: String,
-    pub chrome_version: String,
-    pub chrome_channel: String,
+    pub browser_family: BrowserFamily,
+    pub browser_version: String,
+    pub release_channel: String,
     #[serde(default)]
     pub stale: bool,
     pub platform: Platform,
@@ -144,8 +181,9 @@ mod tests {
 [persona]
 id = "persona-test-01"
 generator_version = "2026.04.18"
-chrome_version = "147.0.7727.94"
-chrome_channel = "stable"
+browser_family = "chrome"
+browser_version = "147.0.7727.94"
+release_channel = "stable"
 
 [persona.platform]
 os_family = "Linux"
@@ -212,12 +250,31 @@ user_data_dir = "/tmp/persona-test-01"
     fn deserializes_minimal_persona() {
         let p: Persona = toml::from_str(MINIMAL_PERSONA).expect("parse");
         assert_eq!(p.persona.id, "persona-test-01");
-        assert_eq!(p.persona.chrome_version, "147.0.7727.94");
+        assert_eq!(p.persona.browser_family, BrowserFamily::Chrome);
+        assert_eq!(p.persona.browser_version, "147.0.7727.94");
+        assert_eq!(p.persona.release_channel, "stable");
         assert_eq!(p.persona.platform.os_family, "Linux");
         assert_eq!(p.persona.device.hardware_concurrency, 8);
         assert_eq!(p.persona.network.alpn, vec!["h2", "http/1.1"]);
         assert!(!p.persona.network.http3_enabled);
         assert!(!p.persona.stale); // default
+    }
+
+    #[test]
+    fn browser_family_parses_lowercase() {
+        let firefox: BrowserFamily = toml::from_str(r#"v = "firefox""#)
+            .map(|t: toml::Table| t.get("v").cloned().unwrap())
+            .and_then(|v| v.try_into())
+            .expect("firefox parse");
+        let safari: BrowserFamily = toml::from_str(r#"v = "safari""#)
+            .map(|t: toml::Table| t.get("v").cloned().unwrap())
+            .and_then(|v| v.try_into())
+            .expect("safari parse");
+        assert_eq!(firefox, BrowserFamily::Firefox);
+        assert_eq!(safari, BrowserFamily::Safari);
+        assert_eq!(BrowserFamily::Chrome.as_str(), "chrome");
+        assert_eq!(BrowserFamily::Firefox.as_str(), "firefox");
+        assert_eq!(BrowserFamily::Safari.as_str(), "safari");
     }
 
     #[test]
