@@ -1,0 +1,418 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Persona",
+  "description": "Frozen bundle of all fingerprintable signals for one automation persona.",
+  "type": "object",
+  "required": [
+    "persona"
+  ],
+  "properties": {
+    "persona": {
+      "$ref": "#/definitions/PersonaInner"
+    }
+  },
+  "definitions": {
+    "Audio": {
+      "type": "object",
+      "required": [
+        "noise_seed"
+      ],
+      "properties": {
+        "noise_seed": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Behavior": {
+      "type": "object",
+      "required": [
+        "mouse_persona",
+        "typing_persona"
+      ],
+      "properties": {
+        "mouse_persona": {
+          "type": "string"
+        },
+        "typing_persona": {
+          "type": "string"
+        }
+      }
+    },
+    "Canvas": {
+      "type": "object",
+      "required": [
+        "noise_seed"
+      ],
+      "properties": {
+        "noise_seed": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Device": {
+      "type": "object",
+      "required": [
+        "color_depth",
+        "device_memory",
+        "device_pixel_ratio",
+        "hardware_concurrency",
+        "max_touch_points",
+        "screen_height",
+        "screen_width"
+      ],
+      "properties": {
+        "color_depth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "device_memory": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "device_pixel_ratio": {
+          "type": "number",
+          "format": "float"
+        },
+        "hardware_concurrency": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "max_touch_points": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "screen_height": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "screen_width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Fonts": {
+      "type": "object",
+      "required": [
+        "available"
+      ],
+      "properties": {
+        "available": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Locale": {
+      "type": "object",
+      "required": [
+        "accept_language",
+        "languages",
+        "timezone"
+      ],
+      "properties": {
+        "accept_language": {
+          "type": "string"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timezone": {
+          "type": "string"
+        }
+      }
+    },
+    "Network": {
+      "type": "object",
+      "required": [
+        "alpn",
+        "http2_akamai",
+        "http3_enabled",
+        "ja4",
+        "ja4h_template"
+      ],
+      "properties": {
+        "alpn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "http2_akamai": {
+          "type": "string"
+        },
+        "http3_enabled": {
+          "type": "boolean"
+        },
+        "ja4": {
+          "type": "string"
+        },
+        "ja4h_template": {
+          "type": "string"
+        }
+      }
+    },
+    "PersonaInner": {
+      "type": "object",
+      "required": [
+        "audio",
+        "behavior",
+        "canvas",
+        "chrome_channel",
+        "chrome_version",
+        "device",
+        "fonts",
+        "generator_version",
+        "id",
+        "locale",
+        "network",
+        "platform",
+        "profile",
+        "user_agent",
+        "webgl"
+      ],
+      "properties": {
+        "audio": {
+          "$ref": "#/definitions/Audio"
+        },
+        "behavior": {
+          "$ref": "#/definitions/Behavior"
+        },
+        "canvas": {
+          "$ref": "#/definitions/Canvas"
+        },
+        "chrome_channel": {
+          "type": "string"
+        },
+        "chrome_version": {
+          "type": "string"
+        },
+        "device": {
+          "$ref": "#/definitions/Device"
+        },
+        "fonts": {
+          "$ref": "#/definitions/Fonts"
+        },
+        "generator_version": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "locale": {
+          "$ref": "#/definitions/Locale"
+        },
+        "network": {
+          "$ref": "#/definitions/Network"
+        },
+        "platform": {
+          "$ref": "#/definitions/Platform"
+        },
+        "plugins": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Plugin"
+          }
+        },
+        "profile": {
+          "$ref": "#/definitions/Profile"
+        },
+        "stale": {
+          "default": false,
+          "type": "boolean"
+        },
+        "user_agent": {
+          "$ref": "#/definitions/UserAgent"
+        },
+        "webgl": {
+          "$ref": "#/definitions/WebGl"
+        }
+      }
+    },
+    "Platform": {
+      "type": "object",
+      "required": [
+        "arch",
+        "bitness",
+        "os_family",
+        "os_version"
+      ],
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "bitness": {
+          "type": "string"
+        },
+        "os_family": {
+          "type": "string"
+        },
+        "os_version": {
+          "type": "string"
+        }
+      }
+    },
+    "Plugin": {
+      "type": "object",
+      "required": [
+        "filename",
+        "name"
+      ],
+      "properties": {
+        "filename": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "Profile": {
+      "type": "object",
+      "required": [
+        "user_data_dir"
+      ],
+      "properties": {
+        "age_hours": {
+          "default": 0,
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "sites_warmed": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "user_data_dir": {
+          "type": "string"
+        }
+      }
+    },
+    "UaCh": {
+      "type": "object",
+      "required": [
+        "architecture",
+        "bitness",
+        "brands",
+        "mobile",
+        "platform",
+        "platform_version"
+      ],
+      "properties": {
+        "architecture": {
+          "type": "string"
+        },
+        "bitness": {
+          "type": "string"
+        },
+        "brands": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "maxItems": 2,
+            "minItems": 2
+          }
+        },
+        "full_version_list": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "maxItems": 2,
+            "minItems": 2
+          }
+        },
+        "mobile": {
+          "type": "boolean"
+        },
+        "model": {
+          "default": "",
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "platform_version": {
+          "type": "string"
+        },
+        "wow64": {
+          "default": false,
+          "type": "boolean"
+        }
+      }
+    },
+    "UserAgent": {
+      "type": "object",
+      "required": [
+        "full",
+        "ua_ch"
+      ],
+      "properties": {
+        "full": {
+          "type": "string"
+        },
+        "ua_ch": {
+          "$ref": "#/definitions/UaCh"
+        }
+      }
+    },
+    "WebGl": {
+      "type": "object",
+      "required": [
+        "renderer",
+        "renderer_unmasked",
+        "vendor",
+        "vendor_unmasked"
+      ],
+      "properties": {
+        "renderer": {
+          "type": "string"
+        },
+        "renderer_unmasked": {
+          "type": "string"
+        },
+        "vendor": {
+          "type": "string"
+        },
+        "vendor_unmasked": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

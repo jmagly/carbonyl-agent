@@ -3,15 +3,16 @@
 //! This module is the canonical Rust representation of a persona TOML file.
 //! Schema version 1.0.0. Breaking changes bump the major.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Frozen bundle of all fingerprintable signals for one automation persona.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Persona {
     pub persona: PersonaInner,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct PersonaInner {
     pub id: String,
     pub generator_version: String,
@@ -34,7 +35,7 @@ pub struct PersonaInner {
     pub profile: Profile,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Platform {
     pub os_family: String,
     pub os_version: String,
@@ -42,13 +43,13 @@ pub struct Platform {
     pub bitness: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct UserAgent {
     pub full: String,
     pub ua_ch: UaCh,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct UaCh {
     pub brands: Vec<(String, String)>,
     #[serde(default)]
@@ -64,14 +65,14 @@ pub struct UaCh {
     pub wow64: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Locale {
     pub accept_language: String,
     pub timezone: String,
     pub languages: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Device {
     pub screen_width: u32,
     pub screen_height: u32,
@@ -82,7 +83,7 @@ pub struct Device {
     pub max_touch_points: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct WebGl {
     pub vendor: String,
     pub renderer: String,
@@ -90,28 +91,28 @@ pub struct WebGl {
     pub renderer_unmasked: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Canvas {
     pub noise_seed: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Audio {
     pub noise_seed: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Fonts {
     pub available: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Plugin {
     pub name: String,
     pub filename: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Network {
     pub ja4: String,
     pub ja4h_template: String,
@@ -120,13 +121,13 @@ pub struct Network {
     pub http3_enabled: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Behavior {
     pub typing_persona: String,
     pub mouse_persona: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Profile {
     pub user_data_dir: String,
     #[serde(default)]
