@@ -129,6 +129,15 @@ pub enum ValidationError {
         expected: String,
         actual: String,
     },
+
+    #[error(
+        "locale.timezone `{timezone}` is implausible for accept_language \
+         `{accept_language}` (SCHEMA.md timezone↔locale plausibility rule)"
+    )]
+    TimezoneLocaleImplausible {
+        timezone: String,
+        accept_language: String,
+    },
 }
 
 /// Aggregate of all violations for a single persona. Empty == valid.
@@ -258,6 +267,10 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
     // Rule E: Linux personas must not advertise an ANGLE/DirectX WebGL
     // renderer (Windows-only ANGLE backend).
     check_linux_forbidden_webgl_renderer(p, &mut errors);
+
+    // Rule G: locale.timezone ↔ accept_language plausibility. Allowlist
+    // covers en-US and en-GB only; other locales pass (out of scope).
+    check_timezone_locale_plausibility(p, &mut errors);
 
     if errors.is_empty() {
         Ok(())
@@ -453,6 +466,54 @@ fn check_linux_forbidden_webgl_renderer(
         errors.push(ValidationError::LinuxForbiddenWebGlRenderer {
             renderer: p.webgl.renderer.clone(),
         });
+    }
+}
+
+/// Plausible timezones for `accept_language` starting with `en-US`.
+/// Drawn from IANA tz database — covers continental US plus Alaska,
+/// Hawaii, Arizona (no DST). SCHEMA.md doesn't enumerate the joint
+/// distribution; this is a minimal allowlist sufficient to catch the
+/// gross mismatches (e.g., en-US + Asia/Tokyo). Other en-* locales,
+/// non-English locales, and multi-language Accept-Language headers fall
+/// outside scope and pass without check.
+const EN_US_TIMEZONES: &[&str] = &[
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "America/Phoenix",
+    "America/Anchorage",
+    "Pacific/Honolulu",
+];
+
+const EN_GB_TIMEZONES: &[&str] = &["Europe/London"];
+
+fn check_timezone_locale_plausibility(
+    p: &crate::schema::PersonaInner,
+    errors: &mut Vec<ValidationError>,
+) {
+    let lang = p.locale.accept_language.as_str();
+    let tz = p.locale.timezone.as_str();
+
+    // Match on the leading language tag (before any comma or quality
+    // qualifier). e.g. "en-US,en;q=0.9" → "en-US".
+    let primary = lang.split([',', ';']).next().unwrap_or("").trim();
+
+    let allowed: Option<&[&str]> = if primary.eq_ignore_ascii_case("en-US") {
+        Some(EN_US_TIMEZONES)
+    } else if primary.eq_ignore_ascii_case("en-GB") {
+        Some(EN_GB_TIMEZONES)
+    } else {
+        None
+    };
+
+    if let Some(allowed_tzs) = allowed {
+        if !allowed_tzs.contains(&tz) {
+            errors.push(ValidationError::TimezoneLocaleImplausible {
+                timezone: tz.to_string(),
+                accept_language: lang.to_string(),
+            });
+        }
     }
 }
 
@@ -967,6 +1028,69 @@ user_data_dir = "/tmp/persona-test-valid"
             .errors()
             .iter()
             .any(|e| matches!(e, ValidationError::H2AkamaiMismatch { .. })));
+    }
+
+    // --------- Rule G: timezone ↔ accept_language plausibility ---------
+
+    #[test]
+    fn rule_g_passes_with_en_us_and_us_eastern() {
+        let p = parse_valid();
+        assert!(p.persona.locale.accept_language.starts_with("en-US"));
+        assert_eq!(p.persona.locale.timezone, "America/New_York");
+        assert!(validate(&p).is_ok());
+    }
+
+    #[test]
+    fn rule_g_passes_with_en_us_and_us_pacific() {
+        let mut p = parse_valid();
+        p.persona.locale.timezone = "America/Los_Angeles".to_string();
+        assert!(validate(&p).is_ok());
+    }
+
+    #[test]
+    fn rule_g_fails_with_en_us_and_tokyo() {
+        let mut p = parse_valid();
+        p.persona.locale.timezone = "Asia/Tokyo".to_string();
+        let report = validate(&p).expect_err("must fail");
+        assert!(report.errors().iter().any(
+            |e| matches!(e, ValidationError::TimezoneLocaleImplausible { timezone, .. } if timezone == "Asia/Tokyo")
+        ));
+    }
+
+    #[test]
+    fn rule_g_passes_with_en_gb_and_london() {
+        let mut p = parse_valid();
+        p.persona.locale.accept_language = "en-GB,en;q=0.9".to_string();
+        p.persona.locale.timezone = "Europe/London".to_string();
+        assert!(validate(&p).is_ok());
+    }
+
+    #[test]
+    fn rule_g_fails_with_en_gb_and_paris() {
+        let mut p = parse_valid();
+        p.persona.locale.accept_language = "en-GB,en;q=0.9".to_string();
+        p.persona.locale.timezone = "Europe/Paris".to_string();
+        let report = validate(&p).expect_err("must fail");
+        assert!(report
+            .errors()
+            .iter()
+            .any(|e| matches!(e, ValidationError::TimezoneLocaleImplausible { .. })));
+    }
+
+    #[test]
+    fn rule_g_skips_unknown_locales() {
+        let mut p = parse_valid();
+        // de-DE not in our allowlist; rule must NOT fire regardless of timezone.
+        p.persona.locale.accept_language = "de-DE,de;q=0.9".to_string();
+        p.persona.locale.timezone = "Asia/Tokyo".to_string();
+        let result = validate(&p);
+        // Other rules may pass; only assert rule G didn't fire.
+        if let Err(report) = result {
+            assert!(!report
+                .errors()
+                .iter()
+                .any(|e| matches!(e, ValidationError::TimezoneLocaleImplausible { .. })));
+        }
     }
 
     // --------- ValidationReport plumbing ---------
