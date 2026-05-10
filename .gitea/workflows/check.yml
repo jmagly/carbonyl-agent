@@ -33,6 +33,12 @@ jobs:
           cd "${GITHUB_WORKSPACE}/.repo-clone"
           git checkout "${GITHUB_SHA:-HEAD}" 2>/dev/null || true
 
+      # `rust:latest` rolled to 1.94.0 and the image's preinstalled
+      # toolchain stopped shipping `rustfmt`/`clippy` by default
+      # (see roctinam/carbonyl-agent#67). Install them explicitly inside
+      # each container before invoking the cargo subcommand. The
+      # `|| true` guard makes the step idempotent if a future image
+      # restores the components.
       - name: cargo fmt --check
         run: |
           docker run --rm \
@@ -40,7 +46,7 @@ jobs:
             -w /workspace/crates/carbonyl-fingerprint \
             -e CARGO_HOME=/tmp/cargo \
             rust:latest \
-            cargo fmt --all -- --check
+            sh -c "rustup component add rustfmt 2>/dev/null || true; cargo fmt --all -- --check"
 
       - name: cargo clippy
         run: |
@@ -49,7 +55,7 @@ jobs:
             -w /workspace/crates/carbonyl-fingerprint \
             -e CARGO_HOME=/tmp/cargo \
             rust:latest \
-            cargo clippy --all-targets -- -D warnings
+            sh -c "rustup component add clippy 2>/dev/null || true; cargo clippy --all-targets -- -D warnings"
 
       - name: cargo test
         run: |
