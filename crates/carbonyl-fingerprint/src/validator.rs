@@ -227,6 +227,9 @@ pub fn validate(persona: &Persona) -> Result<(), ValidationReport> {
     // Rule C: Linux personas must not advertise macOS-only fonts.
     check_linux_forbidden_macos_fonts(p, &mut errors);
 
+    // Rule D: Linux personas must not advertise Windows-only fonts.
+    check_linux_forbidden_windows_fonts(p, &mut errors);
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -340,6 +343,39 @@ fn check_linux_forbidden_macos_fonts(
             errors.push(ValidationError::LinuxForbiddenFont {
                 font: font.clone(),
                 reason: "macos-only",
+            });
+        }
+    }
+}
+
+/// Fonts shipped only with Windows that should never appear on a Linux
+/// persona's available list. Sourced from Windows system font inventories.
+const WINDOWS_ONLY_FONTS: &[&str] = &[
+    "Segoe UI",
+    "Calibri",
+    "Cambria",
+    "Consolas",
+    "Tahoma",
+    "Trebuchet MS",
+    "Microsoft Sans Serif",
+    "Verdana",
+];
+
+fn check_linux_forbidden_windows_fonts(
+    p: &crate::schema::PersonaInner,
+    errors: &mut Vec<ValidationError>,
+) {
+    if !p.platform.os_family.eq_ignore_ascii_case("Linux") {
+        return;
+    }
+    for font in &p.fonts.available {
+        if WINDOWS_ONLY_FONTS
+            .iter()
+            .any(|f| f.eq_ignore_ascii_case(font))
+        {
+            errors.push(ValidationError::LinuxForbiddenFont {
+                font: font.clone(),
+                reason: "windows-only",
             });
         }
     }
@@ -695,6 +731,61 @@ user_data_dir = "/tmp/persona-test-valid"
             .collect();
         assert!(macos_fonts.contains(&"Menlo".to_string()));
         assert!(macos_fonts.contains(&"San Francisco".to_string()));
+    }
+
+    // --------- Rule D: Linux ↛ Windows fonts ---------
+
+    #[test]
+    fn rule_d_fails_when_linux_persona_lists_segoe_ui() {
+        let mut p = parse_valid();
+        p.persona.fonts.available.push("Segoe UI".to_string());
+        let report = validate(&p).expect_err("must fail");
+        assert!(report.errors().iter().any(|e| matches!(
+            e,
+            ValidationError::LinuxForbiddenFont { font, reason: "windows-only" } if font == "Segoe UI"
+        )));
+    }
+
+    #[test]
+    fn rule_d_fails_for_each_windows_only_font_present() {
+        let mut p = parse_valid();
+        p.persona.fonts.available.push("Calibri".to_string());
+        p.persona.fonts.available.push("Consolas".to_string());
+        let report = validate(&p).expect_err("must fail");
+        let win_fonts: Vec<_> = report
+            .errors()
+            .iter()
+            .filter_map(|e| match e {
+                ValidationError::LinuxForbiddenFont {
+                    font,
+                    reason: "windows-only",
+                } => Some(font.clone()),
+                _ => None,
+            })
+            .collect();
+        assert!(win_fonts.contains(&"Calibri".to_string()));
+        assert!(win_fonts.contains(&"Consolas".to_string()));
+    }
+
+    #[test]
+    fn rule_d_distinguishes_macos_and_windows_reasons() {
+        let mut p = parse_valid();
+        p.persona.fonts.available.push("Helvetica Neue".to_string()); // macos
+        p.persona.fonts.available.push("Tahoma".to_string()); // windows
+        let report = validate(&p).expect_err("must fail");
+        let mut saw_macos = false;
+        let mut saw_windows = false;
+        for e in report.errors() {
+            if let ValidationError::LinuxForbiddenFont { reason, .. } = e {
+                if *reason == "macos-only" {
+                    saw_macos = true;
+                }
+                if *reason == "windows-only" {
+                    saw_windows = true;
+                }
+            }
+        }
+        assert!(saw_macos && saw_windows);
     }
 
     // --------- ValidationReport plumbing ---------
