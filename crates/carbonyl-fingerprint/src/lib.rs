@@ -15,19 +15,12 @@
 //! - [`registry`] — in-process registry that loads personas from the corpus (placeholder)
 
 pub mod http;
+pub mod sampler;
 pub mod schema;
 pub mod validator;
 
 #[cfg(feature = "python")]
 pub mod python;
-
-pub mod sampler {
-    //! Joint-distribution sampler — Phase 3A.2.
-    //!
-    //! Will consume the BrowserForge-derived corpus tracked in
-    //! `roctinam/carbonyl-fingerprint-corpus` and emit statistically valid
-    //! `Persona` bundles given constraint filters.
-}
 
 pub mod applier {
     //! Persona → Carbonyl application — Phase 3C.
