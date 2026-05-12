@@ -65,6 +65,15 @@ pub enum PersonaClass {
     /// both BoringSSL (Chrome) and NSS (Firefox). Provenance documented
     /// inline in [`DESKTOP_SAFARI_MACOS`] and the matching corpus TOML.
     DesktopSafariMacOS,
+    /// Chrome stable on Android (mobile).
+    ///
+    /// W3A.6.3 — `Refs: roctinam/carbonyl-agent#73`. First mobile family.
+    /// Chrome on Android uses the same BoringSSL TLS stack as desktop
+    /// Chrome (same JA4 reference data), but the persona-level distinction
+    /// is `ua_ch.mobile = true`, `os_family = "Android"`, mobile-class
+    /// hardware bounds, and ARM-class WebGL renderer. Provenance documented
+    /// inline in [`MOBILE_CHROME_ANDROID`] and the matching corpus TOML.
+    MobileChromeAndroid,
 }
 
 /// Errors surfaced by the sampler.
@@ -144,6 +153,7 @@ fn template_for(class: PersonaClass) -> &'static str {
         PersonaClass::DesktopChromeStableLinux => DESKTOP_CHROME_STABLE_LINUX,
         PersonaClass::DesktopFirefoxStableLinux => DESKTOP_FIREFOX_STABLE_LINUX,
         PersonaClass::DesktopSafariMacOS => DESKTOP_SAFARI_MACOS,
+        PersonaClass::MobileChromeAndroid => MOBILE_CHROME_ANDROID,
     }
 }
 
@@ -422,6 +432,100 @@ mouse_persona = "desk_mouse_windmouse"
 user_data_dir = "/tmp/persona-template-desktop-safari-macos"
 "#;
 
+/// Chrome 147 stable on Android (mobile). W3A.6.3
+/// (`Refs: roctinam/carbonyl-agent#73`). First mobile family.
+///
+/// # Provenance
+///
+/// - Browser-info fields: BrowserForge MIT corpus, sampled with
+///   `FingerprintGenerator(browser=['chrome'], os=['android'],
+///   device=['mobile'])` on 2026-05-12.
+/// - TLS-layer fields: SAME Chrome 147 JA4 + H2 SETTINGS as desktop
+///   Chrome — BoringSSL is platform-agnostic, and Chrome's mobile TLS
+///   stack matches the desktop. The persona-level distinction is at the
+///   UA / UA-CH / screen / WebGL layer, not the TLS layer.
+///
+/// # Schema accommodation
+///
+/// `os_family = "Android"`, `ua_ch.mobile = true`, `ua_ch.platform =
+/// "Android"`. Validator rules:
+/// - Rules 2/3/F: apply (Chrome family) — same JA4/H2 reference as desktop
+/// - Rules C/D/E (Linux-forbidden fonts/ANGLE): auto-skip because
+///   `os_family != "Linux"`
+/// - Rule A (hardware bounds): hwc 7 + mem 8 both ≤ 8, mobile values
+/// - Rule B (os_family ↔ ua_ch.platform): both "Android" ✓
+///
+/// UA-CH brands ARE emitted on Chrome Android (unlike Firefox/Safari).
+/// `sec-ch-ua-mobile: ?1` per ua_ch.mobile = true.
+const MOBILE_CHROME_ANDROID: &str = r#"
+[persona]
+id = "persona-template-mobile-chrome-android"
+generator_version = "2026.05.12"
+browser_family = "chrome"
+browser_version = "147.0.0.0"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "Android"
+os_version = "10"
+arch = "armv8"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36"
+
+[persona.user_agent.ua_ch]
+brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+mobile = true
+platform = "Android"
+platform_version = "10.0.0"
+architecture = ""
+bitness = ""
+
+[persona.locale]
+accept_language = "en-US,en;q=0.9"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 360
+screen_height = 800
+color_depth = 24
+device_pixel_ratio = 3.0
+hardware_concurrency = 7
+device_memory = 8
+max_touch_points = 5
+
+[persona.webgl]
+vendor = "Imagination Technologies"
+renderer = "PowerVR Rogue GE8320"
+vendor_unmasked = "Imagination Technologies"
+renderer_unmasked = "PowerVR Rogue GE8320"
+
+[persona.canvas]
+noise_seed = 0
+
+[persona.audio]
+noise_seed = 0
+
+[persona.fonts]
+available = ["Roboto", "Noto Sans", "Droid Sans"]
+
+[persona.network]
+ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4h_template = "po11nn12enus"
+http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "mobile_thumb"
+mouse_persona = "touch_tap"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-template-mobile-chrome-android"
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,6 +709,57 @@ mod tests {
             let persona = sampler
                 .sample(PersonaClass::DesktopSafariMacOS, &mut rng)
                 .expect("Safari sampler returned validation failure");
+            proptest::prop_assert!(validator::validate(&persona).is_ok());
+        }
+    }
+
+    // --- Mobile Chrome Android (W3A.6.3 #73) ---
+
+    #[test]
+    fn sample_mobile_chrome_android_passes_validator() {
+        let sampler = Sampler::new();
+        let mut rng = deterministic_rng();
+        let persona = sampler
+            .sample(PersonaClass::MobileChromeAndroid, &mut rng)
+            .expect("Mobile Chrome Android sampler must produce valid persona");
+        validator::validate(&persona).expect("post-validate consistency");
+    }
+
+    #[test]
+    fn mobile_chrome_carries_mobile_and_android_markers() {
+        let sampler = Sampler::new();
+        let mut rng = deterministic_rng();
+        let p = sampler
+            .sample(PersonaClass::MobileChromeAndroid, &mut rng)
+            .unwrap();
+        // Still Chrome family (BoringSSL stack, UA-CH brands emitted).
+        assert_eq!(
+            p.persona.browser_family,
+            crate::schema::BrowserFamily::Chrome
+        );
+        // But mobile, Android-platformed.
+        assert!(p.persona.user_agent.ua_ch.mobile);
+        assert_eq!(p.persona.user_agent.ua_ch.platform, "Android");
+        assert_eq!(p.persona.platform.os_family, "Android");
+        // UA contains "Mobile" string per real Chrome Android UAs.
+        assert!(p.persona.user_agent.full.contains("Mobile"));
+        assert!(p.persona.user_agent.full.contains("Android"));
+        // Touch-screen device.
+        assert_eq!(p.persona.device.max_touch_points, 5);
+        // Portrait phone DPR (3.0 on a typical premium phone).
+        assert_eq!(p.persona.device.device_pixel_ratio, 3.0);
+        // UA-CH brands still emitted (Chrome family).
+        assert!(!p.persona.user_agent.ua_ch.brands.is_empty());
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn prop_every_sampled_mobile_chrome_persona_validates(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let sampler = Sampler::new();
+            let persona = sampler
+                .sample(PersonaClass::MobileChromeAndroid, &mut rng)
+                .expect("Mobile Chrome sampler returned validation failure");
             proptest::prop_assert!(validator::validate(&persona).is_ok());
         }
     }

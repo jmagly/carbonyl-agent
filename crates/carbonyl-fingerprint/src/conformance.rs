@@ -201,6 +201,19 @@ impl ConformanceFixture {
         Self::from_persona("safari-26-macos", persona).expect("fixture")
     }
 
+    /// Built-in fixture: Mobile Chrome 147 on Android. W3A.6.3 (`Refs:
+    /// roctinam/carbonyl-agent#73`).
+    ///
+    /// Required headers INCLUDE the full `sec-ch-ua*` suite — Chrome
+    /// family always emits UA-CH, mobile or desktop. Mobile-specific
+    /// values: `sec-ch-ua-mobile: ?1`, `sec-ch-ua-platform: Android`.
+    /// Provenance: see `sampler::MOBILE_CHROME_ANDROID`.
+    pub fn mobile_chrome_android() -> Self {
+        let persona: Persona =
+            toml::from_str(MOBILE_CHROME_ANDROID_TEMPLATE).expect("template parses");
+        Self::from_persona("mobile-chrome-android", persona).expect("fixture")
+    }
+
     /// Construct a fixture from a persona, deriving the expected wire
     /// values from the persona's own `network` and `user_agent` fields.
     /// This is what the conformance contract asserts: the persona spec IS
@@ -384,6 +397,78 @@ fn header_field_name(name: &str) -> &'static str {
 // ---------------------------------------------------------------------------
 // Built-in fixtures
 // ---------------------------------------------------------------------------
+
+/// Mobile Chrome 147 Android template. W3A.6.3 (`Refs:
+/// roctinam/carbonyl-agent#73`). Mirrors `sampler::MOBILE_CHROME_ANDROID`
+/// — drift between the two is itself a conformance bug.
+const MOBILE_CHROME_ANDROID_TEMPLATE: &str = r#"
+[persona]
+id = "persona-test-mobile-chrome-android"
+generator_version = "2026.05.12"
+browser_family = "chrome"
+browser_version = "147.0.0.0"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "Android"
+os_version = "10"
+arch = "armv8"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36"
+
+[persona.user_agent.ua_ch]
+brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+mobile = true
+platform = "Android"
+platform_version = "10.0.0"
+architecture = ""
+bitness = ""
+
+[persona.locale]
+accept_language = "en-US,en;q=0.9"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 360
+screen_height = 800
+color_depth = 24
+device_pixel_ratio = 3.0
+hardware_concurrency = 7
+device_memory = 8
+max_touch_points = 5
+
+[persona.webgl]
+vendor = "Imagination Technologies"
+renderer = "PowerVR Rogue GE8320"
+vendor_unmasked = "Imagination Technologies"
+renderer_unmasked = "PowerVR Rogue GE8320"
+
+[persona.canvas]
+noise_seed = 0
+
+[persona.audio]
+noise_seed = 0
+
+[persona.fonts]
+available = ["Roboto", "Noto Sans", "Droid Sans"]
+
+[persona.network]
+ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4h_template = "po11nn12enus"
+http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "mobile_thumb"
+mouse_persona = "touch_tap"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-test-mobile-chrome-android"
+"#;
 
 /// Safari 26 stable macOS template. W3A.6.2 (`Refs:
 /// roctinam/carbonyl-agent#72`). Mirrors `sampler::DESKTOP_SAFARI_MACOS`
@@ -1035,5 +1120,64 @@ mod tests {
                 "apply_persona must not emit {name} for Safari personas"
             );
         }
+    }
+
+    // --- Mobile Chrome Android conformance (W3A.6.3 #73) ---
+
+    #[test]
+    fn fixture_mobile_chrome_android_loads_and_self_describes() {
+        let f = ConformanceFixture::mobile_chrome_android();
+        assert_eq!(f.label, "mobile-chrome-android");
+        assert_eq!(
+            f.persona.persona.browser_family,
+            crate::schema::BrowserFamily::Chrome
+        );
+        assert_eq!(f.persona.persona.platform.os_family, "Android");
+        assert!(f.persona.persona.user_agent.ua_ch.mobile);
+        // Chrome Android shares the desktop Chrome JA4 — BoringSSL is
+        // platform-agnostic and Chrome's mobile TLS stack mirrors desktop.
+        assert_eq!(f.expected_ja4, "t13d1516h2_8daaf6152771_02713d6af862");
+        // Same H2 SETTINGS too.
+        assert_eq!(
+            f.expected_h2_settings.entries,
+            vec![(1, 65536), (2, 0), (3, 1000), (4, 6291456), (6, 262144)]
+        );
+    }
+
+    #[test]
+    fn mobile_chrome_fixture_required_headers_include_mobile_sec_ch_ua() {
+        let f = ConformanceFixture::mobile_chrome_android();
+        // Chrome Android sends the full UA-CH suite; mobile-specific
+        // values distinguish from desktop.
+        assert_eq!(
+            f.required_headers
+                .get("sec-ch-ua-mobile")
+                .map(String::as_str),
+            Some("?1"),
+            "Mobile Chrome must emit sec-ch-ua-mobile: ?1"
+        );
+        assert_eq!(
+            f.required_headers
+                .get("sec-ch-ua-platform")
+                .map(String::as_str),
+            Some("Android"),
+            "Mobile Chrome must emit sec-ch-ua-platform: Android"
+        );
+        assert!(f.required_headers.contains_key("sec-ch-ua"));
+    }
+
+    #[test]
+    fn vec_recorder_conforms_to_mobile_chrome_android() {
+        let f = ConformanceFixture::mobile_chrome_android();
+        let mut c = VecRecorder::default();
+        conform(&mut c, &f).expect("VecRecorder must conform to Mobile Chrome");
+        // Mobile Chrome MUST emit sec-ch-ua-mobile and sec-ch-ua-platform.
+        let h: std::collections::BTreeMap<&str, &str> = c
+            .applied_headers()
+            .iter()
+            .map(|(n, v)| (n.as_str(), v.as_str()))
+            .collect();
+        assert_eq!(h.get("sec-ch-ua-mobile"), Some(&"?1"));
+        assert_eq!(h.get("sec-ch-ua-platform"), Some(&"Android"));
     }
 }
