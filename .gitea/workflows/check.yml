@@ -50,14 +50,19 @@ jobs:
             rust:latest \
             sh -c "rustup component add rustfmt 2>/dev/null || true; cargo fmt --all -- --check"
 
+      # carbonyl-wreq depends on wreq (-> boring-sys2 = BoringSSL fork),
+      # which requires `clang` + `cmake` at build time. The base
+      # `rust:latest` image doesn't ship them; install before the
+      # clippy/test steps. The fmt step doesn't need them.
       - name: cargo clippy (workspace)
         run: |
           docker run --rm \
             -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
             -w /workspace \
             -e CARGO_HOME=/tmp/cargo \
+            -e DEBIAN_FRONTEND=noninteractive \
             rust:latest \
-            sh -c "rustup component add clippy 2>/dev/null || true; cargo clippy --workspace --all-targets -- -D warnings"
+            sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config && rustup component add clippy 2>/dev/null || true; cargo clippy --workspace --all-targets -- -D warnings"
 
       - name: cargo test (workspace)
         run: |
@@ -65,8 +70,9 @@ jobs:
             -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
             -w /workspace \
             -e CARGO_HOME=/tmp/cargo \
+            -e DEBIAN_FRONTEND=noninteractive \
             rust:latest \
-            cargo test --workspace --all-targets
+            sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config && cargo test --workspace --all-targets"
 
       # Verifies `.carbonyl-fingerprint-version` matches the resolved
       # wreq SHA in Cargo.lock (per ADR-005 bus-factor mitigation #1,

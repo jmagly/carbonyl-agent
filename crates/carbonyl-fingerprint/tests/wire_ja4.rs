@@ -35,6 +35,12 @@
 //! `compute_ja4_from_client_hello` — Layer 2.4 (#79) wires this into
 //! `ConformanceFixture::assert_wire_state`.
 
+// rust 1.95's clippy added collapsible_match — the nested ifs in this
+// extension-walker each carry distinct length-check failure paths;
+// collapsing them obscures the validation logic. Stylistic-only lint.
+#![allow(clippy::collapsible_match)]
+#![allow(clippy::collapsible_if)]
+
 use sha2::{Digest, Sha256};
 
 /// Errors surfaced when parsing a captured ClientHello.

@@ -22,6 +22,12 @@
 #   - roctinam/carbonyl-agent#59 (this file)
 #   - roctinam/carbonyl-agent#44 (consumer)
 
-wreq-version=TBD-#44
-wreq-sha=TBD-#44
-wreq-source=https://github.com/0x676e67/wreq
+# Phase 2.2 (#81) landed wreq from the crates.io registry rather than
+# a git pin. The CI drift check (`.gitea/workflows/check.yml`) skips
+# silently when the lockfile has no git-source `#<sha>` — registry
+# resolution is verified by Cargo.lock itself, not this pin file.
+# Switching to a git pin (e.g. to anchor on a security-relevant SHA)
+# is a follow-up bump documented in `docs/wreq-pin-bumps.md`.
+wreq-version=5.3.0
+wreq-sha=registry
+wreq-source=https://crates.io/crates/wreq

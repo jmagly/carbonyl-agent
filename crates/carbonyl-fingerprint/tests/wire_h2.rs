@@ -16,7 +16,13 @@
 //! 2.4 (#79) wires the captured values into
 //! [`ConformanceFixture::assert_wire_state`].
 
-#![allow(dead_code)] // Test utilities — Layer 2.4 (#79) consumes them.
+#![allow(dead_code)]
+// Test utilities — Layer 2.4 (#79) consumes them.
+// rust 1.95's clippy added collapsible_match — the nested ifs in this
+// parser carry distinct error-return branches; collapsing buries the
+// fall-through behavior. Stylistic-only lint, allowed for clarity.
+#![allow(clippy::collapsible_match)]
+#![allow(clippy::collapsible_if)]
 
 use std::fmt;
 

@@ -14,9 +14,10 @@ crate-type = ["rlib"]
 carbonyl-fingerprint = { path = "../carbonyl-fingerprint" }
 thiserror = "2"
 
-# wreq itself is intentionally NOT a dep at Phase 2.1. wreq pulls
-# boring-sys2 (BoringSSL fork) which requires clang + cmake at build
-# time and adds 5-10 minutes to a cold compile. Phase 2.2
-# (`Refs: roctinam/carbonyl-agent#81`) adds wreq alongside the
-# persona→wreq mapping in a single commit so the heavy native build
-# arrives with the feature that needs it.
+# wreq + wreq-util provide the browser-emulating HTTP/2 client. wreq
+# pulls boring-sys2 (BoringSSL fork) which requires clang + cmake at
+# build time — the project's `.gitea/workflows/check.yml` installs
+# both before invoking cargo (`Refs: roctinam/carbonyl-agent#81`).
+wreq = "5"
+wreq-util = "2"
+http = "1"
