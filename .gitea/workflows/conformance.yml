@@ -1,0 +1,75 @@
+name: conformance
+
+# W3B fingerprint conformance gate (Phase 2.5 — `Refs:
+# roctinam/carbonyl-agent#84`). Complements `check.yml` (which builds
+# the workspace at default features) by exercising the `python`
+# feature on `carbonyl-wreq` — that path is where the PyO3 binding,
+# tokio runtime, and Python ↔ Rust integration live.
+#
+# Why a separate workflow:
+#   - The python feature pulls pyo3 + python3-dev which `check.yml`
+#     doesn't need for the rlib-only build.
+#   - Path filter scopes execution to fingerprint / wreq / egress
+#     changes so the workflow doesn't fire on unrelated edits.
+#
+# Trigger paths intentionally widen on egress/persona_apply.py
+# because changes there can break the WreqTransport contract that
+# carbonyl-wreq's PyO3 binding satisfies — keeping both halves in
+# sync at PR time is the whole point of this workflow.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/carbonyl-fingerprint/**'
+      - 'crates/carbonyl-wreq/**'
+      - 'src/carbonyl_agent/egress.py'
+      - 'src/carbonyl_agent/wreq_transport.py'
+      - 'src/carbonyl_agent/persona_apply.py'
+      - '.gitea/workflows/conformance.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/carbonyl-fingerprint/**'
+      - 'crates/carbonyl-wreq/**'
+      - 'src/carbonyl_agent/egress.py'
+      - 'src/carbonyl_agent/wreq_transport.py'
+      - 'src/carbonyl_agent/persona_apply.py'
+      - '.gitea/workflows/conformance.yml'
+  workflow_dispatch:
+
+jobs:
+  conformance:
+    runs-on: titan
+    steps:
+      - name: Checkout (manual git clone)
+        run: |
+          rm -rf "${GITHUB_WORKSPACE}/.repo-clone" 2>/dev/null || true
+          git clone --depth 1 --branch "${GITHUB_REF_NAME:-main}" \
+            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git" \
+            "${GITHUB_WORKSPACE}/.repo-clone"
+          cd "${GITHUB_WORKSPACE}/.repo-clone"
+          git checkout "${GITHUB_SHA:-HEAD}" 2>/dev/null || true
+
+      # Same boring-sys2 build prereqs as check.yml — clang+cmake for
+      # BoringSSL, libclang-dev for bindgen, python3-dev for PyO3's
+      # extension-module link step.
+      - name: cargo clippy --features python
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
+            -w /workspace \
+            -e CARGO_HOME=/tmp/cargo \
+            -e DEBIAN_FRONTEND=noninteractive \
+            rust:latest \
+            sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config python3-dev && rustup component add clippy 2>/dev/null || true; cargo clippy --workspace --all-targets --features carbonyl-wreq/python -- -D warnings"
+
+      - name: cargo test --features python
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
+            -w /workspace \
+            -e CARGO_HOME=/tmp/cargo \
+            -e DEBIAN_FRONTEND=noninteractive \
+            rust:latest \
+            sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config python3-dev && cargo test --workspace --all-targets --features carbonyl-wreq/python"

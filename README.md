@@ -369,6 +369,57 @@ a different persona.
 
 ---
 
+## Persona-Bound Egress (W3B)
+
+The browser session and the HTTP egress client share the same persona, so out-of-band API requests carry a TLS fingerprint that matches the browser's. The egress path uses the Rust `wreq` backend (BoringSSL with browser-emulating ClientHello generation) when its native extension is built; without it the client falls back to httpx + Python's stdlib SSL and the audit row marks the row explicitly.
+
+```python
+from carbonyl_agent import CarbonylBrowser
+from carbonyl_agent.persona_apply import Persona
+from carbonyl_agent.egress import EgressClient
+
+p = Persona.from_path("personas/chrome-147-stable-linux.toml")
+
+# Browser session bound to the persona
+with CarbonylBrowser(persona=p, viewport=(1280, 800)) as b:
+    b.open("https://example.com/login")
+    # ... drive the UI ...
+
+    # API call from the same session's identity. Headers, JA4 target,
+    # and HTTP/2 SETTINGS all come from the persona.
+    client = EgressClient(p)
+    r = client.get("https://api.example.com/profile")
+    print(r.status_code, r.json())
+    client.close()
+```
+
+### Transport selection
+
+`EgressClient` probes for the `carbonyl_wreq` native module at construction:
+
+| State | Behavior | Audit-row `transport` |
+|---|---|---|
+| `carbonyl_wreq` importable | Routes through Rust wreq; ClientHello matches persona | `wreq` |
+| Module absent | Falls back to httpx + Python stdlib SSL | `httpx-fallback` |
+
+The fallback path is silent — production code doesn't crash if the user hasn't built the native module. Audit consumers can distinguish the paths by the `transport` field in `~/.local/state/carbonyl-agent/egress-audit.log`.
+
+### Enabling the wreq path
+
+The native module is a developer build today. Once built, it's auto-detected by every `EgressClient` instance:
+
+```bash
+pip install carbonyl-agent[wreq]
+cd /path/to/carbonyl-agent
+maturin develop --manifest-path crates/carbonyl-wreq/Cargo.toml --features python
+```
+
+The build pulls BoringSSL via `boring-sys2` — install `clang`, `cmake`, `libclang-dev`, `libssl-dev`, `pkg-config`, and `python3-dev` first. Cold compile is 5-10 minutes; incremental rebuilds are seconds.
+
+### Audit / drift detection
+
+Every egress request appends a JSON Lines row to the audit log with the persona's expected JA4, the captured JA4, status, latency, and the transport tag. STRICT mode (`CARBONYL_FP_AUDIT=strict`) raises `EgressFingerprintDrift` on mismatch; WARN logs it; OFF disables both.
+
 ## Bot Detection Flags
 
 `CarbonylBrowser` applies a curated `_HEADLESS_FLAGS` set at spawn time to minimize detection by commercial bot-detection engines (Akamai, Cloudflare, PerimeterX):

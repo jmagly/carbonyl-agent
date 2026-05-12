@@ -78,6 +78,27 @@ A `Persona` (W3A schema) maps to the `http` trait via the following fields. The 
   - Prod: warn-only, log to audit sink, return the response (so a transient mismatch doesn't take down a real consumer).
 - **CI conformance gate**: the conformance suite (above) runs in CI on every PR touching `carbonyl-fingerprint` or `wreq`-adjacent code. Drift between the trait spec and the wire output blocks merge.
 
+#### Phase 1 → Phase 2 transition (W3B #44, #75 — landed)
+
+The audit log evolved in two passes:
+
+**Phase 1** (httpx + stdlib SSL): every audit row carried `ja4_actual = "phase1-httpx-stdlib-ssl"`. The sentinel was intentional — `httpx` uses Python's stdlib SSL backend whose JA4 reflects neither the persona's emulation target nor any browser. The sentinel told downstream log consumers "this row predates real fingerprint emission" without forcing them to special-case absent values.
+
+**Phase 2** (wreq + BoringSSL): the audit row gained a `transport` field that tags each row as `wreq` or `httpx-fallback`. The transition is auto-detected at `EgressClient` construction:
+
+- `carbonyl_wreq` native module importable → route through wreq → audit row `transport: wreq`, `ja4_actual` carries the captured value
+- Module absent → silent fallback to httpx → audit row `transport: httpx-fallback`, `ja4_actual` keeps the phase1 sentinel
+
+The fallback path preserves Phase 1 behavior exactly so the rollback story is "uninstall the native module"; STRICT mode in the fallback path still raises on the (always-present) sentinel mismatch.
+
+**Layer separation**: Layer 1 (#62, #79) tests assert what the trait setters captured; Layer 2 (#82) drives a real wreq client through a localhost TLS responder and asserts the actual ClientHello + h2 SETTINGS bytes match the persona. The Layer 2 test crate's documented per-fixture gap lists (e.g. `wire.ja4`, `wire.h2_settings` for Chrome 147 against the Chrome 137 emulation preset) are load-bearing — drift in any direction is a regression.
+
+**Cross-references**:
+
+- `conformance.yml` (`.gitea/workflows/conformance.yml`) gates PRs touching fingerprint/wreq/egress paths on the `--features carbonyl-wreq/python` workspace test path — covers the cdylib build that maturin produces.
+- `WreqTransport` (`src/carbonyl_agent/wreq_transport.py`) is the Python httpx.BaseTransport wrapper.
+- `send_request` (`crates/carbonyl-wreq/src/python.rs`) is the PyO3 entry point with an embedded multi-threaded tokio runtime.
+
 ## Consequences
 
 ### Positive
