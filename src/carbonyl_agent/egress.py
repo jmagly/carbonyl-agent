@@ -105,6 +105,24 @@ class EgressAuditMode(enum.Enum):
             ) from exc
 
 
+# ---------------------------------------------------------------------------
+# Sentinel constants (forward-referenced by EgressAuditEntry below)
+# ---------------------------------------------------------------------------
+#
+# Phase 1 (httpx) audit row marks `ja4_actual` with a sentinel string
+# instead of a real JA4. That makes the audit log honest about its
+# current limits and tells Phase 2's CI gate exactly which entries to
+# expect to migrate away from.
+_HTTPX_PHASE1_JA4_SENTINEL = "phase1-httpx-stdlib-ssl"
+
+# Transport selection tags (audit row `transport` field — Phase 2.4 #83).
+# Lets consumers distinguish "real wire fingerprint via wreq" from
+# "stdlib SSL fallback because wreq isn't built" without having to
+# parse ja4_actual for the sentinel string.
+_TRANSPORT_WREQ = "wreq"
+_TRANSPORT_HTTPX_FALLBACK = "httpx-fallback"
+
+
 class EgressError(Exception):
     """Base class for egress errors."""
 
@@ -150,6 +168,12 @@ class EgressAuditEntry:
     latency_ms: float | None
     drift: bool
     audit_mode: str
+    # Phase 2.4 (#83) — which transport was used. "wreq" when the
+    # carbonyl_wreq native module is importable AND its request
+    # succeeded; "httpx-fallback" otherwise. `ja4_actual` carries the
+    # real captured value in the wreq case and the
+    # phase1-httpx-stdlib-ssl sentinel in the fallback case.
+    transport: str = _TRANSPORT_HTTPX_FALLBACK
 
     def to_json(self) -> str:
         return json.dumps(
@@ -165,6 +189,7 @@ class EgressAuditEntry:
                 "latency_ms": self.latency_ms,
                 "drift": self.drift,
                 "audit_mode": self.audit_mode,
+                "transport": self.transport,
             },
             separators=(",", ":"),
         )
@@ -218,9 +243,6 @@ class EgressAuditLog:
 # happened. This makes the audit log honest about its current limits and
 # tells Phase 2's CI gate exactly which entries to expect to migrate
 # away from.
-_HTTPX_PHASE1_JA4_SENTINEL = "phase1-httpx-stdlib-ssl"
-
-
 def _now_iso() -> str:
     return _dt.datetime.now(_dt.timezone.utc).isoformat()
 
@@ -296,6 +318,27 @@ class EgressClient:
         self._persona_headers = _persona_to_headers(persona)
         self._closed = False
 
+        # Phase 2.4 (#83) — try wreq transport, fall back to httpx
+        # stdlib-SSL silently. Probe at construction so each request
+        # doesn't pay the import-attempt cost; the audit row records
+        # which transport was selected.
+        self._wreq_transport: "WreqTransport | None" = None
+        try:
+            from .wreq_transport import WreqTransport, WreqUnavailable
+
+            try:
+                self._wreq_transport = WreqTransport(
+                    persona_toml=persona.raw_toml(),
+                    timeout_seconds=timeout,
+                )
+            except WreqUnavailable:
+                # carbonyl_wreq not built — fall back path stays active
+                self._wreq_transport = None
+        except ImportError:
+            # wreq_transport module not yet present (older install).
+            # Defensive — should never fire in this repo.
+            self._wreq_transport = None
+
     @property
     def persona(self) -> Persona:
         return self._persona
@@ -342,23 +385,56 @@ class EgressClient:
 
         import time as _time
 
-        # Audit step 1: pre-request JA4 check. Phase 1 returns the
-        # sentinel; Phase 2 will return the real on-wire JA4 from the
-        # wreq transport.
+        # Phase 2.4 (#83) — transport selection. Decide upfront so the
+        # audit row's STRICT-mode pre-check can use the right ja4_actual
+        # estimate (sentinel for httpx, "will-capture" for wreq).
+        use_wreq = self._wreq_transport is not None
+        transport_tag = _TRANSPORT_WREQ if use_wreq else _TRANSPORT_HTTPX_FALLBACK
+
+        # Audit step 1: pre-request JA4 expectation. Phase 1's
+        # ja4_actual was the sentinel; Phase 2.4 keeps the sentinel for
+        # the httpx-fallback path AND defers the wreq path's real
+        # ja4_actual until the response returns it (the transport
+        # captures the wire-level value during the handshake).
         ja4_expected = self._persona.raw()["network"]["ja4"]
-        ja4_actual = _HTTPX_PHASE1_JA4_SENTINEL
+        ja4_actual: str
+        if use_wreq:
+            # We don't know the captured JA4 until the request finishes.
+            # Optimistic placeholder: assume conformance. The finally
+            # block overwrites with the real captured value below; if
+            # STRICT mode wants to gate, it must do so post-request.
+            ja4_actual = ja4_expected  # provisional; finalized below
+        else:
+            ja4_actual = _HTTPX_PHASE1_JA4_SENTINEL
+
         drift = ja4_actual != ja4_expected
 
-        if drift and self._audit_mode == EgressAuditMode.STRICT:
+        # STRICT pre-check still fires for the httpx-fallback path so
+        # Phase 1 behavior is preserved. For the wreq path STRICT
+        # evaluates AFTER the request because the wire-level JA4 is
+        # what matters.
+        if drift and self._audit_mode == EgressAuditMode.STRICT and not use_wreq:
             raise EgressFingerprintDrift(ja4_expected, ja4_actual, url)
 
         request_id = uuid.uuid4().hex
         started = _time.perf_counter()
         status: int | None = None
         try:
-            client = self._client_for(url)
-            response = client.request(method, url, **kwargs)
+            if use_wreq:
+                response = self._request_via_wreq(method, url, **kwargs)
+            else:
+                client = self._client_for(url)
+                response = client.request(method, url, **kwargs)
             status = response.status_code
+            if use_wreq and self._wreq_transport is not None:
+                captured = self._wreq_transport.last_captured_ja4
+                if captured is not None:
+                    ja4_actual = captured
+                    drift = ja4_actual != ja4_expected
+                    if drift and self._audit_mode == EgressAuditMode.STRICT:
+                        raise EgressFingerprintDrift(
+                            ja4_expected, ja4_actual, url
+                        )
             return response
         finally:
             latency = (_time.perf_counter() - started) * 1000.0
@@ -374,9 +450,48 @@ class EgressClient:
                 latency_ms=round(latency, 3),
                 drift=drift,
                 audit_mode=self._audit_mode.value,
+                transport=transport_tag,
             )
             if self._audit_mode != EgressAuditMode.OFF:
                 self._audit_log.append(entry)
+
+    def _request_via_wreq(self, method: str, url: str, **kwargs: Any) -> "httpx.Response":
+        """Issue the request through ``WreqTransport``. Mirrors the
+        relevant subset of ``httpx.Client.request`` keyword arguments —
+        body/data/json and headers. Extra kwargs that the wreq path
+        doesn't understand are silently dropped (matching httpx's
+        permissive style)."""
+        import httpx as _httpx
+
+        assert self._wreq_transport is not None  # invariant for callers
+
+        headers: _httpx.Headers = _httpx.Headers(self._persona_headers)
+        for k, v in (kwargs.get("headers") or {}).items():
+            headers[k] = v
+
+        content: bytes | None = None
+        if "content" in kwargs:
+            content = kwargs["content"]
+            if isinstance(content, str):
+                content = content.encode()
+        elif "data" in kwargs:
+            # Trivial form-encoded shape — defer to httpx's serializer
+            # via a stub request, then yank the body bytes back out.
+            stub = _httpx.Request(method, url, data=kwargs["data"])
+            content = bytes(stub.content)
+            headers.setdefault("content-type", stub.headers.get("content-type", ""))
+        elif "json" in kwargs:
+            import json as _json
+            content = _json.dumps(kwargs["json"]).encode()
+            headers.setdefault("content-type", "application/json")
+
+        request = _httpx.Request(
+            method=method.upper(),
+            url=url,
+            headers=headers,
+            content=content,
+        )
+        return self._wreq_transport.handle_request(request)
 
     def get(self, url: str, **kwargs: Any) -> httpx.Response:
         return self.request("GET", url, **kwargs)

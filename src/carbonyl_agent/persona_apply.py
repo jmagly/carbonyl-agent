@@ -172,6 +172,26 @@ class Persona:
         WebGL renderer, etc."""
         return self._data
 
+    def raw_toml(self) -> str:
+        """Re-serialize the persona to its canonical TOML form.
+
+        Used by Phase 2.4's ``WreqTransport`` (#83) — wreq's Rust side
+        parses the persona as TOML to recover the typed fields the
+        Python dict has erased. Round-tripping through TOML keeps the
+        FFI boundary string-based, avoiding a deep marshalling layer.
+
+        Prefers ``tomli_w`` when available (canonical output); falls
+        back to the minimal hand-rolled ``_dict_to_toml`` otherwise.
+        Both paths produce TOML the Rust ``carbonyl_fingerprint`` crate
+        can parse — the validator round-trips on this representation.
+        """
+        try:
+            import tomli_w  # type: ignore[import-not-found,unused-ignore]
+
+            return tomli_w.dumps({"persona": self._data})  # type: ignore[no-any-return,unused-ignore]
+        except ImportError:
+            return _dict_to_toml({"persona": self._data})
+
     # ----- internals -----
 
     def _run_validator(self) -> None:

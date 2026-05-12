@@ -34,6 +34,18 @@ docs = [
 egress = [
     "httpx>=0.27",
 ]
+# W3B Phase 2.4 (#83) — declares intent to use the wreq transport.
+# The native `carbonyl_wreq` module is a developer build today
+# (`maturin develop --manifest-path crates/carbonyl-wreq/Cargo.toml
+# --features python`); #85 wires it into pip install. Installing
+# this extra without building the native module is harmless —
+# EgressClient detects the absence and falls back to the httpx
+# stdlib-SSL path with an explicit `transport: httpx-fallback`
+# audit row tag.
+wreq = [
+    "httpx>=0.27",
+    "tomli_w>=1.0",
+]
 
 [tool.pytest.ini_options]
 markers = [
