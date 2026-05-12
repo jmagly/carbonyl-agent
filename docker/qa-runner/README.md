@@ -8,7 +8,7 @@ Runtime container for Phase 0+ QA of the Carbonyl Trusted Automation Initiative.
 - **evdev + libinput** input drivers wired via `/etc/X11/xorg.conf.d/20-evdev-input.conf` — reads any `/dev/input/event*` including uinput virtual devices
 - **Capture tools**: `scrot` (single frames), `ffmpeg` (streams), `x11vnc` (remote display)
 - **Python 3 + `python-uinput`**: enough to drive the agent SDK from inside the container
-- **Carbonyl x11 runtime** at `/opt/carbonyl/carbonyl` — fetched at image build time via `--build-arg CARBONYL_RUNTIME_URL=...`. The runtime ships as `runtime-x11-<hash>` Gitea releases (e.g. `runtime-x11-dd69bef0ea4b2512` for current main); a stub is left in place if no URL is passed so the image builds standalone
+- **Carbonyl x11 runtime** at `/opt/carbonyl/carbonyl` — fetched at image build time via `--build-arg CARBONYL_RUNTIME_URL=...`. The runtime ships as `runtime-x11-<hash>` Gitea releases (e.g. `runtime-x11-9b3ba53adcd8d330` for current main); a stub is left in place if no URL is passed so the image builds standalone
 
 ## Pull (preferred)
 
@@ -19,7 +19,7 @@ docker login git.integrolabs.net   # one-time, with a Gitea PAT
 docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:latest
 
 # Or pin to a specific runtime hash (matches .carbonyl-runtime-version):
-docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:runtime-dd69bef0ea4b2512
+docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:runtime-9b3ba53adcd8d330
 
 # Or pin to a specific repo commit:
 docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:sha-<short-sha>
@@ -49,7 +49,7 @@ docker/qa-runner/build.sh my-tag:dev
 
 # Manual fallback (equivalent to what build.sh does):
 docker build -t carbonyl-agent-qa-runner:local \
-  --build-arg CARBONYL_RUNTIME_URL=https://git.integrolabs.net/roctinam/carbonyl/releases/download/runtime-x11-dd69bef0ea4b2512/x86_64-unknown-linux-gnu.tgz \
+  --build-arg CARBONYL_RUNTIME_URL=https://git.integrolabs.net/roctinam/carbonyl/releases/download/runtime-x11-9b3ba53adcd8d330/x86_64-unknown-linux-gnu.tgz \
   docker/qa-runner/
 
 # Stub runtime — useful for smoke-testing the entrypoint / Xorg without the heavy tarball.

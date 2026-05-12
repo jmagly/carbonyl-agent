@@ -465,8 +465,8 @@ CI runs the full E2E suite (`tests/e2e/`) against multiple Carbonyl runtime tags
 
 | Tag | Status | Notes |
 |---|---|---|
-| `runtime-dd69bef0ea4b2512` | **Supported** (current pin in `.carbonyl-runtime-version`) | Default for `carbonyl-agent install` |
-| `runtime-3f5e5a96aa10c4ac` | **Backwards-compat tested** | Prior runtime; CI verifies SDK still works against it |
+| `runtime-9b3ba53adcd8d330` | **Supported** (current pin in `.carbonyl-runtime-version`) | Default for `carbonyl-agent install`. Carbonyl v0.2.0-alpha.4 — includes `--carbonyl-cookie-flush-interval-ms` (#51) |
+| `runtime-dd69bef0ea4b2512` | **Backwards-compat tested** | Prior runtime; CI verifies SDK still works against it |
 | Older `runtime-*` tags | Best-effort | Not in CI; expected to work but not guaranteed |
 
 Pin a specific runtime in your project by writing the hash into `.carbonyl-runtime-version` (one `runtime-hash=<hash>` line). The `carbonyl-agent install` command reads it. Override on the command line with `--tag runtime-<hash>` for a one-off install.

@@ -43,8 +43,8 @@ jobs:
             install_args: ""
             label: ".carbonyl-runtime-version (current)"
           - runtime: previous
-            install_args: "--tag runtime-3f5e5a96aa10c4ac"
-            label: "runtime-3f5e5a96aa10c4ac (prior)"
+            install_args: "--tag runtime-dd69bef0ea4b2512"
+            label: "runtime-dd69bef0ea4b2512 (prior)"
     name: e2e (${{ matrix.label }})
     steps:
       - name: Checkout (manual git clone)
