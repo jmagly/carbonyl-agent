@@ -47,3 +47,9 @@ rcgen = "0.13"
 # (W3B.2.2 — `Refs: roctinam/carbonyl-agent#77`).
 tls-parser = "0.12"
 hex = "0.4"
+# h2 SETTINGS capture — drives an h2 client (for integration tests) and
+# parses the inbound preface + SETTINGS / WINDOW_UPDATE frames from
+# captured byte streams (W3B.2.3 — `Refs: roctinam/carbonyl-agent#78`).
+h2 = "0.4"
+bytes = "1"
+http = "1"
