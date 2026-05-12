@@ -1,0 +1,136 @@
+{
+  "managed": {
+    "evidence-integrity.md": {
+      "hash": "sha256:3bd9415a5c6623903bc7f3e6b00f95ea0b1aa6a06f5b770d7223c7420e1f578c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "non-destructive.md": {
+      "hash": "sha256:d38e57414c5fcd7f9c750f4329040cdf84046b9ee302f10804cb175059b8be7a",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "red-flag-escalation.md": {
+      "hash": "sha256:6d13a44533664430aff1bb1f1ad3db7dadff74af97348bda2050033871cd9680",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "volatility-order.md": {
+      "hash": "sha256:773b93ab174fecb75582e302a421e6cfc5301ba2ca143aa1482e0d81e15767ac",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "RULES-INDEX.md": {
+      "hash": "sha256:b06ec2e02abb8ed4738d64092f3bbdd26316ff011e5f9dea7ad909684c1de6bf",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "ops-cross-repo.md": {
+      "hash": "sha256:5a01e2259d765124cb10047d6318ba1001e62c73eead27f05979130db304dbe2",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "ops-documentation.md": {
+      "hash": "sha256:3c8afa236e46256f7d9e41684b54391cb449b3874385eb3e0d4adc761e3a975d",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "ops-issue-tracking.md": {
+      "hash": "sha256:8aa5848f8dee568f22ca41e157cb74db9c22fca0693f6d0b95875d195b7ef514",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "ops-safety.md": {
+      "hash": "sha256:7f8fba07a8b697ad68a8cd7f06b9821671678e7dff765fc94994f61b99393de6",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "crypto-flag-verification.md": {
+      "hash": "sha256:4a5497b13c5732f48f332704beb475e9a90f52b78452d38065b1b290620204bc",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "security-engineering"
+    },
+    "no-adhoc-kdf.md": {
+      "hash": "sha256:b6cadf6f69e24b1021eafc947eb5c17859f24486e81bf36b6da3f55ca6f71388",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "security-engineering"
+    },
+    "no-key-reuse-across-purposes.md": {
+      "hash": "sha256:eb5332597bbd63423418740266443266e3fb9d8f1491bde6289d2472e8e5221b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "security-engineering"
+    },
+    "no-unauthenticated-encryption.md": {
+      "hash": "sha256:2e2a5b42f33c9570353f2aeb8649c943b09e083acdddcabb0013c056860d1391",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "security-engineering"
+    },
+    "color-output-format.md": {
+      "hash": "sha256:52f3f1d5c0bede83a1f3010e078e8555ede72b8f318a2b64ff348776c2c023d8",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "color-palette"
+    },
+    "distractor-filter.md": {
+      "hash": "sha256:b129c39945f20d47047cd6d75a5845474f81200e1f1ba2fd324cce15d4b5ad91",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "context-curator"
+    },
+    "scoped-reasoning.md": {
+      "hash": "sha256:91ef7b19015d98a6a3b829426f55f0e0a5cabe2221ac875629db4affd45322f4",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "context-curator"
+    },
+    "daemon-interaction.md": {
+      "hash": "sha256:939fb6330644e439cc5021c64b6cddfeb53f8f7126b5f5ba782fbdbbd104d26b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "daemon"
+    },
+    "prose-bridge.md": {
+      "hash": "sha256:65282e936dfed0e8a01ef01595688d31e2545425125490111c39460d7f0913ca",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "prose-integration"
+    },
+    "prose-resolution.md": {
+      "hash": "sha256:309f0ee60f8bc244adff632816b1ce392b146e6678eecb19c23b330dc09ae3ef",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "prose-integration"
+    },
+    "rlm-context-management.md": {
+      "hash": "sha256:c1a6d1a0132bc305e404a043cb5b2723256cef9a6d59bc547baf9f37b3fe3215",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "rlm"
+    },
+    "diversity-awareness.md": {
+      "hash": "sha256:c0bad6dda4aa85d794731b6288d30857d529285bfd86948d06bc8c392f18feb6",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "verbalized-sampling"
+    },
+    "voice-framework.md": {
+      "hash": "sha256:fd344cb6477d5c1d2ea372d97c5b64d244e9551e5b5a2b267c9ca86f3727d98e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "voice-framework"
+    }
+  }
+}

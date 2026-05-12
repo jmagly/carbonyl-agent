@@ -1,0 +1,1156 @@
+{
+  "managed": {
+    "cloud-analyst.md": {
+      "hash": "sha256:9ddd9f4327c7456a90c40fe05b5cfbc5e3bdd5a97988b3df37fbc8f1a9d7007c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "container-analyst.md": {
+      "hash": "sha256:94b4ce8a1387bb66d8a9ca78c7bfeb15e6a9489bfb7a180439d063591688f4b9",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "forensic-acquisition-agent.md": {
+      "hash": "sha256:aae5916f281432086f8f4f2c15a1fecf8fab97a961f61483a7faa03ac61f4a8e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "forensics-orchestrator.md": {
+      "hash": "sha256:3209fd6f157c516a61afc6267a3d453dda378a92682b58d9c16dcc539ef86215",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "ioc-analyst.md": {
+      "hash": "sha256:e15178c23091716d9902437918833a0d796f8c98cbd824c15a5b4f898c85a47c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "log-analyst.md": {
+      "hash": "sha256:3d6ffbba9419f6c46db8019b5176ce5e5e15e4ec0072f583d004447e43f6ee94",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "memory-analyst.md": {
+      "hash": "sha256:039c485d0d8c90f3382549a99c8c030393de7f0055695f489282ae93c2cf3413",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "network-analyst.md": {
+      "hash": "sha256:581f6d96c99da38674c4f4cf2f255fda9cb5967d71dbc972531855774a5b8798",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "persistence-hunter.md": {
+      "hash": "sha256:890c042b3cf0c1ba8c143ee1947047d56ca25cc9bb91c27358db763d0079f9dc",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "recon-agent.md": {
+      "hash": "sha256:af2875797a30c9b84acff423c1a965b8a0ee8e7e6abbb321eb39335eaaa915d9",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "reporting-agent.md": {
+      "hash": "sha256:ee8406cabb5bcdd9f79490aa161a08e5415445b9aa2ebf76285b2d3b8d2a86f0",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "timeline-builder.md": {
+      "hash": "sha256:8ed45486d5af21ea7e43c6db5482d1928c9b2c547dfb0ed46d21975328cc3293",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "triage-agent.md": {
+      "hash": "sha256:c281483e2bf3cbe0714a3dda65459933fabd455a7c5695ea8debb538233aed84",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "forensics-complete"
+    },
+    "acquisition-manager.md": {
+      "hash": "sha256:143fe7a70c35a9a7ba37701ecc4561d37fc92b9351019788b22b2897dc922ddd",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-curator"
+    },
+    "completeness-tracker.md": {
+      "hash": "sha256:29ce82e3871e74007cb1f8a1c5798e15272a200b2eae12c9d445c851c0fa67fc",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-curator"
+    },
+    "discography-analyst.md": {
+      "hash": "sha256:085929a67ebc632d32df40dcf92d5494b6f48ba26dae9299bd847661973d4c42",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-curator"
+    },
+    "media-quality-assessor.md": {
+      "hash": "sha256:f68869036655b555e7f54dba33e0f9862026af8256ed80320f613b2ea4194eb8",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-curator"
+    },
+    "metadata-curator.md": {
+      "hash": "sha256:8db86be1b0218754737c99121f6123ab3bbc30a1bd06892b8f460f52f201d739",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-curator"
+    },
+    "source-discoverer.md": {
+      "hash": "sha256:91d4b6841399533cce7045ac50ccfdc68259a363bee011f5a61c78ddb360f14d",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-curator"
+    },
+    "accessibility-checker.md": {
+      "hash": "sha256:71398a37fa43f1d4dd08d7adb6cebdef8a3c866e22070112d218dff71a86c337",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "art-director.md": {
+      "hash": "sha256:eef3016a31f04da8a6e2ecc46b3994095005791af2a76c746643d1bd3440e478",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "asset-manager.md": {
+      "hash": "sha256:e3df4cf3479b8a8052f5acf956aa2b4fb7ca96c32444af5782e5c66ea3c45c69",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "attribution-specialist.md": {
+      "hash": "sha256:c1cb5db76bfc370c9d550ecaa791980920a43ae608570ac52c14f4337f8de4f8",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "brand-guardian.md": {
+      "hash": "sha256:ffe71bbf4782c247b3e6bffe48eb1c6ed07bd0f4cbb151a5d23b026bd99c6b50",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "budget-planner.md": {
+      "hash": "sha256:71fee75e7e68ff2cceba9bad65eab696d0b9f7590ef175e888590a436fa883ef",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "campaign-orchestrator.md": {
+      "hash": "sha256:e0d6f3a445aef23912103e53fafdd888dcaadf12f99896186bc7836c5266012f",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "campaign-strategist.md": {
+      "hash": "sha256:2b53b4474796f8d49c7f5697459f1a569b27e42b4a4433a0c6d111cb20b2c3d9",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "channel-strategist.md": {
+      "hash": "sha256:096a59ed1393f3363ca98895bf2e9b2ca186f35ec5bb2bf09307e8e86475d6ff",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "content-strategist.md": {
+      "hash": "sha256:98b65d2a2f283bfe9d6d2ac8b3c256ea826ba76d6bf11a7e48a0d01c6da60d18",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "content-writer.md": {
+      "hash": "sha256:d0dddc99a5832c02867ed3f04b47ec3b3ecece545711ca3a9c9cd1bad6a28613",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "copywriter.md": {
+      "hash": "sha256:19e0df7ac0bb4a46cf13b696640d2b580968f6c652d7c56bb184095207fe60c7",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "corporate-communications.md": {
+      "hash": "sha256:bb6cd132d0c2a73a375e20ba822c4059377e2282d95195d7c11f2121bd38717f",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "creative-director.md": {
+      "hash": "sha256:2772a48e180bda38075a0e45b2131b23f4f701bd88422b09fd78d07ee442060c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "crisis-communications.md": {
+      "hash": "sha256:327a49752d340ae9e6b990225dd442c2cb329a8ad3cc67f6d49ebc3c7d767a6c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "data-analyst.md": {
+      "hash": "sha256:36e00811b6cf47af5a5974ad461da928c2e0ec9c5e7b1d3d69664de91cf19ed4",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "editor.md": {
+      "hash": "sha256:ae6bc99638e9df18c1feeadaa79ad6b1e3b737991b6e15a74db9487bdf3c469d",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "email-marketer.md": {
+      "hash": "sha256:d1784c3b5e94b341438628be45c141b698aa7cade168d2cd818c334ec439fe1e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "graphic-designer.md": {
+      "hash": "sha256:242a89a8732cc84c7bb9feaa72fb5dd07ad5eb1bab96bbdb477b26549bde3521",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "internal-communications.md": {
+      "hash": "sha256:3e65e2ca2605d973084ea9fc2137addd25dd2265d5ea170b9c94c472932ce9de",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "legal-reviewer.md": {
+      "hash": "sha256:e186b0ac0facf515f3a74d96da59ef8b80e48f316c184155b95f66827bd981e8",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "market-researcher.md": {
+      "hash": "sha256:7b5ceb5e62be155e0b2544f743d4ff223494cd2d948d56156db2f7e6d6c4ddfb",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "marketing-analyst.md": {
+      "hash": "sha256:96851823aaf8d660360c3b139e308e17184dc078fae2fa4cdbc8b4824a5ded59",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "marketing-project-manager.md": {
+      "hash": "sha256:dd299f1769c9c3b19e03ebc2dca33c163f0016082075ca2ae42df5d2f81dec7b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "media-relations.md": {
+      "hash": "sha256:2a42139ca2597563c5d79f536d494c11dca471a8fce02696e332d30c8ac2b670",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "positioning-specialist.md": {
+      "hash": "sha256:d330261a2ff973ba52ee9395fa5812e334c6a48b235fdedbbcb1ebcfe6904dbf",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "pr-specialist.md": {
+      "hash": "sha256:6797b43de494abda0614dcca8ead069a142b7db86513e7c7e74e3806fa0fae40",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "production-coordinator.md": {
+      "hash": "sha256:3b449638b5e1ede5766cb208f55f16b7137d0bfe6b1ebffd065a1963e46fd989",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "quality-controller.md": {
+      "hash": "sha256:8580e41883d2f7f11d28c33240fb60275a1db89f93ec021704a02b92d72e26f8",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "reporting-specialist.md": {
+      "hash": "sha256:1be9279cc5aa32fc2563f1c8754f858eff4f76708f96ff2b7e4fa96c6b5e9f91",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "scriptwriter.md": {
+      "hash": "sha256:c37ac522d10a76726eab96c6bb0004544878cc40da96302ae0d300bda9075518",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "seo-specialist.md": {
+      "hash": "sha256:1cb4adba768de135e78113cea522a96a5fa490eb2de2c8b0a9535054f27661ab",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "social-media-specialist.md": {
+      "hash": "sha256:8a5cfa8c72c47e772241dee7550fa9b3f84af75f83df4d127121d0989f0c2a24",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "technical-marketing-writer.md": {
+      "hash": "sha256:e45c7c5c16d981860f6a3d6633e48b30a83c5da9304391f9185e1515b7b6da2e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "traffic-manager.md": {
+      "hash": "sha256:7f85b3f16a25f4ac36ae3114d3f3f1be316152045507045bcf25b47e703371d4",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "video-producer.md": {
+      "hash": "sha256:576b7b0e95f930060230f3840ce5b928b2857463f234b0e503253b85fbcd8036",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "workflow-coordinator.md": {
+      "hash": "sha256:9112b9f66dbb4d666064b949814475f59e88aa39c9a4166aa59b8b6f5c0344ea",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "media-marketing-kit"
+    },
+    "backup-verifier.md": {
+      "hash": "sha256:a5b58c9a012f86ab82b35cc47a5dc41e14559b651b68152306d5b38ac1ae6452",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "cert-lifecycle-monitor.md": {
+      "hash": "sha256:b3445b4507ff1cbe6808c7ad1deb55051fe655a8e5ad6f644d1ce17177b17e98",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "dr-planner.md": {
+      "hash": "sha256:68df0408278b0ce00906f6f2d6a9e84346bf0e175b528a629fed9ce85f7463ed",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "identity-auditor.md": {
+      "hash": "sha256:9ef993161e28d1ebbcd377fe710781a45e44d3b32f24c75e2176a3b8eeb8a030",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "network-auditor.md": {
+      "hash": "sha256:13bdf37ff827144eef94e36532c1509a16d11f360abecddc4cdc4979ed2f39d1",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "ops-deployment-manager.md": {
+      "hash": "sha256:ba3313a040d4b74e4f6b4b990449e3ca253b43c7686e058b2c2f2ce9d87cfa17",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "ops-inventory.md": {
+      "hash": "sha256:04e0185fafcbf401aade76387fabcdc207ad58982cbb887d9a2fbd995e3a9668",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "ops-runbook-executor.md": {
+      "hash": "sha256:2dd6bb9f6611b561a8a63ba6e23232bf759f997e651b17f910ffb99e89c8de0e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "pki-operator.md": {
+      "hash": "sha256:96e882bdeb03fdd59102fdc1c13ccdffb3d6924d84dad69875d61090b4abcc76",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "secret-operator.md": {
+      "hash": "sha256:e9a8e1108fd4b38d08f45e9e0aa01080a6bb8f50b98aea5fb6d35f245a11716a",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "stream-health-monitor.md": {
+      "hash": "sha256:fb9753e5ecbdb3f920438db4d4d69446c43c37427e147e71a84dc7725f0075df",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "sys-host-profiler.md": {
+      "hash": "sha256:14aca9cbe87817394512f62e30be717b5318e0d0c32a34933094b13d48203c5f",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "ops-complete"
+    },
+    "archival-agent.md": {
+      "hash": "sha256:b14b2337d91ab0e1604440d63047058d05ea825955d7430cf2a179e8e939209a",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "research-complete"
+    },
+    "citation-agent.md": {
+      "hash": "sha256:425ac239e8620160d1e56c4b4aa13c39fa2982c2c8b845c3948de165c696e286",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "research-complete"
+    },
+    "discovery-agent.md": {
+      "hash": "sha256:11fe7f2849f5062e7beebf30a378276725ca925405ede72ede04f8acfe2dcfb9",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "research-complete"
+    },
+    "documentation-agent.md": {
+      "hash": "sha256:147b9fddb081bb8b1145a57e0f63a0795a69af0a8c4037868041536b852df12e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "research-complete"
+    },
+    "provenance-agent.md": {
+      "hash": "sha256:fa1c2bfafd3a1b5406775a7ed4493dfaf086d797d0a7fafa0a1073956dc5f873",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "research-complete"
+    },
+    "quality-agent.md": {
+      "hash": "sha256:3b5afc4f1d78c1a5610a00fdddc99dd01bbc3477da49d71b4dd0126581e54202",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "research-complete"
+    },
+    "research-acquisition-agent.md": {
+      "hash": "sha256:afcca4cec49a2c690348a9c08cfbfb77bc62dc937cf3185c9ce3dd8c566492af",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "research-complete"
+    },
+    "workflow-agent.md": {
+      "hash": "sha256:4986e71aa796065088f09fa9fcd6db6b0229a037a052510993f255ebe332f3ac",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "research-complete"
+    },
+    "accessibility-specialist.md": {
+      "hash": "sha256:9aa2f2ae43cc418045e5188a2a2aa06599432e90199250e90ffdbf9e7fea6bbe",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "agentsmith.md": {
+      "hash": "sha256:5d9ee3d1b42f2b61234c4c4e5c4febcb7883eb5c2895fbf621b2a33930599bda",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "ai-ml-engineer.md": {
+      "hash": "sha256:b19f5c7f527f58db4108ec2821fecea8f848e676530a4be7a8253cc4e9ff71d5",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "api-designer.md": {
+      "hash": "sha256:8d1eeabbff651094d50049f0b6fdde5ac251d71143d929787a3b3b51d9b3874e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "api-documenter.md": {
+      "hash": "sha256:bacb3fdae705b583fe3709f97b774aea70bb7d369773f84aa7135fa3eef48888",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "architecture-designer.md": {
+      "hash": "sha256:979f7f5e2764e3e508e0fbd341cfdd4df1fc920c7757d0eec0c5fd7aa1c693bc",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "architecture-documenter.md": {
+      "hash": "sha256:722c2ebe0aae8a06121855c0ee6cd4c3cb8fb6cce06c2687122f5ead9d9f230e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "aws-specialist.md": {
+      "hash": "sha256:c5dc2cfd80d42bacd8c3ea17996f813bc3ae2bc078fef739cc0e0e05874efe02",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "azure-specialist.md": {
+      "hash": "sha256:7060d4d9d4bd11b579487b41a8a71f64ca4cb8f41b9b7edca5317dffa0bcdd91",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "blockchain-developer.md": {
+      "hash": "sha256:51620fe1a2b2585860d485e3150c9f38cfbc377731850fb59d958fb306622015",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "build-engineer.md": {
+      "hash": "sha256:d761074a9ada6c820c4491b9e00961637af4f020e1b8c6d46b0ad2ff0ed6ee58",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "business-process-analyst.md": {
+      "hash": "sha256:8645644c68ba9f4cd84816d9b2c65fbe71bef919945ee3476e14983119c1562e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "citation-verifier.md": {
+      "hash": "sha256:8a2fb530108ed465ce180e0b6490db3ccb1e87b060f82a7ab1bbbb78dcc6fcdb",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "cloud-architect.md": {
+      "hash": "sha256:362bc54d7b8be24f21cd1d1bd2b4ef242ecbae2e4e39eccd6473d007d61e45ac",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "code-reviewer.md": {
+      "hash": "sha256:9e0d09e31428c20048306f19f81987dd98beef2ac64042cbb5b6e9a71b1796d1",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "commandsmith.md": {
+      "hash": "sha256:a3c7bbf65db3bf637ac35f6e373aeadf83a4a0e0fa1a243e3e4866f2569875fa",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "compliance-checker.md": {
+      "hash": "sha256:5ac694e34c03e618bd37015a7ca8e0412d23beb45abf308cd4ae6c3982da102e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "compliance-grounding-agent.md": {
+      "hash": "sha256:094a2621532e0aff56e77c01f1aa87acc6418e70546e4ff328873e31e8cc4657",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "component-owner.md": {
+      "hash": "sha256:f813a06ff28657ae723090bc87373881c70d12a94e5e35cd2b61cfa2b7d35354",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "configuration-manager.md": {
+      "hash": "sha256:40618382393b9c9235db3924df3f9a376bf525bdec73a0270e50bbf025884bc3",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "context-librarian.md": {
+      "hash": "sha256:d5777bade0e11d38623d4d68accda0a9f15262158fc282cab8efce1d42f8a898",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "cost-optimizer.md": {
+      "hash": "sha256:07d229bf407a6254266974ba5bbef9bba4be3a02656b6fa8414cedcc0b772934",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "data-engineer.md": {
+      "hash": "sha256:a51618420950752a30c2defe77a056ed2bf455bc868a8789e1a89fd006308e8d",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "database-optimizer.md": {
+      "hash": "sha256:66df3fefa93b941cf39e4fc4f6b2111d727be5d9bc6c8c19d9c2ef6049dfd507",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "dead-code-analyzer.md": {
+      "hash": "sha256:9be44bfcfa84938267467e979646c8867381a0142263f953b053eb0d886af59d",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "debugger.md": {
+      "hash": "sha256:84fe7ef1996d95dcf50ee2201cfe8edf2c58fcb4b1d6e583f0b7e4150e2e67e0",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "decision-matrix-expert.md": {
+      "hash": "sha256:92cf007b3455e836bd6294677eed09ed85ad1ab3a027d250042b0eceb2fe115c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "deployment-manager.md": {
+      "hash": "sha256:8cba760ddc8c2d5a48407f80ff6b9bfc9b6b5a0bd70e54345c4b7493abd84509",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "devops-engineer.md": {
+      "hash": "sha256:76583b0030f65a4a42d38e84e533a000482ff1f2ac1307fe55d6bc80a6d14aa1",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "django-expert.md": {
+      "hash": "sha256:ee4e437eaa27c34f6207aeb1da7abf46801e823a44414529b9b3097c270a6390",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "documentation-archivist.md": {
+      "hash": "sha256:8e48bb860f296b6ec64ccd648d3e2929ef4205d5e1831cf20ef882b85e2e5914",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "documentation-synthesizer.md": {
+      "hash": "sha256:ad686abb66f9a519891cbcac0437b176635ebf2cd35d42164c227862940bbcca",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "domain-expert.md": {
+      "hash": "sha256:515cab31d432ad3ea07fcc6df0646338df0ce13512e602063806771d641bd15f",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "environment-engineer.md": {
+      "hash": "sha256:c803ae66c3078e1af4e4dbdbc8cf7db1f800444d333a0b6b5c6059410e4c2b37",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "executive-orchestrator.md": {
+      "hash": "sha256:07d03945a7026933bbf0e782d9f6750d1bb4c920383450fcf1d170bf600297ee",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "frontend-specialist.md": {
+      "hash": "sha256:fd48bda07b6d0cef948d2bab2a27d3205040f495ab7d5b1f8f96ee0f1d5523d7",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "gcp-specialist.md": {
+      "hash": "sha256:3f5c1b040208dc201d18bd91a0984ffba938fef906e700e862831a127636244b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "incident-responder.md": {
+      "hash": "sha256:9dd9dab989f9c0b3a43e732b9f780e83eb87594cef25ffa489efeed1d0a99923",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "intake-coordinator.md": {
+      "hash": "sha256:7f54c00d79f26482025afd1d1dd1c0c5f0b7aae6d83aef67073c622ecd493430",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "integration-engineer.md": {
+      "hash": "sha256:b8fb7a012d0f3c4ed28c6fe5f051e0c22e01eee4a68f58633fba88d3a7e19322",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "kubernetes-expert.md": {
+      "hash": "sha256:b1c6a1aff8e424529d7af389901463fc00e997d5ee7b5b90e0d0eb47b0495358",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "laziness-detector.md": {
+      "hash": "sha256:c3b980765e524a67cf665f82ce2a05268608ed9f72d46fb04c8443d34ebddaae",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "legacy-modernizer.md": {
+      "hash": "sha256:e36e0256c6498e409fcb4614462b5481b68e65e983f79ae5888acb46100e3a7c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "legal-liaison.md": {
+      "hash": "sha256:d4e87ecdaefa49214911c5836c4668d531cd187f5606505d589c2bec891d9431",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "mcpsmith.md": {
+      "hash": "sha256:ed721ef31614a3c22316e476e5cb783217308787c25bd5445c92f4c27bfbe663",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "metrics-analyst.md": {
+      "hash": "sha256:911db3ceeb827d085df10c7f8f89a244a50ac42952bbba8aa5abf1b328525311",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "migration-planner.md": {
+      "hash": "sha256:2f6838567fce0098b5d9847ee08f7ae124497f61fabffd353030ee72f3b9d57b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "mobile-developer.md": {
+      "hash": "sha256:2d21145676b3ad177b6ab896a9be5e699d7e98d2fbedeea6d0f55b6377d2602c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "multi-cloud-strategist.md": {
+      "hash": "sha256:50635b39c3efb5a8e3008682138424130dc0afba990cb5c3faf0ae748cb1580b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "mutation-analyst.md": {
+      "hash": "sha256:68921e535a0a462d6f644a966c112bbf9b2f0f7e9adcd8b72340c5a3afc734c1",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "performance-engineer.md": {
+      "hash": "sha256:0ee7e763d1c91aa039d921ce4241019b8834c58f8da6bebc40a9d2e7c688c618",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "performance-grounding-agent.md": {
+      "hash": "sha256:abbc7bfa9dbb49414e5f1d97a39b3d85896ae5de9b7c06c95d198c268c33cddc",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "privacy-officer.md": {
+      "hash": "sha256:f233f365934a1e680c6e84c38f9b7b05b8dfce40d836bd7ea40fde4e16b50000",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "product-designer.md": {
+      "hash": "sha256:7de53adda9fa4368558e5835a1b4f61470f1f67379c2b108d92de0e7d4819120",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "product-strategist.md": {
+      "hash": "sha256:4a52be78c8357087e49dbebef28e2571d848eb11afbd8bae07c525198b46d2df",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "progress-tracker.md": {
+      "hash": "sha256:a2f3043a6ba323d09b41b552057ef293b5b8c0d03f5dec6838c750db91d54177",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "project-manager.md": {
+      "hash": "sha256:27aa8788dcd32188caaef71ae3f8f518ae2453eda04101c92abf62fe8fe4fd7b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "prompt-reinforcement.md": {
+      "hash": "sha256:7b15ff84012b1461c003f81aa445be7cdde74505a807e4e2917136f6f49f9d57",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "provenance-manager.md": {
+      "hash": "sha256:71c4ea90e80ecdbb1d2fb2a53bb205303435d2fa665b4f4e9cc88bf128ac6e0d",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "quality-assessor.md": {
+      "hash": "sha256:6db70c7422eddec5a3eef398132937893e1928f046e13149737d7b9ac3e3865e",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "raci-expert.md": {
+      "hash": "sha256:4efc5a34ea8c5e0d37305eb9f7df7d06e8b81d182bdc4f44253ca8ffe970e6cd",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "react-expert.md": {
+      "hash": "sha256:5f908326d6ac43883ea33d1391003b94c875f00e3561713ca700f40a7c3183bc",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "recovery-orchestrator.md": {
+      "hash": "sha256:b199bec889ad16f734dcae74583527b47653753edb1d8b493a90ef0145a445f1",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "regression-analyst.md": {
+      "hash": "sha256:8dedf354ab36954b83906f8aeb99d4d34de0d910b3c74c88040659ea7a3d2ecf",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "reliability-engineer.md": {
+      "hash": "sha256:115badd1b97a2dfdf62543822e134ec1c704071575ad74e681cffe6aa8e5c77b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "requirements-analyst.md": {
+      "hash": "sha256:749de12fb61755b16f5ed5af43b05f1fb62cc210f2d73519dd42299b350d5de4",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "requirements-documenter.md": {
+      "hash": "sha256:b47765f0b532c78772b43be89fc17ac8bfc48555aa4e83a61c3fc8ed46234512",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "requirements-reviewer.md": {
+      "hash": "sha256:142d1af28bef43e8434d21c6b1848fe260bf85d8e2d026cea1876345387c16b7",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "security-architect.md": {
+      "hash": "sha256:587fa1b28dc4f7d493d4ee0c1c9d754f9485b9e5fc123f28d3c1db3f7af68064",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "security-auditor.md": {
+      "hash": "sha256:aa2b266770ecc53ef3cc464a2641b828088291561bd7eb0841a15be1ba9cf619",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "security-gatekeeper.md": {
+      "hash": "sha256:b2907ee2f066dfa92749dffcf54e5e005db47db491c200bd3e1bb45eb2de3bf5",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "security-grounding-agent.md": {
+      "hash": "sha256:05558d18f6a3f1a79ee585f3ce42002416575ccf40e470a01fea8b7cd6ee1df1",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "skillsmith.md": {
+      "hash": "sha256:d5178a20f964494fe8a5dc2a352b00cf19559d9f9e0b5976e30afc2b62fbeb3c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "software-implementer.md": {
+      "hash": "sha256:f4d50c99d4148fe9f4de986831b2b9dd07ef0f40eccc9c8ed0f7cd8c549d4803",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "spring-boot-expert.md": {
+      "hash": "sha256:d9cc154f31d147f1fb40d6c7971febc1c3e5dabc06512094ea30edbf99fce716",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "support-lead.md": {
+      "hash": "sha256:7b7b8cb5fc0135542ea8cd147e677cc369bff734964dbe619d608d112a18ec9b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "system-analyst.md": {
+      "hash": "sha256:b599da84527295d3b1c119ade1b951d140eeada515acd7e76c110d56a8d162bf",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "technical-debt-analyst.md": {
+      "hash": "sha256:39e5b2bc31c57b3047e68ff0dbb999f23a5890923fd8e3fbbaabe9b6e5288895",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "technical-researcher.md": {
+      "hash": "sha256:8aa9f670ea5f1f6096629dd73197e405b3be73a5b816f0e9a40c0f5d189b9bad",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "technical-writer.md": {
+      "hash": "sha256:e3289c4e58c1fe0a72a132860b1a02ad66942ef214678d36c2b470631bbfc933",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "technology-grounding-agent.md": {
+      "hash": "sha256:0d6230134f29cac9818d9801c4d1319e06b1e8a2a21f79f0524655d0c01130e1",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "test-architect.md": {
+      "hash": "sha256:17745e25ad13451ef60528b56575071030c168932ac1f495ca8c3dc6d5ef25a5",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "test-documenter.md": {
+      "hash": "sha256:e14eeff9860476bd32b62a39f4bfa2a9457a69700cfd97bc60ab9ba6ba8c7bdb",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "test-engineer.md": {
+      "hash": "sha256:d307115a98cbb467b4cb3511bfada9dd08d734812125c93b194a23086b9a429a",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "toolsmith-dynamic.md": {
+      "hash": "sha256:5a9a27d695616f4fa20fb23a6dac6ce9e0d820912243cfaed99f8114847e49e5",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "toolsmith-provider.md": {
+      "hash": "sha256:cb7a7ad20a45ef0b6b3e9507ea817f40d9ef5e38f62a741068774dbb0ba83e43",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "toolsmith.md": {
+      "hash": "sha256:d11b5b6896a473ed005a9db4485c84d646d16ee84f566b7bfaeb4b7347efdcea",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "traceability-manager.md": {
+      "hash": "sha256:8ae25ef7d95a3508ce9168744b77022aae79bca980e0b02f27f2facee0f43b64",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "ux-lead.md": {
+      "hash": "sha256:ed950ae6ba6485444bf78dcee2dee4c9b73456b8b68ebfc3546b9b790fbbf5ba",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "vision-owner.md": {
+      "hash": "sha256:0358442ff66f7d5aef817f13838e49107e1396b7743434e75f73c11a757dc3c2",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "sdlc-complete"
+    },
+    "applied-cryptographer.md": {
+      "hash": "sha256:cc6f9bc0d7a7d1aeb458d4c7beaa12cd07ec8988cedde840b45316802e4ebe74",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "security-engineering"
+    },
+    "secure-bootstrap-reviewer.md": {
+      "hash": "sha256:bbf74ba7535582a349d0e43e5d0bc36c34691e5379b1ee837135cec2dcf18fb0",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "security-engineering"
+    },
+    "mc-conductor.md": {
+      "hash": "sha256:80ff81ca92bc0a8204e029633505f570e02f79ddf1beaa31b9953c91d50a0122",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "agent-loop"
+    },
+    "ralph-loop.md": {
+      "hash": "sha256:fdecb264560f48ad6323778531ea5101e9c19737ce7634036de75e8726eca1ad",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "agent-loop"
+    },
+    "ralph-verifier.md": {
+      "hash": "sha256:2cb7edd36d44a59adbc914a1a7258ad2e185c682675dea19f0b03b7e3a9d573d",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "agent-loop"
+    },
+    "installer-agent.md": {
+      "hash": "sha256:9ba3fba7e9b6bda7cd6bdf89d8cdb2f5b4cf800f614e94f5e86edc23ac16f97b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "agentic-installer"
+    },
+    "aiwg-developer.md": {
+      "hash": "sha256:e52239ef8754662de30a9423657cc5732b2989c37c342fa8ee3d6d342c7b502b",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "aiwg-utils"
+    },
+    "aiwg-finder.md": {
+      "hash": "sha256:c02af17c243a582541f41bfa33a72a2ce030937e6d90045a502199fac38a48d2",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "aiwg-utils"
+    },
+    "aiwg-steward.md": {
+      "hash": "sha256:94e6b1adcd3d7d655ab9b626de2062533504ec97177fdb848ae05021c4ca6450",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "aiwg-utils"
+    },
+    "consortium-coordinator.md": {
+      "hash": "sha256:fcc55487f8ee0a0956f310ee7b410dedf1b147e733785f7e6c31ddc0c718b263",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "aiwg-utils"
+    },
+    "context-regenerator.md": {
+      "hash": "sha256:8e2211f2b6dc74155ede2c3bf85f60c8e40cabb2d38dbae02b917ea539115c29",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "aiwg-utils"
+    },
+    "self-debug.md": {
+      "hash": "sha256:67891a83270351d5851764fa64ef9e2cca475d30388b444a70b3ce8337c5d2b0",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "aiwg-utils"
+    },
+    "context-curator.md": {
+      "hash": "sha256:3e5ec5978510f6f28ea53508702108a5670ec1f5dfd33dceee35950962131849",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "context-curator"
+    },
+    "concierge.md": {
+      "hash": "sha256:6c73a8eab6fd7642051338a58262554329448a1f22780543c623afa4bc66cd4c",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "daemon"
+    },
+    "doc-analyst.md": {
+      "hash": "sha256:257306b37bfa5f5bc326f97ffd0d0e60dfc47161640d271763ba16a951be8779",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "doc-intelligence"
+    },
+    "cost-analyst.md": {
+      "hash": "sha256:c201741bf51b9ca72db6632c88fc43e75a5a46f04c47ce258d1b6735c00bb58d",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "nlp-prod"
+    },
+    "eval-reviewer.md": {
+      "hash": "sha256:f546df6f00aebd2de2f54d296597daadcae57e61a0fdcd952cf004f58479def8",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "nlp-prod"
+    },
+    "pipeline-architect.md": {
+      "hash": "sha256:a4e3ddf0ef814fdcac41fd91f2b351438eeb05de6f2e50ccf34e901abe56cb21",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "nlp-prod"
+    },
+    "prompt-engineer.md": {
+      "hash": "sha256:4be16da403f8ad2e174e14a3d50028043b91c36949f370c6d77a104936d3d12a",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "nlp-prod"
+    },
+    "rlm-agent.md": {
+      "hash": "sha256:68c2ae80fb6261007d2b68f2655b032a12c63324d08f1ef471307915e2d3e79f",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "rlm"
+    },
+    "skill-architect.md": {
+      "hash": "sha256:0f0ce4ebf94e4c5abc320971bdfff9eb0274757c53c80fd7b43ebd056bcaec11",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "skill-factory"
+    },
+    "uat-executor.md": {
+      "hash": "sha256:7429440640f10326b47c0c06a9714d93bbc8c0023209e59657cbbaa1bdb0ced4",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "uat-mcp"
+    },
+    "uat-planner.md": {
+      "hash": "sha256:b198436ff676300f15d2deec24f2eaab1f92a035ceb53ad048a8db9f74541246",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "uat-mcp"
+    },
+    "content-diversifier.md": {
+      "hash": "sha256:0a5d9f9885cbb001e67ac1e8ad316e9bbe9cd0f07ef942614fc79220bcb4cf79",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "verbalized-sampling"
+    },
+    "prompt-optimizer.md": {
+      "hash": "sha256:8fa6a7470c6759dbdba0a99d62ba001805cb1ad870126fbf35e7356faa9869c2",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "writing-quality"
+    },
+    "writing-validator.md": {
+      "hash": "sha256:476e2ecb18511ba1781a0089bada3091ba7cc14e6140b6f70b62f398f49b59cd",
+      "source": "bundled",
+      "version": "2026.5.2",
+      "frameworkSlug": "writing-quality"
+    }
+  }
+}
