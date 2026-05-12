@@ -34,3 +34,12 @@ pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
 pretty_assertions = "1"
 proptest = "1"
 serde_json = "1"
+# Layer 2 wire-level conformance (W3B.2.1 — `Refs: roctinam/carbonyl-agent#76`).
+# Dev-deps only — these never reach the rlib or cdylib output. The
+# LocalTlsResponder test utility lives under `tests/wire/` and is only
+# compiled when running `cargo test`.
+rustls = "0.23"
+rustls-pemfile = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "time", "sync"] }
+tokio-rustls = "0.26"
+rcgen = "0.13"
