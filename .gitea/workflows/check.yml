@@ -45,28 +45,28 @@ jobs:
         run: |
           docker run --rm \
             -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
-            -w /workspace/crates/carbonyl-fingerprint \
+            -w /workspace \
             -e CARGO_HOME=/tmp/cargo \
             rust:latest \
             sh -c "rustup component add rustfmt 2>/dev/null || true; cargo fmt --all -- --check"
 
-      - name: cargo clippy
+      - name: cargo clippy (workspace)
         run: |
           docker run --rm \
             -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
-            -w /workspace/crates/carbonyl-fingerprint \
+            -w /workspace \
             -e CARGO_HOME=/tmp/cargo \
             rust:latest \
-            sh -c "rustup component add clippy 2>/dev/null || true; cargo clippy --all-targets -- -D warnings"
+            sh -c "rustup component add clippy 2>/dev/null || true; cargo clippy --workspace --all-targets -- -D warnings"
 
-      - name: cargo test
+      - name: cargo test (workspace)
         run: |
           docker run --rm \
             -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
-            -w /workspace/crates/carbonyl-fingerprint \
+            -w /workspace \
             -e CARGO_HOME=/tmp/cargo \
             rust:latest \
-            cargo test --all-targets
+            cargo test --workspace --all-targets
 
       # Verifies `.carbonyl-fingerprint-version` matches the resolved
       # wreq SHA in Cargo.lock (per ADR-005 bus-factor mitigation #1,
@@ -85,7 +85,11 @@ jobs:
           PINNED_SHA="$(grep -E '^wreq-sha=' .carbonyl-fingerprint-version \
             | head -1 | cut -d= -f2 | tr -d '[:space:]')"
 
-          LOCKFILE=crates/carbonyl-fingerprint/Cargo.lock
+          # Top-level Cargo.lock since the Phase 2.1 workspace conversion
+          # (Refs: roctinam/carbonyl-agent#80). Pre-#80 the lockfile lived
+          # inside the crate directory; that legacy path is no longer
+          # produced by cargo when a workspace root exists.
+          LOCKFILE=Cargo.lock
           if [[ ! -f "${LOCKFILE}" ]]; then
             echo "Cargo.lock not present at ${LOCKFILE}; skipping pin check"
             exit 0

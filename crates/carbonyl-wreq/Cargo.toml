@@ -1,0 +1,22 @@
+[package]
+name = "carbonyl-wreq"
+version = "0.0.1-alpha.1"
+edition = "2021"
+description = "wreq-backed implementation of the carbonyl-fingerprint HttpClient trait"
+license = "MIT"
+repository = "https://git.integrolabs.net/roctinam/carbonyl-agent"
+
+[lib]
+name = "carbonyl_wreq"
+crate-type = ["rlib"]
+
+[dependencies]
+carbonyl-fingerprint = { path = "../carbonyl-fingerprint" }
+thiserror = "2"
+
+# wreq itself is intentionally NOT a dep at Phase 2.1. wreq pulls
+# boring-sys2 (BoringSSL fork) which requires clang + cmake at build
+# time and adds 5-10 minutes to a cold compile. Phase 2.2
+# (`Refs: roctinam/carbonyl-agent#81`) adds wreq alongside the
+# persona→wreq mapping in a single commit so the heavy native build
+# arrives with the feature that needs it.

@@ -1,0 +1,11 @@
+# Top-level workspace. Sub-crates live under `crates/`. Each crate
+# stays publishable on its own; the workspace exists so a single
+# `cargo` invocation builds, tests, and lints the whole tree, and so
+# the resolved `Cargo.lock` is shared (which `.carbonyl-fingerprint-version`
+# pins, per ADR-005 bus-factor mitigation #1).
+[workspace]
+members = [
+    "crates/carbonyl-fingerprint",
+    "crates/carbonyl-wreq",
+]
+resolver = "2"

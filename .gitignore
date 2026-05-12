@@ -33,7 +33,9 @@ htmlcov/
 # Rust build artifacts (applies to all crates/ sub-crates)
 target/
 **/target/
-# Library crates: don't commit Cargo.lock
+# Library crates: don't commit per-crate Cargo.lock files. The
+# workspace's top-level Cargo.lock IS committed (the wreq pin check
+# in check.yml compares against it post-#80 workspace conversion).
 crates/*/Cargo.lock
 
 # Generated API docs (#17) — built on demand or in CI, not committed
