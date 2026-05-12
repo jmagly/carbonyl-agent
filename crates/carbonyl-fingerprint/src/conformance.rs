@@ -190,6 +190,17 @@ impl ConformanceFixture {
         Self::from_persona("firefox-150-stable-linux", persona).expect("fixture")
     }
 
+    /// Built-in fixture: Safari 26 stable macOS. W3A.6.2 (`Refs:
+    /// roctinam/carbonyl-agent#72`).
+    ///
+    /// Required headers exclude all `sec-ch-ua*` entries — Safari, like
+    /// Firefox, never sends UA Client Hints. Provenance for the underlying
+    /// fingerprint values is documented in `sampler::DESKTOP_SAFARI_MACOS`.
+    pub fn safari_26_macos() -> Self {
+        let persona: Persona = toml::from_str(SAFARI_26_MACOS_TEMPLATE).expect("template parses");
+        Self::from_persona("safari-26-macos", persona).expect("fixture")
+    }
+
     /// Construct a fixture from a persona, deriving the expected wire
     /// values from the persona's own `network` and `user_agent` fields.
     /// This is what the conformance contract asserts: the persona spec IS
@@ -373,6 +384,78 @@ fn header_field_name(name: &str) -> &'static str {
 // ---------------------------------------------------------------------------
 // Built-in fixtures
 // ---------------------------------------------------------------------------
+
+/// Safari 26 stable macOS template. W3A.6.2 (`Refs:
+/// roctinam/carbonyl-agent#72`). Mirrors `sampler::DESKTOP_SAFARI_MACOS`
+/// — drift between the two is itself a conformance bug.
+const SAFARI_26_MACOS_TEMPLATE: &str = r#"
+[persona]
+id = "persona-test-safari-26"
+generator_version = "2026.05.12"
+browser_family = "safari"
+browser_version = "26.4"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "macOS"
+os_version = "10.15.7"
+arch = "x86_64"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15"
+
+[persona.user_agent.ua_ch]
+brands = []
+mobile = false
+platform = "macOS"
+platform_version = ""
+architecture = ""
+bitness = "64"
+
+[persona.locale]
+accept_language = "en-US,en;q=0.9"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 1920
+screen_height = 1080
+color_depth = 24
+device_pixel_ratio = 2.0
+hardware_concurrency = 8
+device_memory = 8
+max_touch_points = 0
+
+[persona.webgl]
+vendor = "Apple Inc."
+renderer = "Apple GPU"
+vendor_unmasked = "Apple Inc."
+renderer_unmasked = "Apple GPU"
+
+[persona.canvas]
+noise_seed = 0
+
+[persona.audio]
+noise_seed = 0
+
+[persona.fonts]
+available = ["Helvetica Neue", "Gill Sans", "Menlo", "Arial Unicode MS"]
+
+[persona.network]
+ja4 = "t13d3112h2_5e9183dafe04_e7c285222651"
+ja4h_template = "fonn11nn05enus"
+http2_akamai = "2:0,3:100,4:2097152,8:1,9:1|10485760|0|m,a,s,p"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "normal"
+mouse_persona = "desk_mouse_windmouse"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-test-safari-26"
+"#;
 
 /// Firefox 150 stable Linux template. W3A.6.1 (`Refs:
 /// roctinam/carbonyl-agent#71`). Mirrors `sampler::DESKTOP_FIREFOX_STABLE_LINUX`
@@ -901,6 +984,55 @@ mod tests {
             assert!(
                 !name.starts_with("sec-ch-ua"),
                 "apply_persona must not emit {name} for Firefox personas"
+            );
+        }
+    }
+
+    // --- Safari conformance (W3A.6.2 #72) ---
+
+    #[test]
+    fn fixture_safari_26_loads_and_self_describes() {
+        let f = ConformanceFixture::safari_26_macos();
+        assert_eq!(f.label, "safari-26-macos");
+        assert_eq!(f.persona.persona.browser_version, "26.4");
+        assert_eq!(
+            f.persona.persona.browser_family,
+            crate::schema::BrowserFamily::Safari
+        );
+        assert_eq!(f.persona.persona.platform.os_family, "macOS");
+        assert_eq!(f.expected_ja4, "t13d3112h2_5e9183dafe04_e7c285222651");
+        // Apple's H2 SETTINGS shape: id 2 (ENABLE_PUSH=0), id 3
+        // (MAX_CONCURRENT_STREAMS=100), id 4 (INITIAL_WINDOW=2097152),
+        // id 8 (ENABLE_CONNECT_PROTOCOL=1), id 9 (NO_RFC7540_PRIORITIES=1).
+        assert_eq!(
+            f.expected_h2_settings.entries,
+            vec![(2, 0), (3, 100), (4, 2097152), (8, 1), (9, 1)]
+        );
+    }
+
+    #[test]
+    fn safari_fixture_required_headers_exclude_sec_ch_ua() {
+        let f = ConformanceFixture::safari_26_macos();
+        assert!(f.required_headers.contains_key("User-Agent"));
+        assert!(f.required_headers.contains_key("Accept-Language"));
+        for name in f.required_headers.keys() {
+            assert!(
+                !name.starts_with("sec-ch-ua"),
+                "Safari fixture must not require {name} — Safari doesn't send UA-CH"
+            );
+        }
+        assert_eq!(f.required_headers.len(), 2);
+    }
+
+    #[test]
+    fn vec_recorder_conforms_to_safari_26() {
+        let f = ConformanceFixture::safari_26_macos();
+        let mut c = VecRecorder::default();
+        conform(&mut c, &f).expect("VecRecorder must conform to Safari");
+        for (name, _) in c.applied_headers() {
+            assert!(
+                !name.starts_with("sec-ch-ua"),
+                "apply_persona must not emit {name} for Safari personas"
             );
         }
     }

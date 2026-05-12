@@ -57,6 +57,14 @@ pub enum PersonaClass {
     /// documented inline in [`DESKTOP_FIREFOX_STABLE_LINUX`] and the
     /// matching corpus TOML.
     DesktopFirefoxStableLinux,
+    /// Desktop Safari stable on macOS.
+    ///
+    /// W3A.6.2 — `Refs: roctinam/carbonyl-agent#72`. Same provenance
+    /// pattern as Firefox. Apple's Network framework (Secure Transport)
+    /// produces distinctive JA4 and H2 SETTINGS values that differ from
+    /// both BoringSSL (Chrome) and NSS (Firefox). Provenance documented
+    /// inline in [`DESKTOP_SAFARI_MACOS`] and the matching corpus TOML.
+    DesktopSafariMacOS,
 }
 
 /// Errors surfaced by the sampler.
@@ -135,6 +143,7 @@ fn template_for(class: PersonaClass) -> &'static str {
     match class {
         PersonaClass::DesktopChromeStableLinux => DESKTOP_CHROME_STABLE_LINUX,
         PersonaClass::DesktopFirefoxStableLinux => DESKTOP_FIREFOX_STABLE_LINUX,
+        PersonaClass::DesktopSafariMacOS => DESKTOP_SAFARI_MACOS,
     }
 }
 
@@ -314,6 +323,105 @@ mouse_persona = "desk_mouse_windmouse"
 user_data_dir = "/tmp/persona-template-desktop-firefox-stable-linux"
 "#;
 
+/// Safari 26 stable on macOS. W3A.6.2
+/// (`Refs: roctinam/carbonyl-agent#72`).
+///
+/// # Provenance
+///
+/// - Browser-info fields (UA, screen, navigator, fonts, WebGL, headers):
+///   BrowserForge MIT corpus (`apify-fingerprint-datapoints v0.13.0`),
+///   sampled with `FingerprintGenerator(browser=['safari'], os=['macos'],
+///   device=['desktop'])` on 2026-05-12.
+/// - TLS-layer fields (JA4, ALPN, H2 Akamai SETTINGS): FoxIO ja4db public
+///   reference set, canonical Safari 17+ macOS captures. Apple's Network
+///   framework (Secure Transport) produces distinctive H2 SETTINGS that
+///   differ from BoringSSL (Chrome) and NSS (Firefox). H2 entries include
+///   id 2 (ENABLE_PUSH=0), id 3 (MAX_CONCURRENT_STREAMS=100), id 4
+///   (INITIAL_WINDOW_SIZE=2097152) — Apple's canonical defaults.
+///
+/// Future QA-harness pass: refresh both halves with fresh captures on a
+/// live macOS Safari instance + tlsx probe; diff is auditable.
+///
+/// # Schema accommodation
+///
+/// Safari does NOT send UA Client Hints (same as Firefox). Persona carries
+/// `ua_ch.brands = []`; `apply_persona` gates `sec-ch-ua*` header emission
+/// on `browser_family == Chrome` (post-#71). `ua_ch.platform = "macOS"`
+/// is set for validator rule B (os_family ↔ ua_ch.platform match) — the
+/// value is not emitted to the wire by the Safari apply_persona path.
+///
+/// Validator rules C/D/E (Linux-forbidden fonts/ANGLE) skip automatically
+/// because `os_family = "macOS"` — the existing platform-gated rules
+/// already accommodate non-Linux personas.
+const DESKTOP_SAFARI_MACOS: &str = r#"
+[persona]
+id = "persona-template-desktop-safari-macos"
+generator_version = "2026.05.12"
+browser_family = "safari"
+browser_version = "26.4"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "macOS"
+os_version = "10.15.7"
+arch = "x86_64"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15"
+
+[persona.user_agent.ua_ch]
+brands = []
+mobile = false
+platform = "macOS"
+platform_version = ""
+architecture = ""
+bitness = "64"
+
+[persona.locale]
+accept_language = "en-US,en;q=0.9"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 1920
+screen_height = 1080
+color_depth = 24
+device_pixel_ratio = 2.0
+hardware_concurrency = 8
+device_memory = 8
+max_touch_points = 0
+
+[persona.webgl]
+vendor = "Apple Inc."
+renderer = "Apple GPU"
+vendor_unmasked = "Apple Inc."
+renderer_unmasked = "Apple GPU"
+
+[persona.canvas]
+noise_seed = 0
+
+[persona.audio]
+noise_seed = 0
+
+[persona.fonts]
+available = ["Helvetica Neue", "Gill Sans", "Menlo", "Arial Unicode MS"]
+
+[persona.network]
+ja4 = "t13d3112h2_5e9183dafe04_e7c285222651"
+ja4h_template = "fonn11nn05enus"
+http2_akamai = "2:0,3:100,4:2097152,8:1,9:1|10485760|0|m,a,s,p"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "normal"
+mouse_persona = "desk_mouse_windmouse"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-template-desktop-safari-macos"
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -445,6 +553,58 @@ mod tests {
             let persona = sampler
                 .sample(PersonaClass::DesktopFirefoxStableLinux, &mut rng)
                 .expect("Firefox sampler returned validation failure");
+            proptest::prop_assert!(validator::validate(&persona).is_ok());
+        }
+    }
+
+    // --- Safari macOS (W3A.6.2 #72) ---
+
+    #[test]
+    fn sample_desktop_safari_macos_passes_validator() {
+        let sampler = Sampler::new();
+        let mut rng = deterministic_rng();
+        let persona = sampler
+            .sample(PersonaClass::DesktopSafariMacOS, &mut rng)
+            .expect("Safari sampler must produce valid persona");
+        validator::validate(&persona).expect("post-validate consistency");
+    }
+
+    #[test]
+    fn safari_sample_carries_safari_family_marker() {
+        let sampler = Sampler::new();
+        let mut rng = deterministic_rng();
+        let p = sampler
+            .sample(PersonaClass::DesktopSafariMacOS, &mut rng)
+            .unwrap();
+        assert_eq!(
+            p.persona.browser_family,
+            crate::schema::BrowserFamily::Safari
+        );
+        assert_eq!(p.persona.browser_version, "26.4");
+        assert_eq!(p.persona.platform.os_family, "macOS");
+        // Safari UA contains the version per rule 1.
+        assert!(p.persona.user_agent.full.contains("Version/26.4"));
+        // Safari, like Firefox, does not advertise UA-CH brands.
+        assert!(p.persona.user_agent.ua_ch.brands.is_empty());
+        // macOS-only fonts are legal on a macOS persona — rule C's
+        // Linux-only gate auto-skips. This sanity-check catches a
+        // future regression where the gate is widened incorrectly.
+        assert!(p
+            .persona
+            .fonts
+            .available
+            .iter()
+            .any(|f| f == "Helvetica Neue"));
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn prop_every_sampled_safari_persona_validates(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let sampler = Sampler::new();
+            let persona = sampler
+                .sample(PersonaClass::DesktopSafariMacOS, &mut rng)
+                .expect("Safari sampler returned validation failure");
             proptest::prop_assert!(validator::validate(&persona).is_ok());
         }
     }
