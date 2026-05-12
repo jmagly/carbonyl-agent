@@ -74,6 +74,17 @@ pub enum PersonaClass {
     /// hardware bounds, and ARM-class WebGL renderer. Provenance documented
     /// inline in [`MOBILE_CHROME_ANDROID`] and the matching corpus TOML.
     MobileChromeAndroid,
+    /// Safari on iOS (mobile).
+    ///
+    /// W3A.6.4 — `Refs: roctinam/carbonyl-agent#74`. Fourth and final
+    /// family in the W3A.6 sequence. Safari iOS shares the desktop
+    /// Safari TLS stack (Apple's Network framework is unified across
+    /// macOS and iOS) — same JA4 and H2 SETTINGS reference as
+    /// `DesktopSafariMacOS`. Distinction is at the UA / platform /
+    /// screen / fonts layer. Like desktop Safari, sends no UA-CH.
+    /// Provenance documented inline in [`MOBILE_SAFARI_IOS`] and the
+    /// matching corpus TOML.
+    MobileSafariIOS,
 }
 
 /// Errors surfaced by the sampler.
@@ -154,6 +165,7 @@ fn template_for(class: PersonaClass) -> &'static str {
         PersonaClass::DesktopFirefoxStableLinux => DESKTOP_FIREFOX_STABLE_LINUX,
         PersonaClass::DesktopSafariMacOS => DESKTOP_SAFARI_MACOS,
         PersonaClass::MobileChromeAndroid => MOBILE_CHROME_ANDROID,
+        PersonaClass::MobileSafariIOS => MOBILE_SAFARI_IOS,
     }
 }
 
@@ -526,6 +538,106 @@ mouse_persona = "touch_tap"
 user_data_dir = "/tmp/persona-template-mobile-chrome-android"
 "#;
 
+/// Safari 26 on iOS 18.7 (mobile). W3A.6.4
+/// (`Refs: roctinam/carbonyl-agent#74`). Final W3A.6 family.
+///
+/// # Provenance
+///
+/// - Browser-info fields: BrowserForge MIT corpus, sampled with
+///   `FingerprintGenerator(browser=['safari'], os=['ios'],
+///   device=['mobile'])` on 2026-05-12. Generated UA reflects the actual
+///   iOS 18.x / Safari 26.x release combination.
+/// - TLS-layer fields: SAME as desktop Safari macOS — Apple's Network
+///   framework (Secure Transport) is unified across macOS and iOS, so
+///   JA4 / H2 SETTINGS match `DESKTOP_SAFARI_MACOS` verbatim.
+///
+/// # Schema accommodation
+///
+/// - `os_family = "iOS"` — new value (not Linux/macOS/Windows/Android)
+/// - `ua_ch.mobile = true`, `ua_ch.platform = "iOS"`, `ua_ch.brands = []`
+///   (Safari doesn't send UA-CH on either macOS or iOS)
+/// - `apply_persona` gates sec-ch-ua* on `browser_family == Chrome` (post
+///   #71), so the Safari family's no-UA-CH contract holds automatically
+/// - Validator rules:
+///   - Rules 2/3/F skip (browser_family = Safari)
+///   - Rules C/D/E skip (os_family != Linux)
+///   - Rule A: hwc 4 + mem 8 ≤ 8 ✓ (Apple A-series chips report 4-6
+///     `hardwareConcurrency` typically)
+///   - Rule B: os_family ↔ ua_ch.platform → both "iOS" ✓
+///   - Rule G: en-US + America/New_York ✓
+///
+/// Apple frosting note: Safari iOS uses 15E148 in the UA as a frozen
+/// build identifier. Real iOS Safari UAs preserve `Mobile/15E148
+/// Safari/604.1` even across iOS major bumps.
+const MOBILE_SAFARI_IOS: &str = r#"
+[persona]
+id = "persona-template-mobile-safari-ios"
+generator_version = "2026.05.12"
+browser_family = "safari"
+browser_version = "26.4"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "iOS"
+os_version = "18.7"
+arch = "arm64"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1"
+
+[persona.user_agent.ua_ch]
+brands = []
+mobile = true
+platform = "iOS"
+platform_version = "18.7.0"
+architecture = ""
+bitness = "64"
+
+[persona.locale]
+accept_language = "en-US,en;q=0.9"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 402
+screen_height = 874
+color_depth = 24
+device_pixel_ratio = 3.0
+hardware_concurrency = 4
+device_memory = 8
+max_touch_points = 5
+
+[persona.webgl]
+vendor = "Apple Inc."
+renderer = "Apple GPU"
+vendor_unmasked = "Apple Inc."
+renderer_unmasked = "Apple GPU"
+
+[persona.canvas]
+noise_seed = 0
+
+[persona.audio]
+noise_seed = 0
+
+[persona.fonts]
+available = ["Helvetica Neue", "Gill Sans", "Menlo", "SF Pro Display"]
+
+[persona.network]
+ja4 = "t13d3112h2_5e9183dafe04_e7c285222651"
+ja4h_template = "fonn11nn05enus"
+http2_akamai = "2:0,3:100,4:2097152,8:1,9:1|10485760|0|m,a,s,p"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "mobile_thumb"
+mouse_persona = "touch_tap"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-template-mobile-safari-ios"
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -760,6 +872,63 @@ mod tests {
             let persona = sampler
                 .sample(PersonaClass::MobileChromeAndroid, &mut rng)
                 .expect("Mobile Chrome sampler returned validation failure");
+            proptest::prop_assert!(validator::validate(&persona).is_ok());
+        }
+    }
+
+    // --- Mobile Safari iOS (W3A.6.4 #74) ---
+
+    #[test]
+    fn sample_mobile_safari_ios_passes_validator() {
+        let sampler = Sampler::new();
+        let mut rng = deterministic_rng();
+        let persona = sampler
+            .sample(PersonaClass::MobileSafariIOS, &mut rng)
+            .expect("Mobile Safari iOS sampler must produce valid persona");
+        validator::validate(&persona).expect("post-validate consistency");
+    }
+
+    #[test]
+    fn mobile_safari_carries_ios_markers() {
+        let sampler = Sampler::new();
+        let mut rng = deterministic_rng();
+        let p = sampler
+            .sample(PersonaClass::MobileSafariIOS, &mut rng)
+            .unwrap();
+        // Safari family, no UA-CH brands emitted.
+        assert_eq!(
+            p.persona.browser_family,
+            crate::schema::BrowserFamily::Safari
+        );
+        assert!(p.persona.user_agent.ua_ch.brands.is_empty());
+        // iOS-specific markers.
+        assert_eq!(p.persona.platform.os_family, "iOS");
+        assert_eq!(p.persona.user_agent.ua_ch.platform, "iOS");
+        assert!(p.persona.user_agent.ua_ch.mobile);
+        assert_eq!(p.persona.platform.arch, "arm64");
+        // UA shape: iPhone + Mobile/15E148.
+        assert!(p.persona.user_agent.full.contains("iPhone"));
+        assert!(p.persona.user_agent.full.contains("Mobile/15E148"));
+        // Touch screen + Retina@3x typical iPhone.
+        assert_eq!(p.persona.device.max_touch_points, 5);
+        assert_eq!(p.persona.device.device_pixel_ratio, 3.0);
+        // Apple GPU.
+        assert_eq!(p.persona.webgl.renderer, "Apple GPU");
+        // Shares Safari macOS TLS values (unified Network framework).
+        assert_eq!(
+            p.persona.network.ja4,
+            "t13d3112h2_5e9183dafe04_e7c285222651"
+        );
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn prop_every_sampled_mobile_safari_persona_validates(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let sampler = Sampler::new();
+            let persona = sampler
+                .sample(PersonaClass::MobileSafariIOS, &mut rng)
+                .expect("Mobile Safari iOS sampler returned validation failure");
             proptest::prop_assert!(validator::validate(&persona).is_ok());
         }
     }

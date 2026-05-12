@@ -214,6 +214,18 @@ impl ConformanceFixture {
         Self::from_persona("mobile-chrome-android", persona).expect("fixture")
     }
 
+    /// Built-in fixture: Mobile Safari 26 on iOS. W3A.6.4 (`Refs:
+    /// roctinam/carbonyl-agent#74`). Final W3A.6 family.
+    ///
+    /// Required headers exclude all `sec-ch-ua*` entries — Safari (mobile
+    /// or desktop) never sends UA Client Hints. Shares the desktop Safari
+    /// macOS TLS reference (Apple's Network framework is unified across
+    /// macOS and iOS). Provenance: see `sampler::MOBILE_SAFARI_IOS`.
+    pub fn mobile_safari_ios() -> Self {
+        let persona: Persona = toml::from_str(MOBILE_SAFARI_IOS_TEMPLATE).expect("template parses");
+        Self::from_persona("mobile-safari-ios", persona).expect("fixture")
+    }
+
     /// Construct a fixture from a persona, deriving the expected wire
     /// values from the persona's own `network` and `user_agent` fields.
     /// This is what the conformance contract asserts: the persona spec IS
@@ -397,6 +409,78 @@ fn header_field_name(name: &str) -> &'static str {
 // ---------------------------------------------------------------------------
 // Built-in fixtures
 // ---------------------------------------------------------------------------
+
+/// Mobile Safari 26 iOS template. W3A.6.4 (`Refs:
+/// roctinam/carbonyl-agent#74`). Mirrors `sampler::MOBILE_SAFARI_IOS`
+/// — drift between the two is itself a conformance bug.
+const MOBILE_SAFARI_IOS_TEMPLATE: &str = r#"
+[persona]
+id = "persona-test-mobile-safari-ios"
+generator_version = "2026.05.12"
+browser_family = "safari"
+browser_version = "26.4"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "iOS"
+os_version = "18.7"
+arch = "arm64"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1"
+
+[persona.user_agent.ua_ch]
+brands = []
+mobile = true
+platform = "iOS"
+platform_version = "18.7.0"
+architecture = ""
+bitness = "64"
+
+[persona.locale]
+accept_language = "en-US,en;q=0.9"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 402
+screen_height = 874
+color_depth = 24
+device_pixel_ratio = 3.0
+hardware_concurrency = 4
+device_memory = 8
+max_touch_points = 5
+
+[persona.webgl]
+vendor = "Apple Inc."
+renderer = "Apple GPU"
+vendor_unmasked = "Apple Inc."
+renderer_unmasked = "Apple GPU"
+
+[persona.canvas]
+noise_seed = 0
+
+[persona.audio]
+noise_seed = 0
+
+[persona.fonts]
+available = ["Helvetica Neue", "Gill Sans", "Menlo", "SF Pro Display"]
+
+[persona.network]
+ja4 = "t13d3112h2_5e9183dafe04_e7c285222651"
+ja4h_template = "fonn11nn05enus"
+http2_akamai = "2:0,3:100,4:2097152,8:1,9:1|10485760|0|m,a,s,p"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "mobile_thumb"
+mouse_persona = "touch_tap"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-test-mobile-safari-ios"
+"#;
 
 /// Mobile Chrome 147 Android template. W3A.6.3 (`Refs:
 /// roctinam/carbonyl-agent#73`). Mirrors `sampler::MOBILE_CHROME_ANDROID`
@@ -1179,5 +1263,54 @@ mod tests {
             .collect();
         assert_eq!(h.get("sec-ch-ua-mobile"), Some(&"?1"));
         assert_eq!(h.get("sec-ch-ua-platform"), Some(&"Android"));
+    }
+
+    // --- Mobile Safari iOS conformance (W3A.6.4 #74) ---
+
+    #[test]
+    fn fixture_mobile_safari_ios_loads_and_self_describes() {
+        let f = ConformanceFixture::mobile_safari_ios();
+        assert_eq!(f.label, "mobile-safari-ios");
+        assert_eq!(
+            f.persona.persona.browser_family,
+            crate::schema::BrowserFamily::Safari
+        );
+        assert_eq!(f.persona.persona.platform.os_family, "iOS");
+        assert!(f.persona.persona.user_agent.ua_ch.mobile);
+        // Shares the desktop Safari macOS TLS reference — unified Apple
+        // Network framework across macOS and iOS.
+        assert_eq!(f.expected_ja4, "t13d3112h2_5e9183dafe04_e7c285222651");
+        assert_eq!(
+            f.expected_h2_settings.entries,
+            vec![(2, 0), (3, 100), (4, 2097152), (8, 1), (9, 1)]
+        );
+    }
+
+    #[test]
+    fn mobile_safari_fixture_required_headers_exclude_sec_ch_ua() {
+        let f = ConformanceFixture::mobile_safari_ios();
+        // Safari iOS never sends UA-CH — same contract as desktop Safari.
+        assert!(f.required_headers.contains_key("User-Agent"));
+        assert!(f.required_headers.contains_key("Accept-Language"));
+        for name in f.required_headers.keys() {
+            assert!(
+                !name.starts_with("sec-ch-ua"),
+                "Mobile Safari fixture must not require {name}"
+            );
+        }
+        assert_eq!(f.required_headers.len(), 2);
+    }
+
+    #[test]
+    fn vec_recorder_conforms_to_mobile_safari_ios() {
+        let f = ConformanceFixture::mobile_safari_ios();
+        let mut c = VecRecorder::default();
+        conform(&mut c, &f).expect("VecRecorder must conform to Mobile Safari");
+        for (name, _) in c.applied_headers() {
+            assert!(
+                !name.starts_with("sec-ch-ua"),
+                "apply_persona must not emit {name} for Mobile Safari personas"
+            );
+        }
     }
 }
