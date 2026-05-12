@@ -82,6 +82,15 @@ pub struct CapturedHandshake {
     /// or handshake. Preserved for test diagnostics; assertion-style
     /// callers should still inspect `handshake_complete`.
     pub error: Option<String>,
+
+    /// Application-data bytes the client sent after handshake completion.
+    /// For HTTP/2 clients this starts with the connection preface
+    /// (`PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n`) followed by SETTINGS and
+    /// (typically) WINDOW_UPDATE frames. Layer 2.3 (#78) consumes this
+    /// via `parse_h2_initial_frames`. Empty when no app data arrived
+    /// before the drain timeout fires (e.g. http/1.1 clients that close
+    /// before sending a request).
+    pub h2_bytes: Vec<u8>,
 }
 
 /// One-shot localhost TLS responder for Layer 2 wire-level conformance
@@ -193,14 +202,35 @@ async fn capture_one(listener: TcpListener, acceptor: TlsAcceptor) -> CapturedHa
             captured.negotiated_alpn = alpn.map(|b| String::from_utf8_lossy(b).into_owned());
             captured.handshake_complete = true;
 
-            // Drain anything the client wants to send (so the test
-            // client doesn't get reset-by-peer when it pushes its first
-            // request). Then close cleanly.
-            let mut drain = vec![0u8; 4096];
-            // Best-effort read with a short timeout — we don't actually
-            // need the data, just to absorb it so the client's write
-            // succeeds.
-            let _ = timeout(Duration::from_millis(200), tls.read(&mut drain)).await;
+            // Read whatever the client wants to send post-handshake.
+            // For HTTP/2 this is the connection preface + initial
+            // SETTINGS/WINDOW_UPDATE frames; Layer 2.3 (#78) parses
+            // these. Read in a short loop so multi-chunk transmissions
+            // get assembled; bail when the client pauses (no more data
+            // within the inter-read timeout) or we exceed the total
+            // budget.
+            let total_budget = Duration::from_millis(500);
+            let between_reads = Duration::from_millis(100);
+            let start = std::time::Instant::now();
+            let mut buf = vec![0u8; 4096];
+            while start.elapsed() < total_budget {
+                let remaining = total_budget.saturating_sub(start.elapsed());
+                let read_timeout = std::cmp::min(between_reads, remaining);
+                match timeout(read_timeout, tls.read(&mut buf)).await {
+                    Ok(Ok(0)) => break, // EOF
+                    Ok(Ok(n)) => captured.h2_bytes.extend_from_slice(&buf[..n]),
+                    Ok(Err(_)) => break, // read error
+                    Err(_) => {
+                        // Idle period; if we've captured at least the
+                        // preface (24 bytes) + a SETTINGS frame header
+                        // (9 bytes), assume the client is waiting for
+                        // server SETTINGS and stop reading.
+                        if captured.h2_bytes.len() >= 33 {
+                            break;
+                        }
+                    }
+                }
+            }
             let _ = tls.shutdown().await;
         }
         Err(e) => {

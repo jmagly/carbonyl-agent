@@ -124,6 +124,51 @@ impl std::fmt::Display for ConformanceReport {
 
 impl std::error::Error for ConformanceReport {}
 
+/// Wire-level snapshot of what a backend actually emitted on the network
+/// (W3B.2.4 — `Refs: roctinam/carbonyl-agent#79`).
+///
+/// Layer 2 captures TLS ClientHello bytes + HTTP/2 SETTINGS bytes from a
+/// real connection through `LocalTlsResponder`, computes JA4 per the FoxIO
+/// spec, parses the H2 frames, and packages everything into this struct.
+/// [`ConformanceFixture::assert_wire_state`] then diffs it against the
+/// fixture's `expected_*` values.
+///
+/// This struct is intentionally async-runtime-free — building one from
+/// captured bytes happens in the test crate; this production module only
+/// asserts the shape matches the fixture's expectations. That keeps the
+/// production rlib + cdylib from pulling in `tokio`, `rustls`, `h2`,
+/// `tls-parser` etc. Layer 2's test crates (`tests/wire_responder.rs`,
+/// `tests/wire_ja4.rs`, `tests/wire_h2.rs`) compose the snapshot.
+///
+/// External backends (e.g. the wreq integration in #75) build their own
+/// `WireSnapshot` from their wire capture pipeline and call
+/// `assert_wire_state`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WireSnapshot {
+    /// JA4 string computed from the captured ClientHello.
+    pub ja4: String,
+    /// ALPN protocol the server selected (or the client offered and the
+    /// server confirmed). Single string, not a list — Akamai diff
+    /// semantics use the SELECTED protocol, not the list of offered.
+    /// When `expected_alpn` (Vec) is diffed, this value must equal the
+    /// FIRST entry per the fixture's H2-first ALPN ordering.
+    pub negotiated_alpn: Option<String>,
+    /// HTTP/2 SETTINGS entries captured in send order.
+    pub h2_settings: H2Settings,
+    /// First connection-level WINDOW_UPDATE increment.
+    pub h2_window_update: H2WindowUpdate,
+    /// PRIORITY frames captured. Layer 2.3 left this as default; richer
+    /// parsing would land in a follow-up if W3A.6.x personas grow
+    /// distinct priority shapes.
+    pub h2_priority: H2Priority,
+    /// Akamai-shape string composed from the SETTINGS + WINDOW_UPDATE +
+    /// PRIORITY captures (see `wire_h2::compose_akamai`). For diff
+    /// diagnostics — Akamai-shape equality with `persona.network.http2_akamai`
+    /// is the primary assertion, with the individual fields above as
+    /// secondary structural assertions.
+    pub akamai_string: String,
+}
+
 /// Inspection contract a backend's test wrapper implements so the conformance
 /// suite can read back what `apply_persona` produced.
 ///
@@ -286,6 +331,100 @@ impl ConformanceFixture {
             required_headers: headers,
             persona,
         })
+    }
+
+    /// Diff a captured [`WireSnapshot`] against the fixture's expected
+    /// wire values. Layer 2 capture pipeline produces the snapshot; this
+    /// method is the Layer 2.4 verdict (W3B.2.4 — #79).
+    ///
+    /// Differences from [`assert_applied_state`]:
+    /// - Layer 1 (`assert_applied_state`) checks the in-memory state of a
+    ///   backend's builder — was JA4 routed correctly? Were headers set?
+    /// - Layer 2 (`assert_wire_state`, this method) checks the on-wire
+    ///   bytes — did the JA4 actually MATCH on the network? Were the
+    ///   H2 SETTINGS frames the persona promised?
+    ///
+    /// Both layers report through [`ConformanceReport`]. A backend that
+    /// passes Layer 1 but fails Layer 2 has a setter implementation gap
+    /// (the setter accepted the value but didn't push it to the wire).
+    pub fn assert_wire_state(&self, snapshot: &WireSnapshot) -> ConformanceReport {
+        let mut report = ConformanceReport::default();
+
+        if snapshot.ja4 != self.expected_ja4 {
+            report.mismatches.push(ConformanceMismatch {
+                field: "wire.ja4",
+                expected: self.expected_ja4.clone(),
+                actual: snapshot.ja4.clone(),
+            });
+        }
+
+        // ALPN: fixture's `expected_alpn` is a list of offered protocols
+        // in client-preference order. The wire snapshot carries the
+        // negotiated single protocol — must match the FIRST entry the
+        // client offered (assuming the server accepted preference 0).
+        match (&snapshot.negotiated_alpn, self.expected_alpn.first()) {
+            (Some(actual), Some(expected)) if actual == expected => {}
+            (Some(actual), Some(expected)) => {
+                report.mismatches.push(ConformanceMismatch {
+                    field: "wire.alpn",
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                });
+            }
+            (None, Some(expected)) => {
+                report.mismatches.push(ConformanceMismatch {
+                    field: "wire.alpn",
+                    expected: expected.clone(),
+                    actual: "<none negotiated>".into(),
+                });
+            }
+            (Some(actual), None) => {
+                report.mismatches.push(ConformanceMismatch {
+                    field: "wire.alpn",
+                    expected: "<fixture has empty ALPN list>".into(),
+                    actual: actual.clone(),
+                });
+            }
+            (None, None) => {}
+        }
+
+        if snapshot.h2_settings != self.expected_h2_settings {
+            report.mismatches.push(ConformanceMismatch {
+                field: "wire.h2_settings",
+                expected: format!("{:?}", self.expected_h2_settings.entries),
+                actual: format!("{:?}", snapshot.h2_settings.entries),
+            });
+        }
+
+        if snapshot.h2_window_update != self.expected_h2_window {
+            report.mismatches.push(ConformanceMismatch {
+                field: "wire.h2_window",
+                expected: format!("{}", self.expected_h2_window.0),
+                actual: format!("{}", snapshot.h2_window_update.0),
+            });
+        }
+
+        if snapshot.h2_priority != self.expected_h2_priority {
+            report.mismatches.push(ConformanceMismatch {
+                field: "wire.h2_priority",
+                expected: format!("{:?}", self.expected_h2_priority),
+                actual: format!("{:?}", snapshot.h2_priority),
+            });
+        }
+
+        // Top-level Akamai-shape equality — informational diagnostic in
+        // addition to the per-field diffs above. Catches drift in the
+        // composer that the individual diffs wouldn't surface (e.g. a
+        // pseudo-header-order regression in a future Layer 2.5 sub-PR).
+        if snapshot.akamai_string != self.persona.persona.network.http2_akamai {
+            report.mismatches.push(ConformanceMismatch {
+                field: "wire.akamai_string",
+                expected: self.persona.persona.network.http2_akamai.clone(),
+                actual: snapshot.akamai_string.clone(),
+            });
+        }
+
+        report
     }
 
     /// Apply the fixture's persona to `client`, then read back via
@@ -1312,5 +1451,119 @@ mod tests {
                 "apply_persona must not emit {name} for Mobile Safari personas"
             );
         }
+    }
+
+    // ---- Layer 2.4: assert_wire_state ----
+    //
+    // Builds a `WireSnapshot` from the fixture's own expected values and
+    // confirms the round-trip is clean. Then perturbs each field
+    // individually and verifies the mismatch is surfaced.
+
+    fn fixture_to_snapshot(f: &ConformanceFixture) -> WireSnapshot {
+        WireSnapshot {
+            ja4: f.expected_ja4.clone(),
+            negotiated_alpn: f.expected_alpn.first().cloned(),
+            h2_settings: f.expected_h2_settings.clone(),
+            h2_window_update: f.expected_h2_window,
+            h2_priority: f.expected_h2_priority.clone(),
+            akamai_string: f.persona.persona.network.http2_akamai.clone(),
+        }
+    }
+
+    #[test]
+    fn wire_state_matches_chrome_147_baseline() {
+        let f = ConformanceFixture::chrome_147_stable_linux();
+        let snap = fixture_to_snapshot(&f);
+        let report = f.assert_wire_state(&snap);
+        assert!(
+            report.mismatches.is_empty(),
+            "baseline snapshot must be empty, got {:?}",
+            report.mismatches
+        );
+    }
+
+    #[test]
+    fn wire_state_detects_ja4_drift() {
+        let f = ConformanceFixture::chrome_147_stable_linux();
+        let mut snap = fixture_to_snapshot(&f);
+        snap.ja4 = "t13d1516h2_DEADBEEF_02713d6af862".into();
+        let report = f.assert_wire_state(&snap);
+        let m = report
+            .mismatches
+            .iter()
+            .find(|m| m.field == "wire.ja4")
+            .expect("ja4 mismatch must surface");
+        assert_eq!(m.expected, f.expected_ja4);
+    }
+
+    #[test]
+    fn wire_state_detects_alpn_mismatch() {
+        let f = ConformanceFixture::chrome_147_stable_linux();
+        let mut snap = fixture_to_snapshot(&f);
+        snap.negotiated_alpn = Some("http/1.1".into()); // fallback, not preferred
+        let report = f.assert_wire_state(&snap);
+        assert!(report.mismatches.iter().any(|m| m.field == "wire.alpn"));
+    }
+
+    #[test]
+    fn wire_state_detects_missing_alpn() {
+        let f = ConformanceFixture::chrome_147_stable_linux();
+        let mut snap = fixture_to_snapshot(&f);
+        snap.negotiated_alpn = None;
+        let report = f.assert_wire_state(&snap);
+        let m = report
+            .mismatches
+            .iter()
+            .find(|m| m.field == "wire.alpn")
+            .expect("absent ALPN must surface");
+        assert!(m.actual.contains("<none negotiated>"));
+    }
+
+    #[test]
+    fn wire_state_detects_h2_window_drift() {
+        let f = ConformanceFixture::chrome_147_stable_linux();
+        let mut snap = fixture_to_snapshot(&f);
+        snap.h2_window_update = H2WindowUpdate(123);
+        let report = f.assert_wire_state(&snap);
+        assert!(report
+            .mismatches
+            .iter()
+            .any(|m| m.field == "wire.h2_window"));
+    }
+
+    #[test]
+    fn wire_state_detects_akamai_drift() {
+        let f = ConformanceFixture::chrome_147_stable_linux();
+        let mut snap = fixture_to_snapshot(&f);
+        snap.akamai_string = "1:0|0|0|m,a,s,p".into();
+        let report = f.assert_wire_state(&snap);
+        assert!(report
+            .mismatches
+            .iter()
+            .any(|m| m.field == "wire.akamai_string"));
+    }
+
+    #[test]
+    fn wire_state_matches_firefox_baseline() {
+        let f = ConformanceFixture::firefox_150_stable_linux();
+        let snap = fixture_to_snapshot(&f);
+        let report = f.assert_wire_state(&snap);
+        assert!(
+            report.mismatches.is_empty(),
+            "firefox baseline snapshot must round-trip clean, got {:?}",
+            report.mismatches
+        );
+    }
+
+    #[test]
+    fn wire_state_matches_safari_baseline() {
+        let f = ConformanceFixture::safari_26_macos();
+        let snap = fixture_to_snapshot(&f);
+        let report = f.assert_wire_state(&snap);
+        assert!(
+            report.mismatches.is_empty(),
+            "safari baseline snapshot must round-trip clean, got {:?}",
+            report.mismatches
+        );
     }
 }
