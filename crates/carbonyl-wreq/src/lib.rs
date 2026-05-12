@@ -26,4 +26,4 @@
 
 pub mod client;
 
-pub use client::{PendingConfig, WreqClient, WreqError};
+pub use client::{persona_to_emulation, PendingConfig, WreqClient, WreqError};

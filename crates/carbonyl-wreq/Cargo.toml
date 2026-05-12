@@ -21,3 +21,20 @@ thiserror = "2"
 wreq = "5"
 wreq-util = "2"
 http = "1"
+
+# Layer 2 wire conformance (W3B.Phase2.3 — `Refs: roctinam/carbonyl-agent#82`).
+# These dev-deps mirror carbonyl-fingerprint's so the Layer 2 parser
+# modules (wire_responder, wire_ja4, wire_h2) can be re-included into
+# this crate's test crate via `#[path]`.
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "time", "sync"] }
+rustls = "0.23"
+tokio-rustls = "0.26"
+rcgen = "0.13"
+tls-parser = "0.12"
+hex = "0.4"
+sha2 = "0.10"
+thiserror = "2"
+h2 = "0.4"
+proptest = "1"
+rand = "0.8"

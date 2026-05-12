@@ -241,8 +241,18 @@ name = "carbonyl-wreq"
 version = "0.0.1-alpha.1"
 dependencies = [
  "carbonyl-fingerprint",
+ "h2",
+ "hex",
  "http",
+ "proptest",
+ "rand 0.8.6",
+ "rcgen",
+ "rustls",
+ "sha2",
  "thiserror",
+ "tls-parser",
+ "tokio",
+ "tokio-rustls",
  "wreq",
  "wreq-util",
 ]
