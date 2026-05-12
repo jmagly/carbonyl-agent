@@ -62,7 +62,7 @@ jobs:
             -e CARGO_HOME=/tmp/cargo \
             -e DEBIAN_FRONTEND=noninteractive \
             rust:latest \
-            sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config && rustup component add clippy 2>/dev/null || true; cargo clippy --workspace --all-targets -- -D warnings"
+            sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config python3-dev && rustup component add clippy 2>/dev/null || true; cargo clippy --workspace --all-targets -- -D warnings"
 
       - name: cargo test (workspace)
         run: |
@@ -72,7 +72,7 @@ jobs:
             -e CARGO_HOME=/tmp/cargo \
             -e DEBIAN_FRONTEND=noninteractive \
             rust:latest \
-            sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config && cargo test --workspace --all-targets"
+            sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config python3-dev && cargo test --workspace --all-targets"
 
       # Verifies `.carbonyl-fingerprint-version` matches the resolved
       # wreq SHA in Cargo.lock (per ADR-005 bus-factor mitigation #1,

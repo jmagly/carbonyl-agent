@@ -8,7 +8,19 @@ repository = "https://git.integrolabs.net/roctinam/carbonyl-agent"
 
 [lib]
 name = "carbonyl_wreq"
-crate-type = ["rlib"]
+# cdylib enables building as a Python extension module via maturin
+# when the `python` feature is active. rlib keeps the crate usable as
+# a normal Rust dep by carbonyl-wreq's own integration tests
+# (Layer 2 conformance, etc.).
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+# PyO3 bindings (src/python.rs) — build with:
+#   maturin develop --manifest-path crates/carbonyl-wreq/Cargo.toml --features python
+# Pulls in pyo3 + a multi-threaded tokio runtime; both are gated so
+# pure-Rust consumers don't pay the cost.
+python = ["dep:pyo3", "dep:tokio"]
 
 [dependencies]
 carbonyl-fingerprint = { path = "../carbonyl-fingerprint" }
@@ -21,6 +33,13 @@ thiserror = "2"
 wreq = "5"
 wreq-util = "2"
 http = "1"
+# toml parser only needed for the python feature's persona-TOML
+# entry point; cheap to include unconditionally vs gating.
+toml = "0.8"
+
+# Optional — only present when the `python` feature is on.
+pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
+tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 
 # Layer 2 wire conformance (W3B.Phase2.3 — `Refs: roctinam/carbonyl-agent#82`).
 # These dev-deps mirror carbonyl-fingerprint's so the Layer 2 parser

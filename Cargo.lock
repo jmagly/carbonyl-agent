@@ -245,6 +245,7 @@ dependencies = [
  "hex",
  "http",
  "proptest",
+ "pyo3",
  "rand 0.8.6",
  "rcgen",
  "rustls",
@@ -253,6 +254,7 @@ dependencies = [
  "tls-parser",
  "tokio",
  "tokio-rustls",
+ "toml",
  "wreq",
  "wreq-util",
 ]

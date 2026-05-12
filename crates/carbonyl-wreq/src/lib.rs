@@ -27,3 +27,6 @@
 pub mod client;
 
 pub use client::{persona_to_emulation, PendingConfig, WreqClient, WreqError};
+
+#[cfg(feature = "python")]
+mod python;
