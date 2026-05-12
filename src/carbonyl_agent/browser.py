@@ -982,6 +982,56 @@ class CarbonylBrowser:
         """
         return self._persona_obj
 
+    def egress(self, **kwargs: Any) -> Any:
+        """Return a persona-bound :class:`carbonyl_agent.egress.EgressClient`
+        for HTTP traffic outside the browser (W3B #44).
+
+        The returned client carries this browser's persona and, when a
+        profile is active, its cookie jar path (so cookies set in either
+        surface are visible to the other on the next session). Keyword
+        arguments forward to :class:`EgressClient` — typically
+        ``audit_mode=`` and ``timeout=``.
+
+        Raises :class:`RuntimeError` when this browser was not constructed
+        with a typed :class:`Persona`. The string-form ``persona="name"``
+        profile-keying path does NOT populate :attr:`persona`, so it
+        can't drive egress fingerprinting — pass a real
+        :class:`Persona` object to enable egress.
+
+        Example::
+
+            from carbonyl_agent import CarbonylBrowser, Persona
+
+            p = Persona.from_path("personas/ghost-01.toml")
+            b = CarbonylBrowser(persona=p)
+            r = b.egress().get("https://api.example.com/v1/me")
+        """
+        if self._persona_obj is None:
+            raise RuntimeError(
+                "browser.egress() requires a typed Persona — construct with "
+                "CarbonylBrowser(persona=Persona.from_path(...)). The string "
+                "form persona='name' is for profile-name keying only."
+            )
+        from carbonyl_agent.egress import EgressClient
+
+        # Resolve cookie jar path from the active profile, if any. The
+        # profile manager owns the user-data-dir; we co-locate the
+        # egress cookie jar alongside Chromium's cookies SQLite so
+        # operators see all cookie state in one place.
+        cookie_jar_path = kwargs.pop("cookie_jar_path", None)
+        if cookie_jar_path is None and self._profile_manager is not None:
+            try:
+                profile_dir = Path(self._profile_manager.profile_dir)
+                cookie_jar_path = profile_dir / "egress-cookies.jsonl"
+            except Exception:  # noqa: BLE001 — best-effort cookie jar resolution
+                cookie_jar_path = None
+
+        return EgressClient(
+            self._persona_obj,
+            cookie_jar_path=cookie_jar_path,
+            **kwargs,
+        )
+
     def _release_profile(self) -> None:
         if self._profile_manager is not None:
             try:

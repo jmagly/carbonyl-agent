@@ -28,6 +28,12 @@ bench = [
 docs = [
     "pdoc>=14.0",
 ]
+# W3B (#44) — persona-bound HTTP egress. Phase 1 ships an httpx-backed
+# client with audit/drift detection; Phase 2 will swap in a Rust wreq
+# backend behind the same HttpClient trait for actual JA4 emission.
+egress = [
+    "httpx>=0.27",
+]
 
 [tool.pytest.ini_options]
 markers = [

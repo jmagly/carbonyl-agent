@@ -37,6 +37,14 @@ from carbonyl_agent.daemon import (  # noqa: F401
     start_daemon,
     stop_daemon,
 )
+from carbonyl_agent.egress import (  # noqa: F401
+    EgressAuditEntry,
+    EgressAuditLog,
+    EgressAuditMode,
+    EgressClient,
+    EgressError,
+    EgressFingerprintDrift,
+)
 from carbonyl_agent.exceptions import (  # noqa: F401
     BrowserCrashed,
     CarbonylError,
@@ -96,4 +104,11 @@ __all__ = [
     "Persona",
     "PersonaValidationError",
     "persona_to_chromium_flags",
+    # W3B egress (#44) — persona-bound HTTP client
+    "EgressClient",
+    "EgressAuditEntry",
+    "EgressAuditLog",
+    "EgressAuditMode",
+    "EgressError",
+    "EgressFingerprintDrift",
 ]
