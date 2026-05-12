@@ -43,3 +43,7 @@ rustls-pemfile = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "time", "sync"] }
 tokio-rustls = "0.26"
 rcgen = "0.13"
+# JA4 algorithm — parses ClientHello bytes captured by LocalTlsResponder
+# (W3B.2.2 — `Refs: roctinam/carbonyl-agent#77`).
+tls-parser = "0.12"
+hex = "0.4"
