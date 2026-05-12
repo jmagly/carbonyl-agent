@@ -376,7 +376,6 @@ The browser session and the HTTP egress client share the same persona, so out-of
 ```python
 from carbonyl_agent import CarbonylBrowser
 from carbonyl_agent.persona_apply import Persona
-from carbonyl_agent.egress import EgressClient
 
 p = Persona.from_path("personas/chrome-147-stable-linux.toml")
 
@@ -385,12 +384,19 @@ with CarbonylBrowser(persona=p, viewport=(1280, 800)) as b:
     b.open("https://example.com/login")
     # ... drive the UI ...
 
-    # API call from the same session's identity. Headers, JA4 target,
-    # and HTTP/2 SETTINGS all come from the persona.
-    client = EgressClient(p)
-    r = client.get("https://api.example.com/profile")
+    # API call from the same session's identity. browser.egress() returns
+    # an EgressClient bound to this browser's persona and (when present)
+    # its profile cookie jar. Headers, JA4 target, and HTTP/2 SETTINGS
+    # all come from the persona.
+    r = b.egress().get("https://api.example.com/profile")
     print(r.status_code, r.json())
-    client.close()
+```
+
+`b.egress()` is the shorthand. Equivalent explicit construction:
+
+```python
+from carbonyl_agent.egress import EgressClient
+client = EgressClient(p)  # or EgressClient(b.persona)
 ```
 
 ### Transport selection
@@ -418,7 +424,33 @@ The build pulls BoringSSL via `boring-sys2` — install `clang`, `cmake`, `libcl
 
 ### Audit / drift detection
 
-Every egress request appends a JSON Lines row to the audit log with the persona's expected JA4, the captured JA4, status, latency, and the transport tag. STRICT mode (`CARBONYL_FP_AUDIT=strict`) raises `EgressFingerprintDrift` on mismatch; WARN logs it; OFF disables both.
+Every egress request appends a JSON Lines row to `~/.local/state/carbonyl-agent/egress-audit.log` (or `$XDG_STATE_HOME/carbonyl-agent/egress-audit.log` when set). STRICT mode (`CARBONYL_FP_AUDIT=strict`) raises `EgressFingerprintDrift` on mismatch; WARN logs it; OFF disables both.
+
+**Audit row schema** (one JSON object per line):
+
+| Field | Type | Notes |
+|---|---|---|
+| `request_id` | string | UUID per request |
+| `timestamp` | ISO-8601 UTC | |
+| `persona_id` | string | Persona's `id` field |
+| `method` | string | Uppercase HTTP verb |
+| `url` | string | Target URL |
+| `ja4_expected` | string | Persona's `network.ja4` |
+| `ja4_actual` | string | Wire-captured JA4 (wreq path) or `phase1-httpx-stdlib-ssl` sentinel (fallback path) |
+| `status_code` | int \| null | `null` on network failure |
+| `latency_ms` | float \| null | |
+| `drift` | bool | `ja4_actual != ja4_expected` |
+| `audit_mode` | string | `strict` / `warn` / `off` |
+| `transport` | string | `wreq` or `httpx-fallback` — added in 0.2.0a1 (#83) |
+
+### Why the browser stays on HTTP/1.1 while egress emits HTTP/2
+
+`CarbonylBrowser` passes `--disable-http2` in its `_HEADLESS_FLAGS` set. This is intentional and remains the default after Phase 2:
+
+- **Browser path** (terminal-rendered Chromium): HTTP/1.1 fallback. There is no SETTINGS-frame fingerprint to match a specific browser version against, which is the cheapest defense against H2-fingerprint-based bot detection on the browser surface.
+- **Egress path** (`EgressClient` + wreq when built): HTTP/2 with SETTINGS frame matching the persona's `network.http2_akamai`. Modern API endpoints generally require H2 and expect a browser-shaped H2 fingerprint; the wreq path delivers exactly that.
+
+Two-track behavior is deliberate. If your scenario needs the browser to also speak H2, drop `--disable-http2` from `extra_flags=`.
 
 ## Bot Detection Flags
 

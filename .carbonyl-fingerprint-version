@@ -9,11 +9,12 @@
 #                 crate registry mutates underneath us.
 #   wreq-source:  upstream URL of record (for the cold mirror in #60).
 #
-# CI (`.gitea/workflows/check.yml`, after #44 lands the wreq dep) will
-# compare the resolved Cargo.lock SHA against `wreq-sha` and fail on
-# drift. Until #44 is in flight the pin sits as forward-looking
-# infrastructure; values below are TBD placeholders that #44 must
-# replace as its first task.
+# CI (`.gitea/workflows/check.yml`) compares the resolved Cargo.lock
+# SHA against `wreq-sha` and fails on drift when `wreq-sha` is a
+# 40-char hex commit. Phase 2.2 (#81) resolved wreq from the crates.io
+# registry rather than a git pin, so `wreq-sha=registry` skips the
+# drift check (Cargo.lock + crates.io are the integrity record). A
+# future bump to a git pin restarts the drift check naturally.
 #
 # Pin-bump procedure: see `docs/wreq-pin-bumps.md`.
 #

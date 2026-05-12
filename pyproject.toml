@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "carbonyl-agent"
-version = "0.1.0a1"
+version = "0.2.0a1"
 description = "Python automation SDK for the Carbonyl headless browser"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,6 +13,16 @@ dependencies = [
     "pexpect>=4.9",
     "pyte>=0.8",
 ]
+
+[project.urls]
+# GitHub is the canonical public-facing remote (the mirror PyPI users
+# will hit). Gitea is the dev-primary remote per the project's CLAUDE.md
+# convention; declared here for completeness so issue links work for
+# both audiences.
+Homepage = "https://github.com/jmagly/carbonyl-agent"
+Repository = "https://github.com/jmagly/carbonyl-agent"
+Issues = "https://github.com/jmagly/carbonyl-agent/issues"
+Changelog = "https://github.com/jmagly/carbonyl-agent/blob/main/CHANGELOG.md"
 
 [project.scripts]
 carbonyl-agent = "carbonyl_agent.__main__:main"

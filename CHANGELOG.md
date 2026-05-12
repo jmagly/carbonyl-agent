@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0a1] - 2026-05-12
+
+Persona-bound browser + egress. The headline change: a single `Persona` object now drives both the browser session and the out-of-band HTTP egress path, so API calls a script makes around its browser session carry a matching TLS fingerprint instead of a Python-stdlib SSL signature.
+
+### Added — Persona system (W3A)
+
+- New Rust crate `carbonyl-fingerprint` — typed `Persona` schema (v2, with `BrowserFamily` enum and `browser_version` field), consistency validator (rules A–H covering hardware bounds, platform↔UA-CH alignment, Linux font/GPU exclusions, Chrome major↔H2 Akamai pairing, timezone↔language allowlist, deterministic noise seeds via HKDF-Expand), bounded-drift refresher, and a sampler with five family templates: Desktop Chrome 147 Linux, Desktop Firefox 150 Linux, Desktop Safari 26 macOS, Mobile Chrome 147 Android, Mobile Safari 26 iOS. PyO3 bindings expose `validate_toml()` and `is_valid_toml()`. (#43, #66, #68–#74)
+- `CarbonylBrowser(persona=...)` constructor accepts a typed `Persona` object — durable per-persona Chromium profile under `CARBONYL_AGENT_PROFILES_DIR` (default `~/.config/carbonyl-agent/profiles/`). File-locked, isolated from the runtime session store, portable across `input_backend="pty"` and `"uinput"`. Companion `purge_profile()`, `export_profile(path)`, `import_profile(path)` methods; `from carbonyl_agent import ProfileManager, list_personas`. `persona=` and `session=` are mutually exclusive. (#41, #45)
+- Corpus-driven Chrome reference loader for the validator. (#68)
+
+### Added — Persona-bound egress, Phase 1 (httpx + audit)
+
+- `carbonyl_agent.egress.EgressClient(persona)` — persona-aware HTTP client over httpx. Per-(persona, host) connection pool, automatic header injection (UA, Accept-Language, sec-ch-ua-* for Chrome family), JSON Lines audit log at `~/.local/state/carbonyl-agent/egress-audit.log` (or `$XDG_STATE_HOME/carbonyl-agent/...`), drift detector, STRICT/WARN/OFF modes via `CARBONYL_FP_AUDIT`. Audit row fields: `request_id`, `timestamp`, `persona_id`, `method`, `url`, `ja4_expected`, `ja4_actual`, `status_code`, `latency_ms`, `drift`, `audit_mode`, `transport`. (#44)
+- `CarbonylBrowser.egress() -> EgressClient` shorthand — returns a client bound to the browser's persona, with the cookie jar co-located inside the active profile so browser-set and API-set cookies converge. Raises if the browser was constructed with the string-form `persona="name"` (profile keying only). (#44)
+- New `[egress]` extra pulling `httpx>=0.27`.
+
+### Added — Persona-bound egress, Phase 2 (wreq + BoringSSL)
+
+- New Rust crate `carbonyl-wreq` — implements the `carbonyl_fingerprint::http::HttpClient` trait against the `wreq` 5.x browser-emulating HTTPS client. Maps the persona's family + version to the closest `wreq_util::Emulation` preset (Chrome 147 → `Chrome137`, Firefox 150 → `Firefox139`, Safari 26 → `Safari18_3_1`, iOS Safari → `SafariIos17_4_1`). H2 SETTINGS overrides applied via `Http2Builder` on top of the preset. (#75, #80, #81)
+- Layer 2 wire conformance test crate — drives a real wreq client through a localhost rustls responder, captures ClientHello + h2 preface bytes, composes a `WireSnapshot`, asserts `ConformanceFixture::assert_wire_state` against the fixture. Per-fixture baseline gap lists make residual divergence (e.g. wire.ja4 for Chrome 147 against wreq-util's Chrome 137 preset) load-bearing — any change to the gap set surfaces as a test failure. (#82)
+- `carbonyl_agent.wreq_transport.WreqTransport` — an `httpx.BaseTransport` wrapper that delegates to the optional `carbonyl_wreq` native module. `EgressClient` auto-detects at construction; falls back to httpx silently when the native module isn't built. New audit-row `transport` field disambiguates `wreq` vs `httpx-fallback`. (#83)
+- PyO3 binding in `carbonyl-wreq` — single `send_request` function with an embedded multi-threaded tokio runtime (`OnceLock<Runtime>`, shared across threads, GIL-released during IO). Build with `maturin develop --manifest-path crates/carbonyl-wreq/Cargo.toml --features python`. (#85)
+- New `[wreq]` extra (declares intent; the native module is a developer build until pip-install integration lands). (#83)
+- `.gitea/workflows/conformance.yml` — gates PRs touching fingerprint, wreq, or egress paths on `cargo {clippy,test} --workspace --all-targets --features carbonyl-wreq/python`. (#84)
+- Rust workspace conversion: top-level `Cargo.toml` over both crates; single root `Cargo.lock`. (#80)
+
+### Added — Operational
+
+- `--carbonyl-cookie-flush-interval-ms=1000` flag wired into `CarbonylBrowser._spawn` for persona/session mode — cookies persist within the 5 s graceful_timeout instead of requiring a 30 s drain. Requires Carbonyl runtime `9b3ba53adcd8d330` or newer; older runtimes silently ignore the flag. (#51)
+
+### Changed
+
+- Carbonyl runtime pin bumped: `runtime-hash=dd69bef0ea4b2512` → `runtime-hash=9b3ba53adcd8d330` (Carbonyl v0.2.0-alpha.4). E2E compatibility matrix rotated so `dd69bef0ea4b2512` now sits in the prior-runtime slot. (#51)
+- ADR-005 marked Accepted. New Phase 1 → Phase 2 transition notes covering the sentinel preservation in the fallback path, the `transport`-tag field, the Layer 1 vs Layer 2 conformance separation, and cross-references to the new artifacts. (#64, #75)
+- `.gitea/workflows/check.yml` runs at workspace root and installs `clang cmake libclang-dev libssl-dev pkg-config python3-dev` before invoking cargo, for the boring-sys2 + PyO3 build path. (#80, #81, #85)
+- `pyproject.toml` declares `[project.urls]` with GitHub canonical Homepage / Repository / Issues / Changelog for PyPI metadata. Project version bumped to `0.2.0a1`.
+
+### Fixed
+
+- `wreq-mirror` workflow skips early when `wreq-sha=registry` — the cold mirror anchors on git SHAs and registry-resolved deps use crates.io + `Cargo.lock` as the integrity record. (#81)
+- CI typecheck + test jobs install `[dev,egress]` extras (not just `[dev]`) so httpx is available for mypy. (#44 follow-up)
+- `wire_h2.rs` / `wire_ja4.rs` allow `clippy::collapsible_match` / `collapsible_if` (rust 1.95 added these lints; the nested ifs in these parsers carry distinct error-return paths). (#82)
+
 ## [0.1.0a1] - 2026-05-05
 
 First test release of carbonyl-agent. The full feature set documented under
