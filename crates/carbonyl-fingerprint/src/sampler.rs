@@ -48,6 +48,15 @@ use thiserror::Error;
 pub enum PersonaClass {
     /// Desktop Chrome stable channel on Linux (Ubuntu 24.04 baseline).
     DesktopChromeStableLinux,
+    /// Desktop Firefox stable channel on Linux (Ubuntu baseline).
+    ///
+    /// W3A.6.1 — `Refs: roctinam/carbonyl-agent#71`. Browser-info values
+    /// (UA, screen, navigator, headers) sourced from BrowserForge MIT
+    /// corpus; TLS-layer values (JA4, H2 Akamai) sourced from FoxIO ja4db
+    /// canonical Firefox stable Linux capture references. Provenance
+    /// documented inline in [`DESKTOP_FIREFOX_STABLE_LINUX`] and the
+    /// matching corpus TOML.
+    DesktopFirefoxStableLinux,
 }
 
 /// Errors surfaced by the sampler.
@@ -125,6 +134,7 @@ fn randomize_per_instance_fields<R: Rng + ?Sized>(persona: &mut Persona, rng: &m
 fn template_for(class: PersonaClass) -> &'static str {
     match class {
         PersonaClass::DesktopChromeStableLinux => DESKTOP_CHROME_STABLE_LINUX,
+        PersonaClass::DesktopFirefoxStableLinux => DESKTOP_FIREFOX_STABLE_LINUX,
     }
 }
 
@@ -202,6 +212,106 @@ mouse_persona = "desk_mouse_windmouse"
 
 [persona.profile]
 user_data_dir = "/tmp/persona-template-desktop-chrome-stable-linux"
+"#;
+
+/// Firefox 150 stable on Linux (Ubuntu baseline). W3A.6.1
+/// (`Refs: roctinam/carbonyl-agent#71`).
+///
+/// # Provenance
+///
+/// - Browser-info fields (UA, screen, navigator, fonts, WebGL, headers):
+///   BrowserForge MIT corpus (`apify-fingerprint-datapoints v0.13.0`),
+///   sampled with `FingerprintGenerator(browser=['firefox'], os=['linux'],
+///   device=['desktop'])` on 2026-05-12.
+/// - TLS-layer fields (JA4, ALPN, H2 Akamai SETTINGS): FoxIO ja4db public
+///   reference set, canonical Firefox stable Linux 2024-2025 captures. JA4
+///   `t13d1715h2_5b57614c22b0_3d5424432f57` is the documented Firefox 130+
+///   NSS-stack value; H2 SETTINGS Akamai-shape `1:65536,4:131072,5:16384`
+///   plus PRIORITY frames is Firefox's canonical post-#1500533 wire output.
+///
+/// Future QA-harness pass: refresh both halves with fresh local captures
+/// against a live Firefox 150 instance + tlsx probe; diff is auditable.
+///
+/// # Schema accommodation
+///
+/// Firefox does NOT send UA Client Hints. The persona's `ua_ch` block
+/// therefore has `brands = []` and the trait's `apply_persona` gates
+/// `sec-ch-ua*` header emission on `browser_family == Chrome` (see
+/// `http.rs`). UA-CH-dependent validator rules (rule 2, rule 3 JA4, rule F
+/// H2) gate on `browser_family == Chrome` (post-#69 W3A schema migration).
+///
+/// `device.device_memory` is set to 4 GB — Firefox doesn't implement the
+/// `navigator.deviceMemory` API, so server-side detectors won't see this
+/// value from a real Firefox client. The field carries a representative
+/// Linux-laptop value so the schema's required-field contract holds; it
+/// is not emitted to the wire by the Firefox apply_persona path.
+const DESKTOP_FIREFOX_STABLE_LINUX: &str = r#"
+[persona]
+id = "persona-template-desktop-firefox-stable-linux"
+generator_version = "2026.05.12"
+browser_family = "firefox"
+browser_version = "150.0"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "Linux"
+os_version = "Ubuntu 24.04"
+arch = "x86_64"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0"
+
+[persona.user_agent.ua_ch]
+brands = []
+mobile = false
+platform = "Linux"
+platform_version = ""
+architecture = ""
+bitness = "64"
+
+[persona.locale]
+accept_language = "en-US,en;q=0.5"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 1600
+screen_height = 900
+color_depth = 24
+device_pixel_ratio = 1.0
+hardware_concurrency = 4
+device_memory = 4
+max_touch_points = 0
+
+[persona.webgl]
+vendor = "Mozilla"
+renderer = "Mozilla"
+vendor_unmasked = "Intel Inc."
+renderer_unmasked = "Mesa Intel(R) UHD Graphics"
+
+[persona.canvas]
+noise_seed = 0
+
+[persona.audio]
+noise_seed = 0
+
+[persona.fonts]
+available = ["Liberation Sans", "DejaVu Sans", "Ubuntu"]
+
+[persona.network]
+ja4 = "t13d1715h2_5b57614c22b0_3d5424432f57"
+ja4h_template = "fonn11nn05enus"
+http2_akamai = "1:65536,4:131072,5:16384|12517377|0|m,p,a,s"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "normal"
+mouse_persona = "desk_mouse_windmouse"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-template-desktop-firefox-stable-linux"
 "#;
 
 #[cfg(test)]
@@ -290,6 +400,51 @@ mod tests {
                 .sample(PersonaClass::DesktopChromeStableLinux, &mut rng)
                 .expect("sampler returned validation failure");
             // Belt-and-suspenders: re-run validate to confirm.
+            proptest::prop_assert!(validator::validate(&persona).is_ok());
+        }
+    }
+
+    // --- Firefox (W3A.6.1 #71) ---
+
+    #[test]
+    fn sample_desktop_firefox_stable_linux_passes_validator() {
+        let sampler = Sampler::new();
+        let mut rng = deterministic_rng();
+        let persona = sampler
+            .sample(PersonaClass::DesktopFirefoxStableLinux, &mut rng)
+            .expect("Firefox sampler must produce valid persona");
+        validator::validate(&persona).expect("post-validate consistency");
+    }
+
+    #[test]
+    fn firefox_sample_carries_firefox_family_marker() {
+        let sampler = Sampler::new();
+        let mut rng = deterministic_rng();
+        let p = sampler
+            .sample(PersonaClass::DesktopFirefoxStableLinux, &mut rng)
+            .unwrap();
+        assert_eq!(
+            p.persona.browser_family,
+            crate::schema::BrowserFamily::Firefox
+        );
+        assert_eq!(p.persona.browser_version, "150.0");
+        // Firefox UA contains the version string per rule 1.
+        assert!(p.persona.user_agent.full.contains("Firefox/150.0"));
+        // Firefox does not advertise UA-CH brands — the persona reflects that.
+        assert!(p.persona.user_agent.ua_ch.brands.is_empty());
+    }
+
+    proptest::proptest! {
+        /// Same property as Chrome: any seed must produce a validating
+        /// Firefox persona. Catches sampler/validator drift on the
+        /// Firefox path (e.g., per-family rule gating regressions).
+        #[test]
+        fn prop_every_sampled_firefox_persona_validates(seed: u64) {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let sampler = Sampler::new();
+            let persona = sampler
+                .sample(PersonaClass::DesktopFirefoxStableLinux, &mut rng)
+                .expect("Firefox sampler returned validation failure");
             proptest::prop_assert!(validator::validate(&persona).is_ok());
         }
     }

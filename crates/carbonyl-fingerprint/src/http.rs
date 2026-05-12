@@ -18,6 +18,7 @@
 //!
 //! [`Persona`]: crate::Persona
 
+use crate::schema::BrowserFamily;
 use crate::Persona;
 
 /// Errors produced when binding a [`Persona`] to an HTTP client.
@@ -178,28 +179,34 @@ pub trait HttpClient {
         self.set_default_header("User-Agent", &p.user_agent.full)?;
         self.set_default_header("Accept-Language", &p.locale.accept_language)?;
 
-        // sec-ch-ua brand list — emitted as a comma-separated quoted list
-        // matching the Client Hints spec form.
-        if !p.user_agent.ua_ch.brands.is_empty() {
-            let sec_ch_ua = p
-                .user_agent
-                .ua_ch
-                .brands
-                .iter()
-                .map(|(brand, version)| format!("\"{brand}\";v=\"{version}\""))
-                .collect::<Vec<_>>()
-                .join(", ");
-            self.set_default_header("sec-ch-ua", &sec_ch_ua)?;
+        // UA Client Hints are Chrome-only. Firefox and Safari do not send
+        // any sec-ch-ua* header; emitting them on a non-Chrome persona
+        // would immediately unmask the bot. Per W3A.6 (#69), all sec-ch-ua
+        // emission is gated on browser_family == Chrome.
+        if p.browser_family == BrowserFamily::Chrome {
+            // sec-ch-ua brand list — emitted as a comma-separated quoted
+            // list matching the Client Hints spec form.
+            if !p.user_agent.ua_ch.brands.is_empty() {
+                let sec_ch_ua = p
+                    .user_agent
+                    .ua_ch
+                    .brands
+                    .iter()
+                    .map(|(brand, version)| format!("\"{brand}\";v=\"{version}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                self.set_default_header("sec-ch-ua", &sec_ch_ua)?;
+            }
+            self.set_default_header(
+                "sec-ch-ua-mobile",
+                if p.user_agent.ua_ch.mobile {
+                    "?1"
+                } else {
+                    "?0"
+                },
+            )?;
+            self.set_default_header("sec-ch-ua-platform", &p.user_agent.ua_ch.platform)?;
         }
-        self.set_default_header(
-            "sec-ch-ua-mobile",
-            if p.user_agent.ua_ch.mobile {
-                "?1"
-            } else {
-                "?0"
-            },
-        )?;
-        self.set_default_header("sec-ch-ua-platform", &p.user_agent.ua_ch.platform)?;
 
         Ok(())
     }

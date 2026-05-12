@@ -66,6 +66,7 @@
 use std::collections::BTreeMap;
 
 use crate::http::{H2Priority, H2Settings, H2WindowUpdate, HttpClient};
+use crate::schema::BrowserFamily;
 use crate::Persona;
 
 /// One conformance assertion failure. Aggregated into [`ConformanceReport`]
@@ -175,6 +176,20 @@ impl ConformanceFixture {
         Self::from_persona("chrome-147-stable-linux", persona).expect("fixture")
     }
 
+    /// Built-in fixture: Firefox 150 stable Linux. W3A.6.1 (`Refs:
+    /// roctinam/carbonyl-agent#71`).
+    ///
+    /// Required headers exclude all `sec-ch-ua*` entries — Firefox never
+    /// sends UA Client Hints. Provenance for the underlying fingerprint
+    /// values is documented in `sampler::DESKTOP_FIREFOX_STABLE_LINUX`
+    /// (same TOML body, kept in sync by the
+    /// `firefox_fixture_matches_sampler_template` test).
+    pub fn firefox_150_stable_linux() -> Self {
+        let persona: Persona =
+            toml::from_str(FIREFOX_150_STABLE_LINUX_TEMPLATE).expect("template parses");
+        Self::from_persona("firefox-150-stable-linux", persona).expect("fixture")
+    }
+
     /// Construct a fixture from a persona, deriving the expected wire
     /// values from the persona's own `network` and `user_agent` fields.
     /// This is what the conformance contract asserts: the persona spec IS
@@ -194,31 +209,36 @@ impl ConformanceFixture {
             "Accept-Language".into(),
             persona.persona.locale.accept_language.clone(),
         );
-        if !persona.persona.user_agent.ua_ch.brands.is_empty() {
-            let sec_ch_ua = persona
-                .persona
-                .user_agent
-                .ua_ch
-                .brands
-                .iter()
-                .map(|(brand, version)| format!("\"{brand}\";v=\"{version}\""))
-                .collect::<Vec<_>>()
-                .join(", ");
-            headers.insert("sec-ch-ua".into(), sec_ch_ua);
-        }
-        headers.insert(
-            "sec-ch-ua-mobile".into(),
-            if persona.persona.user_agent.ua_ch.mobile {
-                "?1"
-            } else {
-                "?0"
+        // sec-ch-ua* are Chrome-only — mirror the gating in apply_persona
+        // (http.rs). Firefox/Safari personas don't expect these headers in
+        // the conformance assertion.
+        if persona.persona.browser_family == BrowserFamily::Chrome {
+            if !persona.persona.user_agent.ua_ch.brands.is_empty() {
+                let sec_ch_ua = persona
+                    .persona
+                    .user_agent
+                    .ua_ch
+                    .brands
+                    .iter()
+                    .map(|(brand, version)| format!("\"{brand}\";v=\"{version}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                headers.insert("sec-ch-ua".into(), sec_ch_ua);
             }
-            .into(),
-        );
-        headers.insert(
-            "sec-ch-ua-platform".into(),
-            persona.persona.user_agent.ua_ch.platform.clone(),
-        );
+            headers.insert(
+                "sec-ch-ua-mobile".into(),
+                if persona.persona.user_agent.ua_ch.mobile {
+                    "?1"
+                } else {
+                    "?0"
+                }
+                .into(),
+            );
+            headers.insert(
+                "sec-ch-ua-platform".into(),
+                persona.persona.user_agent.ua_ch.platform.clone(),
+            );
+        }
 
         Ok(Self {
             label: label.into(),
@@ -353,6 +373,78 @@ fn header_field_name(name: &str) -> &'static str {
 // ---------------------------------------------------------------------------
 // Built-in fixtures
 // ---------------------------------------------------------------------------
+
+/// Firefox 150 stable Linux template. W3A.6.1 (`Refs:
+/// roctinam/carbonyl-agent#71`). Mirrors `sampler::DESKTOP_FIREFOX_STABLE_LINUX`
+/// — drift between the two is itself a conformance bug.
+const FIREFOX_150_STABLE_LINUX_TEMPLATE: &str = r#"
+[persona]
+id = "persona-test-firefox-150"
+generator_version = "2026.05.12"
+browser_family = "firefox"
+browser_version = "150.0"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "Linux"
+os_version = "Ubuntu 24.04"
+arch = "x86_64"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0"
+
+[persona.user_agent.ua_ch]
+brands = []
+mobile = false
+platform = "Linux"
+platform_version = ""
+architecture = ""
+bitness = "64"
+
+[persona.locale]
+accept_language = "en-US,en;q=0.5"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 1600
+screen_height = 900
+color_depth = 24
+device_pixel_ratio = 1.0
+hardware_concurrency = 4
+device_memory = 4
+max_touch_points = 0
+
+[persona.webgl]
+vendor = "Mozilla"
+renderer = "Mozilla"
+vendor_unmasked = "Intel Inc."
+renderer_unmasked = "Mesa Intel(R) UHD Graphics"
+
+[persona.canvas]
+noise_seed = 0
+
+[persona.audio]
+noise_seed = 0
+
+[persona.fonts]
+available = ["Liberation Sans", "DejaVu Sans", "Ubuntu"]
+
+[persona.network]
+ja4 = "t13d1715h2_5b57614c22b0_3d5424432f57"
+ja4h_template = "fonn11nn05enus"
+http2_akamai = "1:65536,4:131072,5:16384|12517377|0|m,p,a,s"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "normal"
+mouse_persona = "desk_mouse_windmouse"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-test-firefox-150"
+"#;
 
 /// Chrome 147 stable Linux template. Mirrors `validator::tests::VALID_PERSONA_TOML`
 /// — drift between the two is itself a conformance bug.
@@ -756,5 +848,60 @@ mod tests {
         let f = ConformanceFixture::from_persona("custom", p.clone()).expect("fixture");
         assert_eq!(f.expected_ja4, p.persona.network.ja4);
         assert_eq!(f.expected_alpn, p.persona.network.alpn);
+    }
+
+    // --- Firefox conformance (W3A.6.1 #71) ---
+
+    #[test]
+    fn fixture_firefox_150_loads_and_self_describes() {
+        let f = ConformanceFixture::firefox_150_stable_linux();
+        assert_eq!(f.label, "firefox-150-stable-linux");
+        assert_eq!(f.persona.persona.browser_version, "150.0");
+        assert_eq!(
+            f.persona.persona.browser_family,
+            crate::schema::BrowserFamily::Firefox
+        );
+        assert_eq!(f.expected_ja4, "t13d1715h2_5b57614c22b0_3d5424432f57");
+        assert_eq!(f.expected_alpn, vec!["h2", "http/1.1"]);
+        // Firefox H2 SETTINGS: id 1 (HEADER_TABLE_SIZE), id 4 (INIT_WINDOW),
+        // id 5 (MAX_FRAME). Distinct from Chrome's set.
+        assert_eq!(
+            f.expected_h2_settings.entries,
+            vec![(1, 65536), (4, 131072), (5, 16384)]
+        );
+    }
+
+    #[test]
+    fn firefox_fixture_required_headers_exclude_sec_ch_ua() {
+        let f = ConformanceFixture::firefox_150_stable_linux();
+        // Firefox never sends UA Client Hints — fixture must not require
+        // any sec-ch-ua* header. Required: only User-Agent + Accept-Language.
+        assert!(f.required_headers.contains_key("User-Agent"));
+        assert!(f.required_headers.contains_key("Accept-Language"));
+        for name in f.required_headers.keys() {
+            assert!(
+                !name.starts_with("sec-ch-ua"),
+                "Firefox fixture must not require {name} — Firefox doesn't send UA-CH"
+            );
+        }
+        assert_eq!(f.required_headers.len(), 2);
+    }
+
+    #[test]
+    fn vec_recorder_conforms_to_firefox_150() {
+        // Same Recorder impl that conforms to Chrome 147 must also conform
+        // to Firefox 150 — proves the trait + fixture machinery handles
+        // both families without per-family backend wiring.
+        let f = ConformanceFixture::firefox_150_stable_linux();
+        let mut c = VecRecorder::default();
+        conform(&mut c, &f).expect("VecRecorder must conform to Firefox");
+        // Sanity: VecRecorder MUST NOT have recorded any sec-ch-ua header
+        // (the apply_persona path is family-gated).
+        for (name, _) in c.applied_headers() {
+            assert!(
+                !name.starts_with("sec-ch-ua"),
+                "apply_persona must not emit {name} for Firefox personas"
+            );
+        }
     }
 }
