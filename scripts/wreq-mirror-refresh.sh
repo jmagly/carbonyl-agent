@@ -68,6 +68,17 @@ if [[ "${PINNED_SHA}" == "TBD-#44" ]] || [[ -z "${PINNED_SHA}" ]]; then
     exit 0
 fi
 
+# Phase 2.2 (#81) resolves wreq from the crates.io registry rather
+# than a git pin. The mirror exists to anchor on a specific git SHA;
+# registry-resolved deps use crates.io itself + Cargo.lock as the
+# integrity record, so there's nothing to mirror here. A future bump
+# to a git pin (e.g. to anchor on a security-relevant SHA outside a
+# release) restarts the mirror path.
+if [[ "${PINNED_SHA}" == "registry" ]]; then
+    echo "wreq-sha=registry; wreq resolves via crates.io. Skipping cold mirror (Phase 2.2 #81)."
+    exit 0
+fi
+
 # Validate the SHA looks like a git commit hash.
 if [[ ! "${PINNED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
     echo "ERROR: wreq-sha in ${PIN_FILE} is not a 40-char hex SHA: ${PINNED_SHA}" >&2
