@@ -3,9 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project uses [CalVer](https://calver.org/) (`YYYY.M.PATCH`, PEP 440-compliant, no leading zeros) — matching the convention used in `aiwg`, `fortemi`, and related Roctinam repos. See [`docs/versioning.md`](docs/versioning.md).
 
 ## [Unreleased]
+
+## [2026.5.0a1] - 2026-05-15
+
+### Changed
+
+- **Versioning scheme**: Migrated from SemVer (`0.2.0a1`) to CalVer (`2026.5.0a1`) to align with `aiwg`, `fortemi`, and other Roctinam repos. Tag format remains `v${version}` — `v2026.5.0a1`. The `a1` suffix is preserved because other GA blockers (#12, #88, #89, #94, #98) remain open; first non-alpha CalVer release will be `2026.M.0` once those land. See [`docs/versioning.md`](docs/versioning.md). (#87)
 
 ## [0.2.0a1] - 2026-05-12
 
