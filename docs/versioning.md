@@ -5,7 +5,7 @@
 ## Format
 
 ```
-YYYY.M.PATCH[aN|bN|rcN]
+YYYY.M.PATCH
 ```
 
 | Segment | Meaning | Example |
@@ -13,7 +13,8 @@ YYYY.M.PATCH[aN|bN|rcN]
 | `YYYY` | Four-digit year of the release cut | `2026` |
 | `M` | Month of the release cut, **no leading zero** | `5` (May), `12` (December) |
 | `PATCH` | Patch counter within that month, starting at `0`, **no leading zero** | `0`, `1`, `15` |
-| `aN`/`bN`/`rcN` | Optional PEP 440 prerelease suffix | `a1`, `b2`, `rc1` |
+
+No prerelease suffixes (`aN`/`bN`/`rcN`). Each tag is the current state of `main` at that calendar moment. Quality gating happens through CI and changelog, not version metadata.
 
 ### Examples
 
@@ -22,8 +23,6 @@ YYYY.M.PATCH[aN|bN|rcN]
 | `2026.5.0` | First release in May 2026 |
 | `2026.5.1` | Second release in May 2026 |
 | `2026.12.0` | First release in December 2026 |
-| `2026.5.0a1` | First alpha prerelease for the May 2026 cut |
-| `2026.5.0rc1` | First release candidate for the May 2026 cut |
 
 ### Forbidden forms
 
@@ -38,7 +37,7 @@ Git tags use a leading `v`:
 
 ```
 v2026.5.0
-v2026.5.0a1
+v2026.5.1
 ```
 
 The release workflows (`.gitea/workflows/release.yml`, `.github/workflows/release.yml`) trigger on `v*` and validate that the tag matches `pyproject.toml`'s `version` field.
@@ -51,7 +50,7 @@ The release workflows (`.gitea/workflows/release.yml`, `.github/workflows/releas
 
 ## PEP 440 compliance
 
-PEP 440 (Python packaging) accepts CalVer without modification. `2026.5.0` parses as a normal `MAJOR.MINOR.PATCH` release; `2026.5.0a1` parses as a prerelease. PyPI accepts both.
+PEP 440 (Python packaging) accepts CalVer without modification. `2026.5.0` parses as a normal `MAJOR.MINOR.PATCH` release. PyPI accepts it.
 
 ## CHANGELOG convention
 

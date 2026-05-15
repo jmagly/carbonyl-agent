@@ -7,11 +7,11 @@ and this project uses [CalVer](https://calver.org/) (`YYYY.M.PATCH`, PEP 440-com
 
 ## [Unreleased]
 
-## [2026.5.0a1] - 2026-05-15
+## [2026.5.0] - 2026-05-15
 
 ### Changed
 
-- **Versioning scheme**: Migrated from SemVer (`0.2.0a1`) to CalVer (`2026.5.0a1`) to align with `aiwg`, `fortemi`, and other Roctinam repos. Tag format remains `v${version}` — `v2026.5.0a1`. The `a1` suffix is preserved because other GA blockers (#12, #88, #89, #94, #98) remain open; first non-alpha CalVer release will be `2026.M.0` once those land. See [`docs/versioning.md`](docs/versioning.md). (#87)
+- **Versioning scheme**: Migrated from SemVer (`0.2.0a1`) to CalVer (`2026.5.0`) to align with `aiwg`, `fortemi`, and other Roctinam repos. No prerelease suffixes — each release is the current state at that calendar tag. Tag format is `v${version}` — `v2026.5.0`. See [`docs/versioning.md`](docs/versioning.md). (#87)
 
 ## [0.2.0a1] - 2026-05-12
 
