@@ -142,7 +142,9 @@ def cmd_install(args: argparse.Namespace) -> int:
     triple = _platform_triple()
     if args.tag is None:
         default_tag, source = runtime_pin.resolve_default_tag()
-        if source == "pin":
+        if source == "tag-pin":
+            print(f"Using pinned runtime tag: {default_tag} (from .carbonyl-runtime-version)")
+        elif source == "pin":
             print(f"Using pinned runtime: {default_tag} (from .carbonyl-runtime-version)")
         elif source == "env":
             print(f"Using runtime from CARBONYL_RUNTIME_TAG: {default_tag}")

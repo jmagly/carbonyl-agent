@@ -9,10 +9,19 @@ Pin file format::
 
     # comments allowed
     runtime-hash=<hex>
+    # optional — when present, takes precedence over runtime-hash
+    runtime-tag=v2026.5.0
 
 The pin is intentionally a plain ``key=value`` file rather than YAML/JSON so
 shell scripts (`docker/qa-runner/build.sh`, CI YAML) can parse it with `grep`
 without pulling in additional tooling.
+
+Resolution precedence (#98):
+  1. ``CARBONYL_RUNTIME_TAG`` env var
+  2. Pin file ``runtime-tag=<tag>`` (semantic anchor, preferred for releases)
+  3. Pin file ``runtime-hash=<hex>`` (immutable anchor, exact bytes)
+  4. Pin file ``runtime-hash=runtime-latest`` (explicit drift opt-in)
+  5. No pin file (legacy unpinned default → ``runtime-latest``)
 """
 from __future__ import annotations
 
@@ -90,24 +99,50 @@ def read_pinned_hash() -> str | None:
     return value
 
 
+def read_pinned_tag() -> str | None:
+    """Return the pinned ``runtime-tag`` value, or *None* if no pin file
+    is found or the file does not contain a tag entry.
+
+    A tag is a semantic anchor (e.g. ``v2026.5.0``) that the carbonyl
+    runtime publishes alongside the hash-anchored ``runtime-<hash>``
+    releases. When present in the pin file, it takes precedence over
+    ``runtime-hash`` — operators can pin to a semantic release line
+    while still seeing exact-hash diagnostics in the install output.
+    See #98.
+    """
+    path = find_pin_file()
+    if path is None:
+        return None
+    pins = _parse_pin_file(path.read_text())
+    value = pins.get("runtime-tag")
+    if not value:
+        return None
+    return value
+
+
 def resolve_default_tag() -> tuple[str, str]:
     """Return ``(tag, source)`` for the default ``carbonyl-agent install``
     tag when the user has not passed ``--tag``.
 
-    ``source`` is one of ``"pin"``, ``"latest-sentinel"``, ``"unpinned"`` —
-    used by the installer to print which path was taken so operators can
-    spot drift.
+    ``source`` is one of ``"env"``, ``"tag-pin"``, ``"pin"``,
+    ``"latest-sentinel"``, ``"unpinned"`` — used by the installer to
+    print which path was taken so operators can spot drift.
 
     Resolution order:
 
     1. ``CARBONYL_RUNTIME_TAG`` env var (explicit override; not from the pin)
-    2. Pin file ``runtime-hash=<hex>``  →  ``runtime-<hex>``
-    3. Pin file ``runtime-hash=runtime-latest``  →  ``runtime-latest``
-    4. No pin file  →  ``runtime-latest`` (legacy unpinned default)
+    2. Pin file ``runtime-tag=<tag>``  →  ``<tag>`` (semantic anchor, #98)
+    3. Pin file ``runtime-hash=<hex>``  →  ``runtime-<hex>``
+    4. Pin file ``runtime-hash=runtime-latest``  →  ``runtime-latest``
+    5. No pin file  →  ``runtime-latest`` (legacy unpinned default)
     """
     env_tag = os.environ.get("CARBONYL_RUNTIME_TAG")
     if env_tag:
         return env_tag, "env"
+
+    tag_pinned = read_pinned_tag()
+    if tag_pinned:
+        return tag_pinned, "tag-pin"
 
     pinned = read_pinned_hash()
     if pinned is None:

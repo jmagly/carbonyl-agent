@@ -119,6 +119,27 @@ class TestResolveDefaultTag:
                 assert tag == "runtime-overridden"
                 assert source == "env"
 
+    def test_tag_pin_takes_precedence_over_hash(self, tmp_path: Path):
+        # #98 — runtime-tag is a semantic anchor that wins over the hash
+        env, paths = self._isolated(
+            tmp_path,
+            "runtime-hash=deadbeef\nruntime-tag=v2026.5.0\n",
+        )
+        with patch.dict(os.environ, env, clear=False):
+            with patch.object(runtime_pin, "_candidate_pin_paths", return_value=paths):
+                tag, source = runtime_pin.resolve_default_tag()
+                assert tag == "v2026.5.0"
+                assert source == "tag-pin"
+
+    def test_env_var_overrides_tag_pin(self, tmp_path: Path):
+        env, paths = self._isolated(tmp_path, "runtime-tag=v2026.5.0\n")
+        env["CARBONYL_RUNTIME_TAG"] = "v2026.6.0"
+        with patch.dict(os.environ, env, clear=False):
+            with patch.object(runtime_pin, "_candidate_pin_paths", return_value=paths):
+                tag, source = runtime_pin.resolve_default_tag()
+                assert tag == "v2026.6.0"
+                assert source == "env"
+
 
 class TestRepoPin:
     """Sanity check: the repo's own pin file is parseable."""

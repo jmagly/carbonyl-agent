@@ -1,0 +1,79 @@
+# Example persona — Desktop Chrome 147 on Linux.
+#
+# This is the same fixture exercised by the validator unit tests
+# (crates/carbonyl-fingerprint/src/validator.rs::tests::VALID_PERSONA_TOML
+# and tests/test_persona_apply.py::VALID_TOML). It passes all eight
+# consistency rules (A-H) and is safe to use as a starting point for
+# your own personas.
+#
+# To customize, copy this file and edit the fields. Re-validate with:
+#
+#     from carbonyl_agent import Persona
+#     Persona.from_path("./your-persona.toml")  # raises on invalid
+
+[persona]
+id = "persona-example-chrome-147-linux"
+generator_version = "2026.04.18"
+browser_family = "chrome"
+browser_version = "147.0.7727.94"
+release_channel = "stable"
+
+[persona.platform]
+os_family = "Linux"
+os_version = "Ubuntu 24.04"
+arch = "x86_64"
+bitness = "64"
+
+[persona.user_agent]
+full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.94 Safari/537.36"
+
+[persona.user_agent.ua_ch]
+brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+mobile = false
+platform = "Linux"
+platform_version = "6.8.0"
+architecture = "x86"
+bitness = "64"
+
+[persona.locale]
+accept_language = "en-US,en;q=0.9"
+timezone = "America/New_York"
+languages = ["en-US", "en"]
+
+[persona.device]
+screen_width = 1920
+screen_height = 1080
+color_depth = 24
+device_pixel_ratio = 1.0
+hardware_concurrency = 8
+device_memory = 8
+max_touch_points = 0
+
+[persona.webgl]
+vendor = "Google Inc. (Intel)"
+renderer = "ANGLE (Intel, Mesa Intel(R) UHD Graphics, OpenGL 4.6)"
+vendor_unmasked = "Intel Inc."
+renderer_unmasked = "Intel(R) UHD Graphics"
+
+[persona.canvas]
+noise_seed = 2290992331924075179
+
+[persona.audio]
+noise_seed = 9004081640792457512
+
+[persona.fonts]
+available = ["Arial", "DejaVu Sans"]
+
+[persona.network]
+ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4h_template = "po11nn12enus"
+http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+alpn = ["h2", "http/1.1"]
+http3_enabled = false
+
+[persona.behavior]
+typing_persona = "normal"
+mouse_persona = "desk_mouse_windmouse"
+
+[persona.profile]
+user_data_dir = "/tmp/persona-example-chrome-147-linux"

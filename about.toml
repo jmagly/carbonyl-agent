@@ -1,0 +1,38 @@
+# cargo-about configuration — Third-party license aggregation
+#
+# Drives generation of THIRD_PARTY_LICENSES.txt at the workspace root for
+# inclusion in carbonyl-agent's sdist + wheel. The Rust crates in this
+# workspace (carbonyl-fingerprint, carbonyl-wreq) pull in a substantial
+# dep tree — most notably aws-lc-sys (BoringSSL fork), wreq, and
+# wreq-util. Consumer wheel distribution requires aggregated attribution
+# for every redistributable component.
+#
+# Regenerate with: scripts/gen-third-party-licenses.sh
+# CI parity check: same script with --check (TODO: wire into ci.yml)
+
+# Licenses accepted in the dep tree. Anything outside this list causes
+# `cargo about generate` to fail — forcing a human to triage new deps
+# before they ship to consumers.
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CC0-1.0",
+    "Zlib",
+    "OpenSSL",   # aws-lc-sys / BoringSSL fork attribution
+]
+
+# Treat unknown licenses as fatal. Surface them at generation time.
+ignore-build-dependencies = false
+ignore-dev-dependencies = true
+ignore-transitive-dependencies = false
+
+# Per-crate overrides for non-standard license metadata or location
+# would go here. Empty by design — add only when a real dep needs it.
