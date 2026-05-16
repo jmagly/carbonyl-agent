@@ -33,7 +33,14 @@ import pyte
 from carbonyl_agent._logging import get_logger
 
 if TYPE_CHECKING:
-    from carbonyl_agent.persona_apply import Persona
+    # `Persona as _PersonaType` mirrors the local import inside
+    # `__init__` (kept lazy at runtime to dodge the carbonyl-fingerprint
+    # Rust dep when the typed-Persona path isn't exercised). pdoc and
+    # other static-introspection tools need the name at module scope
+    # to resolve the `_PersonaType | None` attribute annotation.
+    #   Refs: roctinam/carbonyl-agent#96
+    from carbonyl_agent.persona_apply import Persona  # noqa: F401
+    from carbonyl_agent.persona_apply import Persona as _PersonaType  # noqa: F401
 
 _log = get_logger(__name__)
 

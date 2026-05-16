@@ -231,6 +231,16 @@ jobs:
 
       - name: build-docs.sh
         run: |
+          # Build the pdoc bundle. pdoc surfaces type-resolution and
+          # missing-doc problems as `Warn:` lines on stdout/stderr.
+          # We fail the job if any are emitted — per #96, the release
+          # asset is expected to be warning-free against the public
+          # API surface. The `pip install httpx tomli_w` is a workaround
+          # for httpx being declared as a TYPE_CHECKING-only import in
+          # egress.py: pdoc 16+ evaluates TYPE_CHECKING blocks so the
+          # module must be importable at doc-gen time even though it's
+          # not a runtime hard dep.
+          #   Refs: roctinam/carbonyl-agent#96
           docker run --rm \
             -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
             -w /workspace \
@@ -242,5 +252,13 @@ jobs:
               apt-get update -qq
               apt-get install -y -qq --no-install-recommends git build-essential >/dev/null
               pip install -q -e ".[docs]"
-              ./scripts/build-docs.sh
+              # TYPE_CHECKING-only deps that pdoc still needs to import
+              # to resolve annotations at doc-gen time.
+              pip install -q httpx tomli_w
+              ./scripts/build-docs.sh 2>&1 | tee /tmp/pdoc.log
+              if grep -E "^(Warn:|Error)" /tmp/pdoc.log; then
+                echo "::error::pdoc emitted warnings or errors above — fail build per #96"
+                exit 1
+              fi
+              echo "[docs] pdoc bundle clean (0 warnings)"
             '
