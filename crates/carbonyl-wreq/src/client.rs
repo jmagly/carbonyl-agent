@@ -303,8 +303,10 @@ fn persona_to_emulation_provider(pending: &PendingConfig) -> wreq::EmulationProv
     let preset = preset_for_pending(pending);
 
     // ----- TLS -----
-    let mut tls = wreq::TlsConfig::default();
-    tls.alpn_protos = alpn_from_persona_or_preset(&pending.alpn, preset);
+    let mut tls = wreq::TlsConfig {
+        alpn_protos: alpn_from_persona_or_preset(&pending.alpn, preset),
+        ..Default::default()
+    };
     if let Some(p) = preset {
         if let Some(cipher) = p.tls.cipher_list {
             tls.cipher_list = Some(std::borrow::Cow::Borrowed(cipher));
@@ -419,8 +421,8 @@ fn alpn_from_persona_or_preset(
 }
 
 fn alpn_from_str_slice(alpn: &[&str]) -> wreq::AlpnProtos {
-    let has_h2 = alpn.iter().any(|p| *p == "h2");
-    let has_h11 = alpn.iter().any(|p| *p == "http/1.1");
+    let has_h2 = alpn.contains(&"h2");
+    let has_h11 = alpn.contains(&"http/1.1");
     match (has_h2, has_h11) {
         (true, true) => wreq::AlpnProtos::ALL,
         (true, false) => wreq::AlpnProtos::HTTP2,

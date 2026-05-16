@@ -189,7 +189,10 @@ mod tests {
     fn preset_for_chrome_148_returns_desktop_entry() {
         let p = preset_for(
             BrowserFamily::Chrome,
-            BrowserVersion { major: 148, minor: 0 },
+            BrowserVersion {
+                major: 148,
+                minor: 0,
+            },
             Platform::Desktop,
         );
         let p = p.expect("Chrome 148 desktop preset should exist");
@@ -205,7 +208,10 @@ mod tests {
     fn preset_for_chrome_147_falls_back_to_148_per_nearest_neighbor() {
         let p = preset_for(
             BrowserFamily::Chrome,
-            BrowserVersion { major: 147, minor: 0 },
+            BrowserVersion {
+                major: 147,
+                minor: 0,
+            },
             Platform::Desktop,
         );
         let p = p.expect("Chrome 147 desktop should fall back to nearest neighbor");
@@ -217,7 +223,10 @@ mod tests {
     fn preset_for_unknown_returns_none() {
         let p = preset_for(
             BrowserFamily::Firefox,
-            BrowserVersion { major: 150, minor: 0 },
+            BrowserVersion {
+                major: 150,
+                minor: 0,
+            },
             Platform::Desktop,
         );
         assert!(p.is_none(), "Firefox preset not yet captured");

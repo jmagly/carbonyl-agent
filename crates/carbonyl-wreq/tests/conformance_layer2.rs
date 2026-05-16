@@ -299,7 +299,10 @@ fn assert_layer2_via_registry(
     let actual_fields: std::collections::BTreeSet<&'static str> =
         report.mismatches.iter().map(|m| m.field).collect();
     let expected_fields: std::collections::BTreeSet<&'static str> =
-        expected_partial_mismatches_via_registry(label).iter().copied().collect();
+        expected_partial_mismatches_via_registry(label)
+            .iter()
+            .copied()
+            .collect();
 
     // The new path's expected divergence is a SUPERSET of the legacy
     // path's gap (wreq defaults diverge from the persona on more
@@ -311,7 +314,10 @@ fn assert_layer2_via_registry(
             expected_fields.contains(field),
             "[{label}/registry] unexpected mismatch field {:?}. Expected gap superset: {:?}. \
              Actual: {:?}. Report: {:#?}",
-            field, expected_fields, actual_fields, report.mismatches
+            field,
+            expected_fields,
+            actual_fields,
+            report.mismatches
         );
     }
 }

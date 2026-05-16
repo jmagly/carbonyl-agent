@@ -49,12 +49,17 @@ jobs:
     steps:
       - name: Checkout (manual git clone)
         run: |
+          # Init + fetch-by-SHA — see .gitea/workflows/check.yml for
+          # rationale (PR-event GITHUB_REF_NAME is the PR number,
+          # not a branch). Refs: roctinam/carbonyl-agent#107, #108.
           rm -rf "${GITHUB_WORKSPACE}/.repo-clone" 2>/dev/null || true
-          git clone --depth 1 --branch "${GITHUB_REF_NAME:-main}" \
-            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git" \
-            "${GITHUB_WORKSPACE}/.repo-clone"
+          mkdir -p "${GITHUB_WORKSPACE}/.repo-clone"
           cd "${GITHUB_WORKSPACE}/.repo-clone"
-          git checkout "${GITHUB_SHA:-HEAD}" 2>/dev/null || true
+          git init -q
+          git remote add origin \
+            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git"
+          git fetch --depth 1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
 
       - name: e2e suite (${{ matrix.label }})
         run: |

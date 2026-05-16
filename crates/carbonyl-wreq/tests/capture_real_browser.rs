@@ -23,7 +23,7 @@
 #![allow(clippy::collapsible_if)]
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -142,7 +142,8 @@ fn spki_b64_for_chrome(cert_der: &[u8]) -> String {
 /// Inline one-shot TLS responder. Same shape as carbonyl-fingerprint's
 /// `LocalTlsResponder` but exposes the cert DER so callers can compute
 /// the Chrome SPKI hash.
-async fn start_responder() -> std::io::Result<(std::net::SocketAddr, oneshot::Receiver<Captured>, Vec<u8>)> {
+async fn start_responder(
+) -> std::io::Result<(std::net::SocketAddr, oneshot::Receiver<Captured>, Vec<u8>)> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let listen_addr = listener.local_addr()?;
     let (server_config, cert_der) = make_server_config_with_cert()?;
@@ -284,7 +285,7 @@ fn write_fixture_artifacts(
     browser_product: &str,
     platform_label: &str,
     captured: &Captured,
-    dir: &PathBuf,
+    dir: &Path,
 ) {
     eprintln!(
         "[capture] handshake_complete={}, client_hello={}b, h2={}b, alpn={:?}, err={:?}",
@@ -297,7 +298,8 @@ fn write_fixture_artifacts(
     assert!(
         !captured.client_hello_bytes.is_empty(),
         "ClientHello bytes empty (handshake_complete={}, error={:?})",
-        captured.handshake_complete, captured.error
+        captured.handshake_complete,
+        captured.error
     );
 
     let ch_path = dir.join(format!("{fixture_id}.client_hello.bin"));
@@ -372,8 +374,11 @@ fn format_epoch_seconds_utc(secs: u64) -> String {
     let z = (secs / 86400) as i64 + 719468;
     let era = z.div_euclid(146097);
     let doe = (z - era * 146097) as u64;
-    let yoe =
-        (doe.wrapping_sub(doe / 1460).wrapping_sub(doe / 36524).wrapping_add(doe / 146096)) / 365;
+    let yoe = (doe
+        .wrapping_sub(doe / 1460)
+        .wrapping_sub(doe / 36524)
+        .wrapping_add(doe / 146096))
+        / 365;
     let y = yoe as i64 + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;

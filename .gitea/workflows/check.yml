@@ -28,12 +28,22 @@ jobs:
     steps:
       - name: Checkout (manual git clone)
         run: |
+          # Init + fetch-by-SHA. The previous `git clone --branch
+          # ${GITHUB_REF_NAME}` form failed on pull_request events
+          # because Gitea sets GITHUB_REF_NAME to the PR number (e.g.
+          # `109`), which is not a branch name. Fetching the resolved
+          # SHA directly works on both push and pull_request events
+          # without caring what GITHUB_REF_NAME is.
+          #   Refs: roctinam/carbonyl-agent#107, #108 (PRs #109, #110
+          #   uncovered the bug).
           rm -rf "${GITHUB_WORKSPACE}/.repo-clone" 2>/dev/null || true
-          git clone --depth 1 --branch "${GITHUB_REF_NAME:-main}" \
-            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git" \
-            "${GITHUB_WORKSPACE}/.repo-clone"
+          mkdir -p "${GITHUB_WORKSPACE}/.repo-clone"
           cd "${GITHUB_WORKSPACE}/.repo-clone"
-          git checkout "${GITHUB_SHA:-HEAD}" 2>/dev/null || true
+          git init -q
+          git remote add origin \
+            "https://token:${{ github.token }}@git.integrolabs.net/${GITHUB_REPOSITORY}.git"
+          git fetch --depth 1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
 
       # `rust:latest` rolled to 1.94.0 and the image's preinstalled
       # toolchain stopped shipping `rustfmt`/`clippy` by default

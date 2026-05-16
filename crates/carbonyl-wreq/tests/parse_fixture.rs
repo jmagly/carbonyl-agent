@@ -212,10 +212,7 @@ fn parse_chrome_148() {
     eprintln!("        extension_permutation_indices: None, // Chrome 110+ permutes; let wreq permute too");
     eprintln!("        cipher_list: Some(\"{}\"),", cipher_names.join(":"));
     eprintln!("        alpn_default: &[\"h2\", \"http/1.1\"],");
-    eprintln!(
-        "        grease_enabled: Some({}),",
-        p.grease_in_extensions
-    );
+    eprintln!("        grease_enabled: Some({}),", p.grease_in_extensions);
     eprintln!("        permute_extensions: Some(true),");
     eprint!("        supported_groups: &[");
     let groups_filtered: Vec<String> = p
@@ -225,13 +222,18 @@ fn parse_chrome_148() {
         .map(|g| format!("0x{:04x}", g))
         .collect();
     eprintln!("{}],", groups_filtered.join(", "));
-    eprintln!("        sigalgs_list: Some(\"{}\"),", sigalg_names.join(":"));
+    eprintln!(
+        "        sigalgs_list: Some(\"{}\"),",
+        sigalg_names.join(":")
+    );
     eprintln!("    }},");
     eprintln!("    h2: H2Profile {{");
     eprintln!("        // Persona-declared (Chrome 147 spec) — preset backstop:");
     eprintln!("        settings_default: &[(0x01, 65536), (0x02, 0), (0x03, 1000), (0x04, 6291456), (0x06, 262144)],");
     eprintln!("        initial_connection_window: 15663105,");
-    eprintln!("        pseudo_header_order: &[\":method\", \":authority\", \":scheme\", \":path\"],");
+    eprintln!(
+        "        pseudo_header_order: &[\":method\", \":authority\", \":scheme\", \":path\"],"
+    );
     eprintln!("    }},");
     eprintln!("    headers: HeaderProfile {{");
     eprintln!("        default_order: &[");
