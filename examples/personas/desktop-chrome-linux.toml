@@ -1,4 +1,4 @@
-# Example persona — Desktop Chrome 147 on Linux.
+# Example persona — Desktop Chrome 148 on Linux.
 #
 # This is the same fixture exercised by the validator unit tests
 # (crates/carbonyl-fingerprint/src/validator.rs::tests::VALID_PERSONA_TOML
@@ -12,10 +12,10 @@
 #     Persona.from_path("./your-persona.toml")  # raises on invalid
 
 [persona]
-id = "persona-example-chrome-147-linux"
+id = "persona-example-chrome-148-linux"
 generator_version = "2026.04.18"
 browser_family = "chrome"
-browser_version = "147.0.7727.94"
+browser_version = "148.0.7778.167"
 release_channel = "stable"
 
 [persona.platform]
@@ -25,10 +25,10 @@ arch = "x86_64"
 bitness = "64"
 
 [persona.user_agent]
-full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.94 Safari/537.36"
+full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.167 Safari/537.36"
 
 [persona.user_agent.ua_ch]
-brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+brands = [["Chromium", "148"], ["Not_A Brand", "8"], ["Google Chrome", "148"]]
 mobile = false
 platform = "Linux"
 platform_version = "6.8.0"
@@ -65,9 +65,9 @@ noise_seed = 9004081640792457512
 available = ["Arial", "DejaVu Sans"]
 
 [persona.network]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
 ja4h_template = "po11nn12enus"
-http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+http2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 http3_enabled = false
 
@@ -76,4 +76,4 @@ typing_persona = "normal"
 mouse_persona = "desk_mouse_windmouse"
 
 [persona.profile]
-user_data_dir = "/tmp/persona-example-chrome-147-linux"
+user_data_dir = "/tmp/persona-example-chrome-148-linux"

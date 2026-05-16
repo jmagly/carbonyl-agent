@@ -4,7 +4,7 @@
 //! Loads `corpus/chrome/chrome-{major}.toml` files from
 //! [carbonyl-fingerprint-corpus][corpus] and exposes them to the
 //! validator via [`ChromeRegistry::lookup`]. The `inline_default()`
-//! constructor returns a built-in registry containing only Chrome 147
+//! constructor returns a built-in registry containing only Chrome 148
 //! (the SCHEMA.md exemplar) — preserves the validator's behavior from
 //! before #68 landed for callers that haven't checked out the corpus
 //! repo.
@@ -107,19 +107,19 @@ pub struct ChromeRegistry {
 }
 
 impl ChromeRegistry {
-    /// Built-in fallback registry containing only Chrome 147. Used as
+    /// Built-in fallback registry containing only Chrome 148. Used as
     /// the default when no corpus directory is configured. Preserves
     /// the validator's pre-#68 behavior for callers that don't pass a
     /// registry explicitly.
     pub fn inline_default() -> Self {
         let mut by_major = BTreeMap::new();
         by_major.insert(
-            147,
+            148,
             ChromeReference {
-                major: 147,
-                version: "147.0.7727.94".to_string(),
-                ja4: "t13d1516h2_8daaf6152771_02713d6af862".to_string(),
-                h2_akamai: "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p".to_string(),
+                major: 148,
+                version: "148.0.7778.167".to_string(),
+                ja4: "t13d1516h2_8daaf6152771_773c5fd3846b".to_string(),
+                h2_akamai: "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p".to_string(),
                 alpn: vec!["h2".to_string(), "http/1.1".to_string()],
                 stale: false,
             },
@@ -287,7 +287,7 @@ impl ChromeReferenceFile {
     }
 }
 
-/// Parse `chrome-147.toml` → `Some(147)`. Anything else (no prefix,
+/// Parse `chrome-148.toml` → `Some(148)`. Anything else (no prefix,
 /// non-numeric major, wrong extension) returns `None`.
 fn parse_chrome_filename_major(filename: &str) -> Option<u32> {
     let stripped = filename.strip_prefix("chrome-")?.strip_suffix(".toml")?;
@@ -315,16 +315,16 @@ mod tests {
         }
     }
 
-    const CHROME_147_TOML: &str = r#"
+    const CHROME_148_TOML: &str = r#"
 [chrome]
-major = 147
-version = "147.0.7727.94"
+major = 148
+version = "148.0.7778.167"
 stable_since = "2026-04-10"
 marked_stale_at = ""
 
 [chrome.fingerprints]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
-h2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
+h2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 post_quantum = true
 
@@ -346,7 +346,7 @@ marked_stale_at = "2026-04-10"
 
 [chrome.fingerprints]
 ja4 = "t13d1516h2_DEADBEEF146_02713d6af862"
-h2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+h2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 post_quantum = true
 "#;
@@ -354,11 +354,11 @@ post_quantum = true
     // -------- inline_default --------
 
     #[test]
-    fn inline_default_carries_chrome_147() {
+    fn inline_default_carries_chrome_148() {
         let reg = ChromeRegistry::inline_default();
-        assert_eq!(reg.known_majors(), vec![147]);
-        let r = reg.lookup(147).expect("147 present");
-        assert_eq!(r.ja4, "t13d1516h2_8daaf6152771_02713d6af862");
+        assert_eq!(reg.known_majors(), vec![148]);
+        let r = reg.lookup(148).expect("148 present");
+        assert_eq!(r.ja4, "t13d1516h2_8daaf6152771_773c5fd3846b");
         assert!(!r.stale);
     }
 
@@ -372,14 +372,14 @@ post_quantum = true
     #[test]
     fn loads_single_chrome_file_from_corpus() {
         let tmp = tempdir();
-        write_corpus(tmp.path(), [("chrome-147.toml", CHROME_147_TOML)]);
+        write_corpus(tmp.path(), [("chrome-148.toml", CHROME_148_TOML)]);
 
         let reg = ChromeRegistry::from_corpus_dir(tmp.path()).expect("loads");
-        assert_eq!(reg.known_majors(), vec![147]);
-        let r = reg.lookup(147).unwrap();
-        assert_eq!(r.major, 147);
-        assert_eq!(r.version, "147.0.7727.94");
-        assert_eq!(r.ja4, "t13d1516h2_8daaf6152771_02713d6af862");
+        assert_eq!(reg.known_majors(), vec![148]);
+        let r = reg.lookup(148).unwrap();
+        assert_eq!(r.major, 148);
+        assert_eq!(r.version, "148.0.7778.167");
+        assert_eq!(r.ja4, "t13d1516h2_8daaf6152771_773c5fd3846b");
         assert_eq!(r.alpn, vec!["h2".to_string(), "http/1.1".to_string()]);
     }
 
@@ -389,12 +389,12 @@ post_quantum = true
         write_corpus(
             tmp.path(),
             [
-                ("chrome-147.toml", CHROME_147_TOML),
+                ("chrome-148.toml", CHROME_148_TOML),
                 ("chrome-146.toml", CHROME_146_STALE_TOML),
             ],
         );
         let reg = ChromeRegistry::from_corpus_dir(tmp.path()).expect("loads");
-        assert_eq!(reg.known_majors(), vec![146, 147]);
+        assert_eq!(reg.known_majors(), vec![146, 148]);
         assert_eq!(reg.len(), 2);
         assert!(!reg.is_empty());
     }
@@ -405,14 +405,14 @@ post_quantum = true
         write_corpus(
             tmp.path(),
             [
-                ("chrome-147.toml", CHROME_147_TOML),
+                ("chrome-148.toml", CHROME_148_TOML),
                 ("README.md", "# not a chrome file"),
                 (".gitkeep", ""),
                 ("notes.txt", "ignored"),
             ],
         );
         let reg = ChromeRegistry::from_corpus_dir(tmp.path()).expect("loads");
-        assert_eq!(reg.known_majors(), vec![147]);
+        assert_eq!(reg.known_majors(), vec![148]);
     }
 
     // -------- staleness routing --------
@@ -432,9 +432,9 @@ post_quantum = true
     #[test]
     fn fresh_entry_reports_not_stale() {
         let tmp = tempdir();
-        write_corpus(tmp.path(), [("chrome-147.toml", CHROME_147_TOML)]);
+        write_corpus(tmp.path(), [("chrome-148.toml", CHROME_148_TOML)]);
         let reg = ChromeRegistry::from_corpus_dir(tmp.path()).unwrap();
-        let (_, is_stale) = reg.lookup_with_status(147).unwrap();
+        let (_, is_stale) = reg.lookup_with_status(148).unwrap();
         assert!(!is_stale);
     }
 
@@ -468,12 +468,12 @@ post_quantum = true
         let tmp = tempdir();
         write_corpus(
             tmp.path(),
-            [("chrome-147.toml", "this is not = [valid toml")],
+            [("chrome-148.toml", "this is not = [valid toml")],
         );
         let err = ChromeRegistry::from_corpus_dir(tmp.path()).expect_err("must error");
         match err {
             RegistryError::Parse { path, .. } => {
-                assert!(path.to_string_lossy().contains("chrome-147.toml"));
+                assert!(path.to_string_lossy().contains("chrome-148.toml"));
             }
             other => panic!("unexpected: {other:?}"),
         }
@@ -482,8 +482,8 @@ post_quantum = true
     #[test]
     fn filename_body_major_mismatch_errors() {
         let tmp = tempdir();
-        // Filename says 999 but body says 147.
-        write_corpus(tmp.path(), [("chrome-999.toml", CHROME_147_TOML)]);
+        // Filename says 999 but body says 148.
+        write_corpus(tmp.path(), [("chrome-999.toml", CHROME_148_TOML)]);
         let err = ChromeRegistry::from_corpus_dir(tmp.path()).expect_err("must error");
         match err {
             RegistryError::MajorMismatch {
@@ -492,7 +492,7 @@ post_quantum = true
                 ..
             } => {
                 assert_eq!(filename_major, 999);
-                assert_eq!(body_major, 147);
+                assert_eq!(body_major, 148);
             }
             other => panic!("unexpected: {other:?}"),
         }
@@ -502,7 +502,7 @@ post_quantum = true
 
     #[test]
     fn parse_chrome_filename_major_accepts_canonical() {
-        assert_eq!(parse_chrome_filename_major("chrome-147.toml"), Some(147));
+        assert_eq!(parse_chrome_filename_major("chrome-148.toml"), Some(148));
         assert_eq!(parse_chrome_filename_major("chrome-1.toml"), Some(1));
         assert_eq!(
             parse_chrome_filename_major("chrome-99999.toml"),
@@ -513,11 +513,11 @@ post_quantum = true
     #[test]
     fn parse_chrome_filename_major_rejects_non_canonical() {
         assert_eq!(parse_chrome_filename_major("chrome-abc.toml"), None);
-        assert_eq!(parse_chrome_filename_major("chrome-147.txt"), None);
+        assert_eq!(parse_chrome_filename_major("chrome-148.txt"), None);
         assert_eq!(parse_chrome_filename_major("README.md"), None);
         assert_eq!(parse_chrome_filename_major(".gitkeep"), None);
         assert_eq!(parse_chrome_filename_major("chrome.toml"), None);
-        assert_eq!(parse_chrome_filename_major("chrome-147"), None);
+        assert_eq!(parse_chrome_filename_major("chrome-148"), None);
     }
 
     // -------- Default impl --------

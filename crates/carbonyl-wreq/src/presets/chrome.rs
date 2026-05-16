@@ -5,15 +5,7 @@
 //! (real Google Chrome 148.0.7778.167 on Linux x86_64; see
 //! `crates/carbonyl-wreq/data/fixtures/chrome-148-desktop.metadata.toml`).
 //!
-//! `CHROME_147_DESKTOP` is intentionally absent. The persona spec
-//! declares Chrome 147 but Chrome 147 stable is no longer available
-//! from Google's apt repo. Lookups for `(Chrome, 147, Desktop)` fall
-//! through to `CHROME_148_DESKTOP` via `presets::preset_for`'s
-//! nearest-neighbor — wire fingerprint between Chrome 147 and 148 is
-//! near-identical (same TLS profile family; possible bump in
-//! `extension_permutation_indices` ordering only).
-//!
-//! `CHROME_147_MOBILE_ANDROID` lands in Iteration B item 1a (HITL:
+//! `CHROME_148_MOBILE_ANDROID` lands in Iteration B item 1a (HITL:
 //! Chrome on Android device or emulator). See `fixtures-plan.md`.
 
 use carbonyl_fingerprint::schema::BrowserFamily;
@@ -27,7 +19,7 @@ use super::{BrowserVersion, H2Profile, HeaderProfile, Platform, PresetTable, Tls
 /// captured 2026-05-16 via `tests/capture_real_browser.rs::capture_chrome_desktop`.
 ///
 /// h2 SETTINGS values come from the persona spec's `network.http2_akamai`
-/// (Chrome 147 ground truth) — the capture's TLS handshake didn't
+/// (Chrome 148 ground truth) — the capture's TLS handshake didn't
 /// complete (responder cert untrusted in headless=new) so h2 frames
 /// weren't reached. The persona-declared values are accepted as the
 /// h2 backstop until a fixture with a system-trusted cert lands.
@@ -99,7 +91,7 @@ pub static CHROME_148_DESKTOP: PresetTable = PresetTable {
         // "Real Chrome 148 h2 fingerprint". The Akamai-string form is:
         //   "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
         //
-        // Note: Chrome 147's persona-spec template historically included
+        // Note: Chrome 148's persona-spec template historically included
         // `3:1000` (MAX_CONCURRENT_STREAMS). Chrome 148 dropped that
         // value from its preface SETTINGS; the persona spec inherited
         // the obsolete shape under a "wire-shape preserved 147→148"

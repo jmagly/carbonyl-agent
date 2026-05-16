@@ -48,8 +48,8 @@
 //! }
 //!
 //! #[test]
-//! fn wreq_conforms_to_chrome_147_stable_linux() {
-//!     let fixture = ConformanceFixture::chrome_147_stable_linux();
+//! fn wreq_conforms_to_chrome_148_stable_linux() {
+//!     let fixture = ConformanceFixture::chrome_148_stable_linux();
 //!     let mut client = WreqTestWrapper::new();
 //!     conform(&mut client, &fixture).expect("wreq must conform");
 //! }
@@ -193,7 +193,7 @@ pub trait ApplyInspector {
 /// fingerprint promises. A backend that applies the persona must emit
 /// exactly these values.
 ///
-/// Built-in fixtures use the validator's reference data (Chrome 147 stable
+/// Built-in fixtures use the validator's reference data (Chrome 148 stable
 /// Linux today, more families as W3A.6 follow-ups land their captures);
 /// callers can construct ad-hoc fixtures via [`ConformanceFixture::from_persona`]
 /// and overrides.
@@ -213,12 +213,12 @@ pub struct ConformanceFixture {
 }
 
 impl ConformanceFixture {
-    /// Built-in fixture: Chrome 147 stable Linux. Mirrors the validator's
+    /// Built-in fixture: Chrome 148 stable Linux. Mirrors the validator's
     /// inline reference (`Refs: roctinam/carbonyl-agent#68`).
-    pub fn chrome_147_stable_linux() -> Self {
+    pub fn chrome_148_stable_linux() -> Self {
         let persona: Persona =
-            toml::from_str(CHROME_147_STABLE_LINUX_TEMPLATE).expect("template parses");
-        Self::from_persona("chrome-147-stable-linux", persona).expect("fixture")
+            toml::from_str(CHROME_148_STABLE_LINUX_TEMPLATE).expect("template parses");
+        Self::from_persona("chrome-148-stable-linux", persona).expect("fixture")
     }
 
     /// Built-in fixture: Firefox 150 stable Linux. W3A.6.1 (`Refs:
@@ -246,7 +246,7 @@ impl ConformanceFixture {
         Self::from_persona("safari-26-macos", persona).expect("fixture")
     }
 
-    /// Built-in fixture: Mobile Chrome 147 on Android. W3A.6.3 (`Refs:
+    /// Built-in fixture: Mobile Chrome 148 on Android. W3A.6.3 (`Refs:
     /// roctinam/carbonyl-agent#73`).
     ///
     /// Required headers INCLUDE the full `sec-ch-ua*` suite — Chrome
@@ -621,7 +621,7 @@ mouse_persona = "touch_tap"
 user_data_dir = "/tmp/persona-test-mobile-safari-ios"
 "#;
 
-/// Mobile Chrome 147 Android template. W3A.6.3 (`Refs:
+/// Mobile Chrome 148 Android template. W3A.6.3 (`Refs:
 /// roctinam/carbonyl-agent#73`). Mirrors `sampler::MOBILE_CHROME_ANDROID`
 /// — drift between the two is itself a conformance bug.
 const MOBILE_CHROME_ANDROID_TEMPLATE: &str = r#"
@@ -629,7 +629,7 @@ const MOBILE_CHROME_ANDROID_TEMPLATE: &str = r#"
 id = "persona-test-mobile-chrome-android"
 generator_version = "2026.05.12"
 browser_family = "chrome"
-browser_version = "147.0.0.0"
+browser_version = "148.0.0.0"
 release_channel = "stable"
 
 [persona.platform]
@@ -639,10 +639,10 @@ arch = "armv8"
 bitness = "64"
 
 [persona.user_agent]
-full = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36"
+full = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
 
 [persona.user_agent.ua_ch]
-brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+brands = [["Chromium", "148"], ["Not_A Brand", "8"], ["Google Chrome", "148"]]
 mobile = true
 platform = "Android"
 platform_version = "10.0.0"
@@ -679,9 +679,9 @@ noise_seed = 0
 available = ["Roboto", "Noto Sans", "Droid Sans"]
 
 [persona.network]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
 ja4h_template = "po11nn12enus"
-http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+http2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 http3_enabled = false
 
@@ -837,14 +837,14 @@ mouse_persona = "desk_mouse_windmouse"
 user_data_dir = "/tmp/persona-test-firefox-150"
 "#;
 
-/// Chrome 147 stable Linux template. Mirrors `validator::tests::VALID_PERSONA_TOML`
+/// Chrome 148 stable Linux template. Mirrors `validator::tests::VALID_PERSONA_TOML`
 /// — drift between the two is itself a conformance bug.
-const CHROME_147_STABLE_LINUX_TEMPLATE: &str = r#"
+const CHROME_148_STABLE_LINUX_TEMPLATE: &str = r#"
 [persona]
 id = "persona-test-valid"
 generator_version = "2026.04.18"
 browser_family = "chrome"
-browser_version = "147.0.7727.94"
+browser_version = "148.0.7778.167"
 release_channel = "stable"
 
 [persona.platform]
@@ -854,10 +854,10 @@ arch = "x86_64"
 bitness = "64"
 
 [persona.user_agent]
-full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.94 Safari/537.36"
+full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.167 Safari/537.36"
 
 [persona.user_agent.ua_ch]
-brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+brands = [["Chromium", "148"], ["Not_A Brand", "8"], ["Google Chrome", "148"]]
 mobile = false
 platform = "Linux"
 platform_version = "6.8.0"
@@ -894,9 +894,9 @@ noise_seed = 524190668593274066
 available = ["Arial", "DejaVu Sans"]
 
 [persona.network]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
 ja4h_template = "po11nn12enus"
-http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+http2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 http3_enabled = false
 
@@ -1061,27 +1061,27 @@ mod tests {
     // ---- assertions ----
 
     #[test]
-    fn fixture_chrome_147_loads_and_self_describes() {
-        let f = ConformanceFixture::chrome_147_stable_linux();
-        assert_eq!(f.label, "chrome-147-stable-linux");
-        assert_eq!(f.persona.persona.browser_version, "147.0.7727.94");
-        assert_eq!(f.expected_ja4, "t13d1516h2_8daaf6152771_02713d6af862");
+    fn fixture_chrome_148_loads_and_self_describes() {
+        let f = ConformanceFixture::chrome_148_stable_linux();
+        assert_eq!(f.label, "chrome-148-stable-linux");
+        assert_eq!(f.persona.persona.browser_version, "148.0.7778.167");
+        assert_eq!(f.expected_ja4, "t13d1516h2_8daaf6152771_773c5fd3846b");
         assert_eq!(f.expected_alpn, vec!["h2", "http/1.1"]);
         assert_eq!(f.expected_h2_window.0, 15_663_105);
-        assert_eq!(f.expected_h2_settings.entries.len(), 5);
+        assert_eq!(f.expected_h2_settings.entries.len(), 4);
     }
 
     #[test]
-    fn vec_recorder_conforms_to_chrome_147() {
-        let f = ConformanceFixture::chrome_147_stable_linux();
+    fn vec_recorder_conforms_to_chrome_148() {
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut c = VecRecorder::default();
         conform(&mut c, &f).expect("VecRecorder must conform");
     }
 
     #[test]
-    fn map_recorder_conforms_to_chrome_147() {
+    fn map_recorder_conforms_to_chrome_148() {
         // Different internals, same fixture → trait surface is impl-independent.
-        let f = ConformanceFixture::chrome_147_stable_linux();
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut c = MapRecorder::default();
         conform(&mut c, &f).expect("MapRecorder must conform");
     }
@@ -1138,7 +1138,7 @@ mod tests {
             }
         }
 
-        let f = ConformanceFixture::chrome_147_stable_linux();
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut c = BrokenJa4(VecRecorder::default());
         let report = f.assert_applied_state(&mut c);
         assert!(
@@ -1204,7 +1204,7 @@ mod tests {
             }
         }
 
-        let f = ConformanceFixture::chrome_147_stable_linux();
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut c = WrongUaRecorder(VecRecorder::default());
         let report = f.assert_applied_state(&mut c);
         assert!(report
@@ -1235,7 +1235,7 @@ mod tests {
     fn from_persona_derives_expected_values_from_template() {
         // Build a fixture from a custom persona; the expected values must
         // mirror that persona's network section verbatim.
-        let p: Persona = toml::from_str(CHROME_147_STABLE_LINUX_TEMPLATE).expect("parse");
+        let p: Persona = toml::from_str(CHROME_148_STABLE_LINUX_TEMPLATE).expect("parse");
         let f = ConformanceFixture::from_persona("custom", p.clone()).expect("fixture");
         assert_eq!(f.expected_ja4, p.persona.network.ja4);
         assert_eq!(f.expected_alpn, p.persona.network.alpn);
@@ -1280,7 +1280,7 @@ mod tests {
 
     #[test]
     fn vec_recorder_conforms_to_firefox_150() {
-        // Same Recorder impl that conforms to Chrome 147 must also conform
+        // Same Recorder impl that conforms to Chrome 148 must also conform
         // to Firefox 150 — proves the trait + fixture machinery handles
         // both families without per-family backend wiring.
         let f = ConformanceFixture::firefox_150_stable_linux();
@@ -1359,11 +1359,11 @@ mod tests {
         assert!(f.persona.persona.user_agent.ua_ch.mobile);
         // Chrome Android shares the desktop Chrome JA4 — BoringSSL is
         // platform-agnostic and Chrome's mobile TLS stack mirrors desktop.
-        assert_eq!(f.expected_ja4, "t13d1516h2_8daaf6152771_02713d6af862");
+        assert_eq!(f.expected_ja4, "t13d1516h2_8daaf6152771_773c5fd3846b");
         // Same H2 SETTINGS too.
         assert_eq!(
             f.expected_h2_settings.entries,
-            vec![(1, 65536), (2, 0), (3, 1000), (4, 6291456), (6, 262144)]
+            vec![(1, 65536), (2, 0), (4, 6291456), (6, 262144)]
         );
     }
 
@@ -1471,8 +1471,8 @@ mod tests {
     }
 
     #[test]
-    fn wire_state_matches_chrome_147_baseline() {
-        let f = ConformanceFixture::chrome_147_stable_linux();
+    fn wire_state_matches_chrome_148_baseline() {
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let snap = fixture_to_snapshot(&f);
         let report = f.assert_wire_state(&snap);
         assert!(
@@ -1484,7 +1484,7 @@ mod tests {
 
     #[test]
     fn wire_state_detects_ja4_drift() {
-        let f = ConformanceFixture::chrome_147_stable_linux();
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut snap = fixture_to_snapshot(&f);
         snap.ja4 = "t13d1516h2_DEADBEEF_02713d6af862".into();
         let report = f.assert_wire_state(&snap);
@@ -1498,7 +1498,7 @@ mod tests {
 
     #[test]
     fn wire_state_detects_alpn_mismatch() {
-        let f = ConformanceFixture::chrome_147_stable_linux();
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut snap = fixture_to_snapshot(&f);
         snap.negotiated_alpn = Some("http/1.1".into()); // fallback, not preferred
         let report = f.assert_wire_state(&snap);
@@ -1507,7 +1507,7 @@ mod tests {
 
     #[test]
     fn wire_state_detects_missing_alpn() {
-        let f = ConformanceFixture::chrome_147_stable_linux();
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut snap = fixture_to_snapshot(&f);
         snap.negotiated_alpn = None;
         let report = f.assert_wire_state(&snap);
@@ -1521,7 +1521,7 @@ mod tests {
 
     #[test]
     fn wire_state_detects_h2_window_drift() {
-        let f = ConformanceFixture::chrome_147_stable_linux();
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut snap = fixture_to_snapshot(&f);
         snap.h2_window_update = H2WindowUpdate(123);
         let report = f.assert_wire_state(&snap);
@@ -1533,7 +1533,7 @@ mod tests {
 
     #[test]
     fn wire_state_detects_akamai_drift() {
-        let f = ConformanceFixture::chrome_147_stable_linux();
+        let f = ConformanceFixture::chrome_148_stable_linux();
         let mut snap = fixture_to_snapshot(&f);
         snap.akamai_string = "1:0|0|0|m,a,s,p".into();
         let report = f.assert_wire_state(&snap);

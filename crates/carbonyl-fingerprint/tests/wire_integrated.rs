@@ -21,7 +21,7 @@
 //!
 //! # What this test crate does NOT prove
 //!
-//! - That rustls produces a JA4 matching Chrome 147. It doesn't — JA4
+//! - That rustls produces a JA4 matching Chrome 148. It doesn't — JA4
 //!   depends on the cipher list, extension order, and ALPN ordering
 //!   the client library happens to send. Reproducing Chrome's JA4
 //!   requires a forked client like wreq (Phase 2, #75). Until then,
@@ -228,11 +228,11 @@ async fn integrated_snapshot_round_trips_against_self() {
         "JA4 must be three underscore-separated parts"
     );
 
-    // The Chrome 147 fixture's JA4 will NOT match rustls's JA4 — that's
+    // The Chrome 148 fixture's JA4 will NOT match rustls's JA4 — that's
     // expected (different client). We don't assert that here; we just
     // verify the snapshot is well-formed and the assert_wire_state path
     // produces a coherent mismatch report.
-    let chrome = ConformanceFixture::chrome_147_stable_linux();
+    let chrome = ConformanceFixture::chrome_148_stable_linux();
     let report = chrome.assert_wire_state(&snap);
     // Either there's a JA4 mismatch (expected for rustls vs Chrome) OR
     // no mismatch (only possible if rustls happened to match — would be
@@ -259,9 +259,9 @@ async fn integrated_snapshot_against_matching_fixture_passes_clean() {
     let snap = snapshot_from_capture(&capture).expect("snapshot");
 
     // Build a custom fixture whose expectations are the snapshot itself.
-    // We start from chrome_147 (to get a valid Persona) and override the
+    // We start from chrome_148 (to get a valid Persona) and override the
     // expected_* fields with the captured values.
-    let mut fixture = ConformanceFixture::chrome_147_stable_linux();
+    let mut fixture = ConformanceFixture::chrome_148_stable_linux();
     fixture.expected_ja4 = snap.ja4.clone();
     fixture.expected_alpn = snap
         .negotiated_alpn

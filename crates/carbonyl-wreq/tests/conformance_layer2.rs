@@ -11,7 +11,7 @@
 //!
 //! wreq's emulation presets top out at Chrome 137 / Firefox 139 /
 //! Safari 18.3.1 / SafariIos 17.4.1 today, whereas the W3A.6
-//! personas target Chrome 147 / Firefox 150 / Safari 26. The
+//! personas target Chrome 148 / Firefox 150 / Safari 26. The
 //! `wire.ja4` field will therefore diverge — that gap is real and
 //! documented in [`expected_partial_mismatches`].
 //!
@@ -62,7 +62,7 @@ use wire_responder::{CapturedHandshake, LocalTlsResponder};
 ///
 /// 1. **wire.ja4** — wreq-util's emulation presets target the most
 ///    recent browser version they ship (Chrome137 etc.); the W3A.6
-///    personas target newer browser versions (Chrome147 etc.) whose
+///    personas target newer browser versions (Chrome148 etc.) whose
 ///    TLS ClientHello has incremented cipher and extension orderings.
 ///    JA4 is a content-sensitive hash; any drift yields a different
 ///    `ja4_b`/`ja4_c`. Closes when wreq-util ships newer presets.
@@ -80,10 +80,17 @@ use wire_responder::{CapturedHandshake, LocalTlsResponder};
 /// exactly but emits a different connection-level WINDOW_UPDATE.
 fn expected_partial_mismatches(fixture_label: &str) -> &'static [&'static str] {
     match fixture_label {
-        "chrome-147-stable-linux"
-        | "firefox-150-stable-linux"
-        | "mobile-chrome-android"
-        | "mobile-safari-ios" => &["wire.ja4", "wire.h2_settings", "wire.akamai_string"],
+        // Chrome 148 corpus refresh (#105) aligned the persona's
+        // declared h2 SETTINGS + Akamai string with the real Chrome 148
+        // wire capture (4 settings, no 0x03=1000), so those two gaps
+        // closed. Only `wire.ja4` remains because wreq's emulation
+        // emits 15 non-GREASE extensions vs the real Chrome 148
+        // ClientHello's 16, and the LocalTlsResponder capture is
+        // SNI-less. ALPN was h2 in both, but the ja4_c hash differs.
+        "chrome-148-stable-linux" | "mobile-chrome-android" => &["wire.ja4"],
+        "firefox-150-stable-linux" | "mobile-safari-ios" => {
+            &["wire.ja4", "wire.h2_settings", "wire.akamai_string"]
+        }
         "safari-26-macos" => &["wire.ja4", "wire.h2_window", "wire.akamai_string"],
         _ => &[],
     }
@@ -216,10 +223,10 @@ fn assert_layer2_for_fixture(
 }
 
 #[tokio::test]
-async fn layer2_chrome_147() {
-    let fixture = ConformanceFixture::chrome_147_stable_linux();
+async fn layer2_chrome_148() {
+    let fixture = ConformanceFixture::chrome_148_stable_linux();
     let capture = drive_wreq_through_responder(&fixture).await;
-    assert_layer2_for_fixture(&fixture, "chrome-147-stable-linux", &capture);
+    assert_layer2_for_fixture(&fixture, "chrome-148-stable-linux", &capture);
 }
 
 // ----- New-path (build_via_registry) parallel tests — Iteration A item 5 -----
@@ -323,10 +330,10 @@ fn assert_layer2_via_registry(
 }
 
 #[tokio::test]
-async fn layer2_chrome_147_via_registry() {
-    let fixture = ConformanceFixture::chrome_147_stable_linux();
+async fn layer2_chrome_148_via_registry() {
+    let fixture = ConformanceFixture::chrome_148_stable_linux();
     let capture = drive_wreq_via_registry_through_responder(&fixture).await;
-    assert_layer2_via_registry(&fixture, "chrome-147-stable-linux", &capture);
+    assert_layer2_via_registry(&fixture, "chrome-148-stable-linux", &capture);
 }
 
 #[tokio::test]

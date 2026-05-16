@@ -40,7 +40,7 @@ fn corpus_dir() -> Option<PathBuf> {
 }
 
 #[test]
-fn loads_chrome_147_from_real_corpus_when_available() {
+fn loads_chrome_148_from_real_corpus_when_available() {
     let Some(corpus) = corpus_dir() else {
         eprintln!(
             "skipping: carbonyl-fingerprint-corpus not found as a sibling. \
@@ -51,24 +51,24 @@ fn loads_chrome_147_from_real_corpus_when_available() {
 
     let reg = ChromeRegistry::from_corpus_dir(&corpus).expect("real corpus should load cleanly");
 
-    // Chrome 147 must be present (per corpus#1 seeding).
+    // Chrome 148 must be present (per corpus#1 seeding).
     let r = reg
-        .lookup(147)
-        .expect("real corpus should carry chrome-147 entry (corpus#1)");
-    assert_eq!(r.major, 147);
-    assert_eq!(r.version, "147.0.7727.94");
-    assert_eq!(r.ja4, "t13d1516h2_8daaf6152771_02713d6af862");
+        .lookup(148)
+        .expect("real corpus should carry chrome-148 entry (corpus#1)");
+    assert_eq!(r.major, 148);
+    assert_eq!(r.version, "148.0.7778.167");
+    assert_eq!(r.ja4, "t13d1516h2_8daaf6152771_773c5fd3846b");
     assert!(!r.stale);
     // ALPN order is part of the wire contract.
     assert_eq!(r.alpn, vec!["h2".to_string(), "http/1.1".to_string()]);
 }
 
 #[test]
-fn corpus_chrome_147_matches_inline_default() {
-    // Single source of truth check: the corpus's chrome-147 entry must
+fn corpus_chrome_148_matches_inline_default() {
+    // Single source of truth check: the corpus's chrome-148 entry must
     // produce the exact same ChromeReference projection as
     // `ChromeRegistry::inline_default()`. Drift here means the inline
-    // fallback is lying about Chrome 147's fingerprints.
+    // fallback is lying about Chrome 148's fingerprints.
     let Some(corpus) = corpus_dir() else {
         eprintln!("skipping: corpus not available");
         return;
@@ -79,9 +79,9 @@ fn corpus_chrome_147_matches_inline_default() {
     let from_inline = ChromeRegistry::inline_default();
 
     assert_eq!(
-        from_corpus.lookup(147).expect("corpus has 147"),
-        from_inline.lookup(147).expect("inline has 147"),
-        "inline default has drifted from the corpus chrome-147.toml — \
+        from_corpus.lookup(148).expect("corpus has 148"),
+        from_inline.lookup(148).expect("inline has 148"),
+        "inline default has drifted from the corpus chrome-148.toml — \
          update one or the other"
     );
 }
@@ -111,7 +111,7 @@ fn validate_with_corpus_registry_matches_validate_default() {
 
 fn canonical_persona_toml() -> String {
     // Lifted from the validator's VALID_PERSONA_TOML fixture (id
-    // "persona-test-valid", Chrome 147, derived noise seeds). Kept in
+    // "persona-test-valid", Chrome 148, derived noise seeds). Kept in
     // sync by hand; if the validator's fixture changes, this test
     // will fail loudly rather than silently diverge.
     r#"
@@ -119,7 +119,7 @@ fn canonical_persona_toml() -> String {
 id = "persona-test-valid"
 generator_version = "2026.04.18"
 browser_family = "chrome"
-browser_version = "147.0.7727.94"
+browser_version = "148.0.7778.167"
 release_channel = "stable"
 
 [persona.platform]
@@ -129,10 +129,10 @@ arch = "x86_64"
 bitness = "64"
 
 [persona.user_agent]
-full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.94 Safari/537.36"
+full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.167 Safari/537.36"
 
 [persona.user_agent.ua_ch]
-brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+brands = [["Chromium", "148"], ["Not_A Brand", "8"], ["Google Chrome", "148"]]
 mobile = false
 platform = "Linux"
 platform_version = "6.8.0"
@@ -169,9 +169,9 @@ noise_seed = 524190668593274066
 available = ["Arial", "DejaVu Sans"]
 
 [persona.network]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
 ja4h_template = "po11nn12enus"
-http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+http2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 http3_enabled = false
 

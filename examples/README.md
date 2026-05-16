@@ -25,7 +25,7 @@ build manually with `maturin develop --manifest-path crates/carbonyl-wreq/Cargo.
 ## Persona fixture
 
 [`personas/desktop-chrome-linux.toml`](personas/desktop-chrome-linux.toml) is a
-valid Chrome-147-on-Linux persona used by examples 04, 05, and 06. It's the
+valid Chrome-148-on-Linux persona used by examples 04, 05, and 06. It's the
 same fixture exercised by the validator's tests, so it's guaranteed to pass
 schema validation.
 

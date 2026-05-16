@@ -24,7 +24,7 @@
 //! See [`persona_to_emulation`] for the family + version → preset
 //! mapping table. The mapping is "closest available preset" — wreq
 //! ships up to Chrome 137 / Firefox 139 / Safari 18.3.1 today
-//! whereas the W3A.6 personas target Chrome 147 / Firefox 150 /
+//! whereas the W3A.6 personas target Chrome 148 / Firefox 150 /
 //! Safari 26. That gap is unavoidable until wreq-util ships newer
 //! presets; Phase 2.3 (#82) measures the resulting wire-level
 //! divergence against the persona spec.
@@ -217,7 +217,7 @@ fn apply_h2_settings(
 ///
 /// Selection rules:
 /// - Chrome family → newest `Chrome*` preset (wreq-util tops out at
-///   Chrome137 as of v2; the W3A.6 personas target Chrome147 →
+///   Chrome137 as of v2; the W3A.6 personas target Chrome148 →
 ///   closest is Chrome137)
 /// - Firefox family → newest `Firefox*` preset (Firefox139)
 /// - Safari family → newest desktop `Safari18_3_1` for macOS, newest
@@ -236,7 +236,7 @@ pub fn persona_to_emulation(persona: &Persona) -> wreq_util::Emulation {
     let os = p.platform.os_family.to_ascii_lowercase();
     match p.browser_family {
         BrowserFamily::Chrome => {
-            // Chrome 147 → Chrome137 (newest preset). Android variant
+            // Chrome 148 → Chrome137 (newest preset). Android variant
             // has no dedicated preset — same TLS/H2 shape applies and
             // sec-ch-ua-mobile carries the platform signal.
             Chrome137
@@ -442,12 +442,12 @@ fn alpn_from_str_slice(alpn: &[&str]) -> wreq::AlpnProtos {
 fn preset_for_pending(_pending: &PendingConfig) -> Option<&'static presets::PresetTable> {
     // The registry is empty until concrete entries land alongside
     // captured fixtures (Iteration A item 3 / Iteration B items 1a-1d).
-    // The chrome-147-desktop preset would be looked up here once it
+    // The chrome-148-desktop preset would be looked up here once it
     // exists; until then `preset_for` always returns None.
     presets::preset_for(
         BrowserFamily::Chrome,
         BrowserVersion {
-            major: 147,
+            major: 148,
             minor: 0,
         },
         Platform::Desktop,
@@ -544,14 +544,14 @@ mod tests {
     use super::*;
     use carbonyl_fingerprint::conformance::{conform, ConformanceFixture};
 
-    /// Layer 1 smoke against Chrome 147 — confirms the trait setters
+    /// Layer 1 smoke against Chrome 148 — confirms the trait setters
     /// + recorder still work end-to-end after Phase 2.2 added wreq.
     #[test]
-    fn layer1_chrome_147_round_trips() {
-        let fixture = ConformanceFixture::chrome_147_stable_linux();
+    fn layer1_chrome_148_round_trips() {
+        let fixture = ConformanceFixture::chrome_148_stable_linux();
         let mut client = WreqClient::new();
         client.apply_persona_typed(&fixture.persona).unwrap();
-        conform(&mut client, &fixture).expect("Chrome 147 must conform at Layer 1");
+        conform(&mut client, &fixture).expect("Chrome 148 must conform at Layer 1");
         assert_eq!(
             client.pending().emulation,
             Some(wreq_util::Emulation::Chrome137)
@@ -612,7 +612,7 @@ mod tests {
     #[test]
     fn build_succeeds_for_all_fixtures() {
         for (label, fixture) in [
-            ("chrome-147", ConformanceFixture::chrome_147_stable_linux()),
+            ("chrome-148", ConformanceFixture::chrome_148_stable_linux()),
             (
                 "firefox-150",
                 ConformanceFixture::firefox_150_stable_linux(),

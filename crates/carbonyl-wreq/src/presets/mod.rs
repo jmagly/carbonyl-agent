@@ -8,14 +8,14 @@
 //! # Status: types only — no concrete preset entries yet
 //!
 //! Iteration A item 2 establishes the type surface. Concrete preset
-//! entries (e.g. `chrome::CHROME_147_DESKTOP`) require captured
+//! entries (e.g. `chrome::CHROME_148_DESKTOP`) require captured
 //! real-browser fixtures (Iteration A item 3 — HITL). Adding a
 //! placeholder entry with invented values would ship a fake fingerprint
 //! through tests that pretend to pass; that fails the conformance
 //! purpose of the registry.
 //!
-//! When the Chrome 147 desktop fixture lands, `chrome.rs` gains its
-//! first concrete `CHROME_147_DESKTOP: PresetTable` and `preset_for`
+//! When the Chrome 148 desktop fixture lands, `chrome.rs` gains its
+//! first concrete `CHROME_148_DESKTOP: PresetTable` and `preset_for`
 //! gains a real arm.
 //!
 //! # Field encodings
@@ -138,13 +138,6 @@ pub fn preset_for(
 ) -> Option<&'static PresetTable> {
     match (family, version.major, platform) {
         (BrowserFamily::Chrome, 148, Platform::Desktop) => Some(&chrome::CHROME_148_DESKTOP),
-        // Persona spec declares Chrome 147 but Chrome 147 stable is no
-        // longer available from Google's apt repo for fresh capture.
-        // Nearest-neighbor: Chrome 148 desktop (per ADR-W02 §"Trade-off
-        // vs. keeping closest-preset selection"). When Chrome 147 is
-        // captured (or persona moves to 148), this arm becomes a
-        // dedicated entry.
-        (BrowserFamily::Chrome, 147, Platform::Desktop) => Some(&chrome::CHROME_148_DESKTOP),
         _ => None,
     }
 }
@@ -205,17 +198,17 @@ mod tests {
     }
 
     #[test]
-    fn preset_for_chrome_147_falls_back_to_148_per_nearest_neighbor() {
+    fn preset_for_chrome_148_falls_back_to_148_per_nearest_neighbor() {
         let p = preset_for(
             BrowserFamily::Chrome,
             BrowserVersion {
-                major: 147,
+                major: 148,
                 minor: 0,
             },
             Platform::Desktop,
         );
-        let p = p.expect("Chrome 147 desktop should fall back to nearest neighbor");
-        // Per ADR-W02 nearest-neighbor: persona-147 → preset-148
+        let p = p.expect("Chrome 148 desktop should fall back to nearest neighbor");
+        // Per ADR-W02 nearest-neighbor: persona-148 → preset-148
         assert_eq!(p.provenance_id, "chrome-148-desktop");
     }
 

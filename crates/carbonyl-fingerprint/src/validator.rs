@@ -221,7 +221,7 @@ impl std::error::Error for ValidationReport {}
 // ---------------------------------------------------------------------------
 //
 // Reference data lives in [`ChromeRegistry`] (see crate::registry).
-// `validate()` uses the inline-default registry (Chrome 147 only — the
+// `validate()` uses the inline-default registry (Chrome 148 only — the
 // SCHEMA.md exemplar) so it is a no-config drop-in for callers that
 // don't have the corpus repo checked out. Callers that want
 // multi-major coverage build a registry with
@@ -233,7 +233,7 @@ impl std::error::Error for ValidationReport {}
 // ---------------------------------------------------------------------------
 
 /// Validate the persona against all v1 hard rules using the inline
-/// fallback registry (Chrome 147 only). Drop-in replacement for
+/// fallback registry (Chrome 148 only). Drop-in replacement for
 /// callers that don't have a corpus directory configured.
 ///
 /// Equivalent to:
@@ -624,14 +624,14 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     /// Canonical valid persona, derived from `SCHEMA.md` §"TOML layout"
-    /// in `carbonyl-fingerprint-corpus`. Chrome 147 is the only major in
+    /// in `carbonyl-fingerprint-corpus`. Chrome 148 is the only major in
     /// `CHROME_REFERENCES`, so all v1 fixtures pin to this version.
     const VALID_PERSONA_TOML: &str = r#"
 [persona]
 id = "persona-test-valid"
 generator_version = "2026.04.18"
 browser_family = "chrome"
-browser_version = "147.0.7727.94"
+browser_version = "148.0.7778.167"
 release_channel = "stable"
 
 [persona.platform]
@@ -641,10 +641,10 @@ arch = "x86_64"
 bitness = "64"
 
 [persona.user_agent]
-full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.94 Safari/537.36"
+full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.167 Safari/537.36"
 
 [persona.user_agent.ua_ch]
-brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+brands = [["Chromium", "148"], ["Not_A Brand", "8"], ["Google Chrome", "148"]]
 mobile = false
 platform = "Linux"
 platform_version = "6.8.0"
@@ -681,9 +681,9 @@ noise_seed = 524190668593274066
 available = ["Arial", "DejaVu Sans"]
 
 [persona.network]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
 ja4h_template = "po11nn12enus"
-http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+http2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 http3_enabled = false
 
@@ -710,13 +710,13 @@ user_data_dir = "/tmp/persona-test-valid"
     #[test]
     fn rule1_fails_when_ua_omits_browser_version() {
         let mut p = parse_valid();
-        // Replace 147.0.7727.94 with 146.0.0.0 — UA now disagrees with
+        // Replace 148.0.7778.167 with 146.0.0.0 — UA now disagrees with
         // browser_version field.
         p.persona.user_agent.full = p
             .persona
             .user_agent
             .full
-            .replace("147.0.7727.94", "146.0.0.0");
+            .replace("148.0.7778.167", "146.0.0.0");
 
         let report = validate(&p).expect_err("must fail");
         assert!(
@@ -734,7 +734,7 @@ user_data_dir = "/tmp/persona-test-valid"
     #[test]
     fn rule2_fails_when_google_chrome_brand_major_mismatches() {
         let mut p = parse_valid();
-        // Persona claims Chrome 147 but UA-CH brand says Google Chrome 146.
+        // Persona claims Chrome 148 but UA-CH brand says Google Chrome 146.
         for (name, ver) in p.persona.user_agent.ua_ch.brands.iter_mut() {
             if name == "Google Chrome" {
                 *ver = "146".to_string();
@@ -780,8 +780,8 @@ user_data_dir = "/tmp/persona-test-valid"
             report
                 .errors()
                 .iter()
-                .any(|e| matches!(e, ValidationError::Ja4Mismatch { major: 147, .. })),
-            "expected Ja4Mismatch for major 147 in {:?}",
+                .any(|e| matches!(e, ValidationError::Ja4Mismatch { major: 148, .. })),
+            "expected Ja4Mismatch for major 148 in {:?}",
             report.errors()
         );
     }
@@ -796,7 +796,7 @@ user_data_dir = "/tmp/persona-test-valid"
             .persona
             .user_agent
             .full
-            .replace("147.0.7727.94", "999.0.0.0");
+            .replace("148.0.7778.167", "999.0.0.0");
         for (name, ver) in p.persona.user_agent.ua_ch.brands.iter_mut() {
             if name == "Google Chrome" || name == "Chromium" {
                 *ver = "999".to_string();
@@ -1055,7 +1055,7 @@ user_data_dir = "/tmp/persona-test-valid"
     #[test]
     fn rule_f_passes_with_canonical_h2_akamai() {
         let p = parse_valid();
-        // Fixture pins the canonical Chrome 147 H2 fingerprint.
+        // Fixture pins the canonical Chrome 148 H2 fingerprint.
         assert!(validate(&p).is_ok());
     }
 
@@ -1063,12 +1063,12 @@ user_data_dir = "/tmp/persona-test-valid"
     fn rule_f_fails_on_h2_akamai_mismatch() {
         let mut p = parse_valid();
         p.persona.network.http2_akamai =
-            "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|p,a,s,m".to_string();
+            "1:65536,2:0,4:6291456,6:262144|15663105|0|p,a,s,m".to_string();
         let report = validate(&p).expect_err("must fail");
         assert!(report
             .errors()
             .iter()
-            .any(|e| matches!(e, ValidationError::H2AkamaiMismatch { major: 147, .. })));
+            .any(|e| matches!(e, ValidationError::H2AkamaiMismatch { major: 148, .. })));
     }
 
     #[test]
@@ -1080,7 +1080,7 @@ user_data_dir = "/tmp/persona-test-valid"
             .persona
             .user_agent
             .full
-            .replace("147.0.7727.94", "999.0.0.0");
+            .replace("148.0.7778.167", "999.0.0.0");
         for (name, ver) in p.persona.user_agent.ua_ch.brands.iter_mut() {
             if name == "Google Chrome" || name == "Chromium" {
                 *ver = "999".to_string();
@@ -1242,7 +1242,7 @@ user_data_dir = "/tmp/persona-test-valid"
             .persona
             .user_agent
             .full
-            .replace("147.0.7727.94", "146.0.0.0");
+            .replace("148.0.7778.167", "146.0.0.0");
         for (name, ver) in p.persona.user_agent.ua_ch.brands.iter_mut() {
             if name == "Google Chrome" {
                 *ver = "146".to_string();
@@ -1280,7 +1280,7 @@ user_data_dir = "/tmp/persona-test-valid"
             ja4 in "[a-zA-Z0-9_]{3,80}"
         ) {
             // Skip the fluke where proptest happens to sample the canonical JA4.
-            proptest::prop_assume!(ja4 != "t13d1516h2_8daaf6152771_02713d6af862");
+            proptest::prop_assume!(ja4 != "t13d1516h2_8daaf6152771_773c5fd3846b");
 
             let mut p = parse_valid();
             p.persona.network.ja4 = ja4.clone();
@@ -1300,13 +1300,13 @@ user_data_dir = "/tmp/persona-test-valid"
             let _ = parse_chrome_major(&s);
         }
 
-        /// For any valid Chrome 147 persona with the canonical JA4,
+        /// For any valid Chrome 148 persona with the canonical JA4,
         /// arbitrarily replacing browser_version with a different major
         /// (and nothing else) trips rule 1 (UA mismatch) plus either
         /// rule 2 or rule 3 (or both); the report is non-empty.
         #[test]
         fn prop_chrome_major_drift_always_fails(major in 100u32..200u32) {
-            proptest::prop_assume!(major != 147);
+            proptest::prop_assume!(major != 148);
             let mut p = parse_valid();
             p.persona.browser_version = format!("{major}.0.0.0");
             let report = validate(&p).expect_err("major drift must fail");

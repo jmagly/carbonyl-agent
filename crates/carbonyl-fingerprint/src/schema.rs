@@ -182,7 +182,7 @@ mod tests {
 id = "persona-test-01"
 generator_version = "2026.04.18"
 browser_family = "chrome"
-browser_version = "147.0.7727.94"
+browser_version = "148.0.7778.167"
 release_channel = "stable"
 
 [persona.platform]
@@ -192,10 +192,10 @@ arch = "x86_64"
 bitness = "64"
 
 [persona.user_agent]
-full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.94 Safari/537.36"
+full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.167 Safari/537.36"
 
 [persona.user_agent.ua_ch]
-brands = [["Chromium", "147"], ["Google Chrome", "147"]]
+brands = [["Chromium", "148"], ["Google Chrome", "148"]]
 mobile = false
 platform = "Linux"
 platform_version = "6.8.0"
@@ -232,9 +232,9 @@ noise_seed = 729608453
 available = ["Arial", "DejaVu Sans"]
 
 [persona.network]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
 ja4h_template = "po11nn12enus"
-http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+http2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 http3_enabled = false
 
@@ -251,7 +251,7 @@ user_data_dir = "/tmp/persona-test-01"
         let p: Persona = toml::from_str(MINIMAL_PERSONA).expect("parse");
         assert_eq!(p.persona.id, "persona-test-01");
         assert_eq!(p.persona.browser_family, BrowserFamily::Chrome);
-        assert_eq!(p.persona.browser_version, "147.0.7727.94");
+        assert_eq!(p.persona.browser_version, "148.0.7778.167");
         assert_eq!(p.persona.release_channel, "stable");
         assert_eq!(p.persona.platform.os_family, "Linux");
         assert_eq!(p.persona.device.hardware_concurrency, 8);

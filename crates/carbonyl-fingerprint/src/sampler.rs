@@ -149,7 +149,7 @@ impl Sampler {
 /// - `persona.profile.user_data_dir` — `/tmp/<id>`
 ///
 /// Everything else is template-driven so the persona matches the
-/// validator's reference data (Chrome 147 JA4, brand list, etc.).
+/// validator's reference data (Chrome 148 JA4, brand list, etc.).
 fn randomize_per_instance_fields<R: Rng + ?Sized>(persona: &mut Persona, rng: &mut R) {
     let id_suffix: u64 = rng.gen();
     let id = format!("persona-sampled-{id_suffix:016x}");
@@ -169,7 +169,7 @@ fn template_for(class: PersonaClass) -> &'static str {
     }
 }
 
-/// Chrome 147 stable on Linux (Ubuntu 24.04). Lifted from the SCHEMA.md
+/// Chrome 148 stable on Linux (Ubuntu 24.04). Lifted from the SCHEMA.md
 /// exemplar in `carbonyl-fingerprint-corpus`. JA4 / H2-Akamai / UA-CH
 /// brands all match the inline reference data in `validator::CHROME_REFERENCES`.
 ///
@@ -181,7 +181,7 @@ const DESKTOP_CHROME_STABLE_LINUX: &str = r#"
 id = "persona-template-desktop-chrome-stable-linux"
 generator_version = "2026.04.18"
 browser_family = "chrome"
-browser_version = "147.0.7727.94"
+browser_version = "148.0.7778.167"
 release_channel = "stable"
 
 [persona.platform]
@@ -191,10 +191,10 @@ arch = "x86_64"
 bitness = "64"
 
 [persona.user_agent]
-full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.94 Safari/537.36"
+full = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.167 Safari/537.36"
 
 [persona.user_agent.ua_ch]
-brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+brands = [["Chromium", "148"], ["Not_A Brand", "8"], ["Google Chrome", "148"]]
 mobile = false
 platform = "Linux"
 platform_version = "6.8.0"
@@ -231,9 +231,9 @@ noise_seed = 0
 available = ["Arial", "DejaVu Sans"]
 
 [persona.network]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
 ja4h_template = "po11nn12enus"
-http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+http2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 http3_enabled = false
 
@@ -444,7 +444,7 @@ mouse_persona = "desk_mouse_windmouse"
 user_data_dir = "/tmp/persona-template-desktop-safari-macos"
 "#;
 
-/// Chrome 147 stable on Android (mobile). W3A.6.3
+/// Chrome 148 stable on Android (mobile). W3A.6.3
 /// (`Refs: roctinam/carbonyl-agent#73`). First mobile family.
 ///
 /// # Provenance
@@ -452,7 +452,7 @@ user_data_dir = "/tmp/persona-template-desktop-safari-macos"
 /// - Browser-info fields: BrowserForge MIT corpus, sampled with
 ///   `FingerprintGenerator(browser=['chrome'], os=['android'],
 ///   device=['mobile'])` on 2026-05-12.
-/// - TLS-layer fields: SAME Chrome 147 JA4 + H2 SETTINGS as desktop
+/// - TLS-layer fields: SAME Chrome 148 JA4 + H2 SETTINGS as desktop
 ///   Chrome — BoringSSL is platform-agnostic, and Chrome's mobile TLS
 ///   stack matches the desktop. The persona-level distinction is at the
 ///   UA / UA-CH / screen / WebGL layer, not the TLS layer.
@@ -474,7 +474,7 @@ const MOBILE_CHROME_ANDROID: &str = r#"
 id = "persona-template-mobile-chrome-android"
 generator_version = "2026.05.12"
 browser_family = "chrome"
-browser_version = "147.0.0.0"
+browser_version = "148.0.0.0"
 release_channel = "stable"
 
 [persona.platform]
@@ -484,10 +484,10 @@ arch = "armv8"
 bitness = "64"
 
 [persona.user_agent]
-full = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36"
+full = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36"
 
 [persona.user_agent.ua_ch]
-brands = [["Chromium", "147"], ["Not_A Brand", "8"], ["Google Chrome", "147"]]
+brands = [["Chromium", "148"], ["Not_A Brand", "8"], ["Google Chrome", "148"]]
 mobile = true
 platform = "Android"
 platform_version = "10.0.0"
@@ -524,9 +524,9 @@ noise_seed = 0
 available = ["Roboto", "Noto Sans", "Droid Sans"]
 
 [persona.network]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
 ja4h_template = "po11nn12enus"
-http2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+http2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 http3_enabled = false
 
@@ -692,10 +692,10 @@ mod tests {
             persona.persona.browser_family,
             crate::schema::BrowserFamily::Chrome
         );
-        assert_eq!(persona.persona.browser_version, "147.0.7727.94");
+        assert_eq!(persona.persona.browser_version, "148.0.7778.167");
         assert_eq!(
             persona.persona.network.ja4,
-            "t13d1516h2_8daaf6152771_02713d6af862"
+            "t13d1516h2_8daaf6152771_773c5fd3846b"
         );
         assert_eq!(persona.persona.platform.os_family, "Linux");
         assert_eq!(persona.persona.user_agent.ua_ch.platform, "Linux");

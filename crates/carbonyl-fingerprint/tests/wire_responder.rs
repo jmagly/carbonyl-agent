@@ -30,8 +30,8 @@
 //! // proper public test-utilities crate in Layer 2.4.
 //!
 //! #[tokio::test]
-//! async fn wreq_conforms_chrome_147_wire_level() {
-//!     let fixture = ConformanceFixture::chrome_147_stable_linux();
+//! async fn wreq_conforms_chrome_148_wire_level() {
+//!     let fixture = ConformanceFixture::chrome_148_stable_linux();
 //!     let (addr, capture) = LocalTlsResponder::start_one_shot().await.unwrap();
 //!
 //!     let client = wreq::Client::builder()

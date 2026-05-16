@@ -277,12 +277,12 @@ mod tests {
             .expect("sampler emits valid persona")
     }
 
-    /// Registry with Chrome 147 only (matches `inline_default`).
-    fn registry_with_only_147() -> ChromeRegistry {
+    /// Registry with Chrome 148 only (matches `inline_default`).
+    fn registry_with_only_148() -> ChromeRegistry {
         ChromeRegistry::inline_default()
     }
 
-    /// Registry where 147 is stale and 146 is the fallback. Lets the
+    /// Registry where 148 is stale and 146 is the fallback. Lets the
     /// "Stale" branch fire without inventing JA4/H2 values.
     fn registry_all_stale() -> ChromeRegistry {
         // Construct via the corpus-loader path is nontrivial; build a
@@ -291,17 +291,17 @@ mod tests {
         let chrome_dir = dir.path().join("corpus").join("chrome");
         std::fs::create_dir_all(&chrome_dir).unwrap();
         std::fs::write(
-            chrome_dir.join("chrome-147.toml"),
+            chrome_dir.join("chrome-148.toml"),
             r#"
 [chrome]
-major = 147
-version = "147.0.7727.94"
+major = 148
+version = "148.0.7778.167"
 stable_since = "2026-04-10"
 marked_stale_at = "2026-05-01"
 
 [chrome.fingerprints]
-ja4 = "t13d1516h2_8daaf6152771_02713d6af862"
-h2_akamai = "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+ja4 = "t13d1516h2_8daaf6152771_773c5fd3846b"
+h2_akamai = "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
 alpn = ["h2", "http/1.1"]
 post_quantum = true
 "#,
@@ -317,7 +317,7 @@ post_quantum = true
     #[test]
     fn refresh_is_noop_when_persona_matches_target() {
         let mut p = fresh_persona();
-        let reg = registry_with_only_147();
+        let reg = registry_with_only_148();
         let r = CorpusRefresher::new(&reg);
         let outcome = r.refresh(&mut p).expect("refresh ok");
         assert_eq!(outcome, RefreshOutcome::NoOp);
@@ -332,7 +332,7 @@ post_quantum = true
         let canvas_before = p.persona.canvas.noise_seed;
         let audio_before = p.persona.audio.noise_seed;
 
-        let reg = registry_with_only_147();
+        let reg = registry_with_only_148();
         let r = CorpusRefresher::new(&reg);
         let _ = r.refresh(&mut p).expect("refresh ok");
 
@@ -378,7 +378,7 @@ post_quantum = true
         let mut p = fresh_persona();
         // Corrupt the UA so the browser_version substring isn't present.
         p.persona.user_agent.full = "Mozilla/5.0 (Custom UA without version)".to_string();
-        let reg = registry_with_only_147();
+        let reg = registry_with_only_148();
         let r = CorpusRefresher::new(&reg);
         let err = r.refresh(&mut p).expect_err("must error");
         assert!(matches!(err, RefreshError::UserAgentNotRewritable { .. }));
@@ -392,7 +392,7 @@ post_quantum = true
         // their UA / UA-CH / JA4 by treating them as Chrome.
         let mut p = fresh_persona();
         p.persona.browser_family = BrowserFamily::Firefox;
-        let reg = registry_with_only_147();
+        let reg = registry_with_only_148();
         let r = CorpusRefresher::new(&reg);
         let err = r.refresh(&mut p).expect_err("must error");
         assert!(matches!(
@@ -406,7 +406,7 @@ post_quantum = true
     #[test]
     fn refresh_then_validate_round_trip_passes() {
         let mut p = fresh_persona();
-        let reg = registry_with_only_147();
+        let reg = registry_with_only_148();
         let r = CorpusRefresher::new(&reg);
         r.refresh(&mut p).expect("refresh ok");
         validator::validate_with_registry(&p, &reg).expect("post-refresh validate");
@@ -427,7 +427,7 @@ post_quantum = true
             let reg = ChromeRegistry::inline_default();
             let r = CorpusRefresher::new(&reg);
             let outcome = r.refresh(&mut p).expect("refresh ok");
-            // Stale outcome is never produced by inline_default (147 is
+            // Stale outcome is never produced by inline_default (148 is
             // fresh), so we should always see NoOp here.
             proptest::prop_assert!(matches!(outcome, RefreshOutcome::NoOp));
             validator::validate_with_registry(&p, &reg)

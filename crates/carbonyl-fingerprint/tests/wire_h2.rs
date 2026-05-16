@@ -206,16 +206,16 @@ mod tests {
     use super::*;
 
     /// Hand-craft an HTTP/2 connection preface + SETTINGS + WINDOW_UPDATE
-    /// byte stream matching the Chrome 147 persona's documented Akamai
+    /// byte stream matching the Chrome 148 persona's documented Akamai
     /// settings shape.
-    fn chrome_147_preface_and_frames() -> Vec<u8> {
+    fn chrome_148_preface_and_frames() -> Vec<u8> {
         let mut buf = Vec::new();
         buf.extend_from_slice(H2_CONNECTION_PREFACE);
 
-        // SETTINGS frame matching Chrome 147 persona:
-        // 1:65536, 2:0, 3:1000, 4:6291456, 6:262144  (5 entries × 6 bytes = 30)
-        let settings: Vec<(u16, u32)> =
-            vec![(1, 65536), (2, 0), (3, 1000), (4, 6291456), (6, 262144)];
+        // SETTINGS frame matching Chrome 148 persona (real wire shape;
+        // 0x03 MAX_CONCURRENT_STREAMS dropped per PR #114 / issue #113):
+        // 1:65536, 2:0, 4:6291456, 6:262144  (4 entries × 6 bytes = 24)
+        let settings: Vec<(u16, u32)> = vec![(1, 65536), (2, 0), (4, 6291456), (6, 262144)];
         let mut settings_payload = Vec::with_capacity(settings.len() * 6);
         for (id, val) in &settings {
             settings_payload.extend_from_slice(&id.to_be_bytes());
@@ -226,7 +226,7 @@ mod tests {
         buf.extend_from_slice(&settings_payload);
 
         // WINDOW_UPDATE (stream 0, increment 15663105 — matches Chrome
-        // 147 persona's Akamai window section).
+        // 148 persona's Akamai window section).
         let window_inc: u32 = 15_663_105;
         push_frame_header(&mut buf, 4, 0x08, 0, 0);
         buf.extend_from_slice(&window_inc.to_be_bytes());
@@ -250,18 +250,18 @@ mod tests {
     }
 
     #[test]
-    fn parses_chrome_147_handcrafted_preface_and_settings() {
-        let buf = chrome_147_preface_and_frames();
+    fn parses_chrome_148_handcrafted_preface_and_settings() {
+        let buf = chrome_148_preface_and_frames();
         let captured = parse_h2_initial_frames(&buf).expect("parse");
 
         assert_eq!(
             captured.settings_entries,
-            vec![(1, 65536), (2, 0), (3, 1000), (4, 6291456), (6, 262144)]
+            vec![(1, 65536), (2, 0), (4, 6291456), (6, 262144)]
         );
         assert_eq!(captured.initial_window_increment, 15_663_105);
         assert_eq!(
             captured.akamai_string,
-            "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+            "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
         );
     }
 
@@ -347,7 +347,7 @@ mod tests {
     fn akamai_string_round_trips_through_h2settings_from_akamai() {
         use carbonyl_fingerprint::http::{H2Settings, H2WindowUpdate};
 
-        let buf = chrome_147_preface_and_frames();
+        let buf = chrome_148_preface_and_frames();
         let captured = parse_h2_initial_frames(&buf).expect("parse");
 
         // The composed string must parse back through the production
