@@ -93,12 +93,21 @@ pub static CHROME_148_DESKTOP: PresetTable = PresetTable {
         )),
     },
     h2: H2Profile {
-        // From persona spec network.http2_akamai for Chrome 147:
-        //   "1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p"
+        // Captured from real Chrome 148.0.7778.167 wire bytes via
+        // tests/capture_real_browser.rs — see
+        // crates/carbonyl-wreq/data/fixtures/PROVENANCE.md
+        // "Real Chrome 148 h2 fingerprint". The Akamai-string form is:
+        //   "1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p"
+        //
+        // Note: Chrome 147's persona-spec template historically included
+        // `3:1000` (MAX_CONCURRENT_STREAMS). Chrome 148 dropped that
+        // value from its preface SETTINGS; the persona spec inherited
+        // the obsolete shape under a "wire-shape preserved 147→148"
+        // assumption that PR #110's real capture disproved.
+        //   Refs: roctinam/carbonyl-agent#113, #107, #105
         settings_default: &[
             (0x01, 65536),   // HEADER_TABLE_SIZE
             (0x02, 0),       // ENABLE_PUSH
-            (0x03, 1000),    // MAX_CONCURRENT_STREAMS
             (0x04, 6291456), // INITIAL_WINDOW_SIZE
             (0x06, 262144),  // MAX_HEADER_LIST_SIZE
         ],

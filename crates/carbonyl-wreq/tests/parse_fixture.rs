@@ -228,8 +228,10 @@ fn parse_chrome_148() {
     );
     eprintln!("    }},");
     eprintln!("    h2: H2Profile {{");
-    eprintln!("        // Persona-declared (Chrome 147 spec) — preset backstop:");
-    eprintln!("        settings_default: &[(0x01, 65536), (0x02, 0), (0x03, 1000), (0x04, 6291456), (0x06, 262144)],");
+    eprintln!("        // Real Chrome 148 wire capture (4 values; persona's 0x03=1000 dropped):");
+    eprintln!(
+        "        settings_default: &[(0x01, 65536), (0x02, 0), (0x04, 6291456), (0x06, 262144)],"
+    );
     eprintln!("        initial_connection_window: 15663105,");
     eprintln!(
         "        pseudo_header_order: &[\":method\", \":authority\", \":scheme\", \":path\"],"
