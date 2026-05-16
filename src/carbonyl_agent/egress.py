@@ -58,6 +58,31 @@ Set ``CARBONYL_FP_AUDIT`` env var or pass ``audit_mode=`` explicitly:
 - ``OFF``: no audit. Use only when the per-request overhead matters and
   drift has been verified absent by another mechanism (e.g., the
   conformance suite gating the wreq impl).
+
+# Audit log rotation
+
+The audit log writer (:class:`EgressAuditLog`) rotates the JSON-Lines
+file once it would cross a size threshold, the same way Python's
+``logging.handlers.RotatingFileHandler`` does:
+
+::
+
+    egress-audit.log    # active
+    egress-audit.log.1  # most recent rotation
+    ...
+    egress-audit.log.5  # oldest; dropped on next rotation
+
+Defaults: ``10 MiB`` per file, ``5`` backups → ``~50 MiB`` worst-case
+disk. Override per-instance via the ``max_bytes`` / ``backup_count``
+constructor arguments or fleet-wide via the environment:
+
+- ``CARBONYL_FP_AUDIT_MAX_BYTES`` — integer bytes. ``0`` disables
+  rotation entirely (unbounded growth; do not set in production).
+- ``CARBONYL_FP_AUDIT_BACKUP_COUNT`` — integer. ``0`` truncates the
+  active file on rotation without keeping history.
+
+Setting ``CARBONYL_FP_AUDIT=off`` skips audit writes entirely; rotation
+settings don't apply in that mode.
 """
 from __future__ import annotations
 
@@ -207,29 +232,159 @@ def _default_audit_log_path() -> Path:
     return base / "carbonyl-agent" / "egress-audit.log"
 
 
+# Rotation defaults — tuned for "long-running agent workflows" per #93.
+# 10 MB × 5 backups → ~50 MB worst-case disk, which is well under
+# any reasonable state-dir budget. Overridable per-instance and via
+# the CARBONYL_FP_AUDIT_MAX_BYTES / CARBONYL_FP_AUDIT_BACKUP_COUNT
+# env vars.
+_DEFAULT_AUDIT_MAX_BYTES = 10 * 1024 * 1024
+_DEFAULT_AUDIT_BACKUP_COUNT = 5
+
+
+def _resolve_rotation_defaults() -> tuple[int, int]:
+    """Resolve max_bytes + backup_count from env, falling back to defaults.
+
+    Refs: roctinam/carbonyl-agent#93
+    """
+    raw_bytes = os.environ.get("CARBONYL_FP_AUDIT_MAX_BYTES", "").strip()
+    max_bytes = _DEFAULT_AUDIT_MAX_BYTES
+    if raw_bytes:
+        try:
+            max_bytes = int(raw_bytes)
+        except ValueError as exc:
+            raise ValueError(
+                f"CARBONYL_FP_AUDIT_MAX_BYTES={raw_bytes!r} is not an integer"
+            ) from exc
+        if max_bytes < 0:
+            raise ValueError(
+                f"CARBONYL_FP_AUDIT_MAX_BYTES={max_bytes} must be >= 0 "
+                "(0 disables rotation)"
+            )
+
+    raw_count = os.environ.get("CARBONYL_FP_AUDIT_BACKUP_COUNT", "").strip()
+    backup_count = _DEFAULT_AUDIT_BACKUP_COUNT
+    if raw_count:
+        try:
+            backup_count = int(raw_count)
+        except ValueError as exc:
+            raise ValueError(
+                f"CARBONYL_FP_AUDIT_BACKUP_COUNT={raw_count!r} is not an integer"
+            ) from exc
+        if backup_count < 0:
+            raise ValueError(
+                f"CARBONYL_FP_AUDIT_BACKUP_COUNT={backup_count} must be >= 0 "
+                "(0 disables backups but rotation still truncates the active file)"
+            )
+
+    return max_bytes, backup_count
+
+
 class EgressAuditLog:
-    """Thread-safe append-only writer for :class:`EgressAuditEntry`.
+    """Thread-safe append-only writer for :class:`EgressAuditEntry` with
+    size-based rotation.
 
     Writes JSON Lines to ``_default_audit_log_path()`` by default; pass a
-    custom path for tests or alternate storage. Each write is O(1) —
-    no rotation here; operators wire logrotate or equivalent on the
-    output file when retention matters.
+    custom path for tests or alternate storage. Each ``append()`` checks
+    the current file size against ``max_bytes`` and rotates *before*
+    writing if the new line would push it over. Rotation is in-process,
+    O(``backup_count``) renames, no external dependency on ``logrotate``.
+
+    Rotation scheme (matches ``logging.handlers.RotatingFileHandler``):
+
+    ::
+
+        egress-audit.log     # active
+        egress-audit.log.1   # most recent rotation
+        egress-audit.log.2
+        ...
+        egress-audit.log.N   # N == backup_count; oldest, dropped on next rotate
+
+    Parameters:
+        path: log file path. ``None`` → :func:`_default_audit_log_path`.
+        max_bytes: rotate when file size + new line would exceed this.
+            ``0`` disables rotation (unbounded growth — only set for tests
+            or when external rotation is wired upstream). Default
+            ``10 MiB``; override via ``CARBONYL_FP_AUDIT_MAX_BYTES``.
+        backup_count: keep this many ``.N`` backups. ``0`` truncates the
+            active file on rotation without keeping history. Default
+            ``5``; override via ``CARBONYL_FP_AUDIT_BACKUP_COUNT``.
+
+    Refs: roctinam/carbonyl-agent#93
     """
 
-    def __init__(self, path: Path | str | None = None) -> None:
+    def __init__(
+        self,
+        path: Path | str | None = None,
+        *,
+        max_bytes: int | None = None,
+        backup_count: int | None = None,
+    ) -> None:
         self._path = Path(path) if path is not None else _default_audit_log_path()
         self._lock = threading.Lock()
+
+        env_max_bytes, env_backup_count = _resolve_rotation_defaults()
+        self._max_bytes = max_bytes if max_bytes is not None else env_max_bytes
+        self._backup_count = (
+            backup_count if backup_count is not None else env_backup_count
+        )
+        if self._max_bytes < 0:
+            raise ValueError(f"max_bytes={self._max_bytes} must be >= 0")
+        if self._backup_count < 0:
+            raise ValueError(f"backup_count={self._backup_count} must be >= 0")
 
     @property
     def path(self) -> Path:
         return self._path
 
+    @property
+    def max_bytes(self) -> int:
+        return self._max_bytes
+
+    @property
+    def backup_count(self) -> int:
+        return self._backup_count
+
     def append(self, entry: EgressAuditEntry) -> None:
         line = entry.to_json() + "\n"
+        encoded = line.encode("utf-8")
         with self._lock:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self._path, "a", encoding="utf-8") as f:
-                f.write(line)
+            self._rotate_if_needed(len(encoded))
+            with open(self._path, "ab") as f:
+                f.write(encoded)
+
+    def _rotate_if_needed(self, incoming_bytes: int) -> None:
+        """Rotate the active log if appending ``incoming_bytes`` would
+        push it past ``max_bytes``. No-op when ``max_bytes == 0``.
+
+        Held under ``self._lock``; do not call from outside ``append``.
+        """
+        if self._max_bytes == 0:
+            return
+        try:
+            current = self._path.stat().st_size
+        except FileNotFoundError:
+            return
+        if current + incoming_bytes <= self._max_bytes:
+            return
+
+        # Shift backups down: .N-1 → .N, ..., .1 → .2, active → .1.
+        # Anything past .N is dropped (the unlink at the start drops .N
+        # so the highest-index slot is free for the active file).
+        if self._backup_count == 0:
+            # No history: just truncate by removing the active file.
+            self._path.unlink(missing_ok=True)
+            return
+
+        oldest = self._path.with_suffix(self._path.suffix + f".{self._backup_count}")
+        oldest.unlink(missing_ok=True)
+        for i in range(self._backup_count - 1, 0, -1):
+            src = self._path.with_suffix(self._path.suffix + f".{i}")
+            dst = self._path.with_suffix(self._path.suffix + f".{i + 1}")
+            if src.exists():
+                src.rename(dst)
+        # Active log → .1
+        self._path.rename(self._path.with_suffix(self._path.suffix + ".1"))
 
 
 # ---------------------------------------------------------------------------
