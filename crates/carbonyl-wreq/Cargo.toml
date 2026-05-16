@@ -57,3 +57,6 @@ thiserror = "2"
 h2 = "0.4"
 proptest = "1"
 rand = "0.8"
+# Used by tests/capture_real_browser.rs to base64-encode the SPKI
+# hash for Chrome's --ignore-certificate-errors-spki-list flag.
+base64 = "0.22"

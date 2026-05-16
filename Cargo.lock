@@ -240,6 +240,7 @@ dependencies = [
 name = "carbonyl-wreq"
 version = "0.0.1-alpha.1"
 dependencies = [
+ "base64",
  "carbonyl-fingerprint",
  "h2",
  "hex",

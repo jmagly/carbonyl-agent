@@ -132,19 +132,21 @@ pub mod safari;
 /// entries exist yet (Iteration A item 2 ships types only; concrete
 /// entries land alongside captured fixtures in items 3+ and Iteration B).
 pub fn preset_for(
-    _family: BrowserFamily,
-    _version: BrowserVersion,
-    _platform: Platform,
+    family: BrowserFamily,
+    version: BrowserVersion,
+    platform: Platform,
 ) -> Option<&'static PresetTable> {
-    // No concrete entries yet. When `chrome::CHROME_147_DESKTOP` lands
-    // (with a real captured fixture), this becomes:
-    //
-    //     match (family, version.major, platform) {
-    //         (BrowserFamily::Chrome, 147, Platform::Desktop) =>
-    //             Some(&chrome::CHROME_147_DESKTOP),
-    //         _ => Some(nearest_neighbor(family, version, platform)),
-    //     }
-    None
+    match (family, version.major, platform) {
+        (BrowserFamily::Chrome, 148, Platform::Desktop) => Some(&chrome::CHROME_148_DESKTOP),
+        // Persona spec declares Chrome 147 but Chrome 147 stable is no
+        // longer available from Google's apt repo for fresh capture.
+        // Nearest-neighbor: Chrome 148 desktop (per ADR-W02 §"Trade-off
+        // vs. keeping closest-preset selection"). When Chrome 147 is
+        // captured (or persona moves to 148), this arm becomes a
+        // dedicated entry.
+        (BrowserFamily::Chrome, 147, Platform::Desktop) => Some(&chrome::CHROME_148_DESKTOP),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -152,7 +154,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn types_compile_and_construct() {
+    fn _types_compile_and_construct() {
         // Sanity: the type surface compiles and a construction-only
         // instance is buildable. No real preset values yet.
         let p = PresetTable {
@@ -184,16 +186,40 @@ mod tests {
     }
 
     #[test]
-    fn preset_for_returns_none_until_real_entries_land() {
+    fn preset_for_chrome_148_returns_desktop_entry() {
+        let p = preset_for(
+            BrowserFamily::Chrome,
+            BrowserVersion { major: 148, minor: 0 },
+            Platform::Desktop,
+        );
+        let p = p.expect("Chrome 148 desktop preset should exist");
+        assert_eq!(p.family, BrowserFamily::Chrome);
+        assert_eq!(p.version.major, 148);
+        assert_eq!(p.provenance_id, "chrome-148-desktop");
+        assert!(p.tls.cipher_list.is_some());
+        assert!(p.tls.sigalgs_list.is_some());
+        assert_eq!(p.tls.alpn_default, &["h2", "http/1.1"]);
+    }
+
+    #[test]
+    fn preset_for_chrome_147_falls_back_to_148_per_nearest_neighbor() {
         let p = preset_for(
             BrowserFamily::Chrome,
             BrowserVersion { major: 147, minor: 0 },
             Platform::Desktop,
         );
-        assert!(
-            p.is_none(),
-            "no concrete preset entries should exist until Iteration A item 3 \
-             (Chrome 147 desktop fixture capture) lands"
+        let p = p.expect("Chrome 147 desktop should fall back to nearest neighbor");
+        // Per ADR-W02 nearest-neighbor: persona-147 → preset-148
+        assert_eq!(p.provenance_id, "chrome-148-desktop");
+    }
+
+    #[test]
+    fn preset_for_unknown_returns_none() {
+        let p = preset_for(
+            BrowserFamily::Firefox,
+            BrowserVersion { major: 150, minor: 0 },
+            Platform::Desktop,
         );
+        assert!(p.is_none(), "Firefox preset not yet captured");
     }
 }
