@@ -25,6 +25,7 @@
 #![deny(rust_2018_idioms)]
 
 pub mod client;
+pub mod presets;
 
 pub use client::{persona_to_emulation, PendingConfig, WreqClient, WreqError};
 
