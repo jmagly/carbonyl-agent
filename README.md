@@ -542,17 +542,21 @@ unreachable.
 3. `carbonyl` on `$PATH`
 4. Docker fallback (requires `CARBONYL_ALLOW_DOCKER=1`)
 
-### Runtime compatibility matrix (#21)
+### Runtime compatibility matrix (#21, #92)
 
-CI runs the full E2E suite (`tests/e2e/`) against multiple Carbonyl runtime tags so SDK-vs-runtime drift is caught before it reaches users.
+Each `carbonyl-agent` release pins a Carbonyl runtime hash. CI runs the full E2E suite (`tests/e2e/`) against the current and prior runtimes so SDK-vs-runtime drift is caught before it reaches users.
 
-| Tag | Status | Notes |
-|---|---|---|
-| `runtime-9b3ba53adcd8d330` | **Supported** (current pin in `.carbonyl-runtime-version`) | Default for `carbonyl-agent install`. Carbonyl v0.2.0-alpha.4 — includes `--carbonyl-cookie-flush-interval-ms` (#51) |
-| `runtime-dd69bef0ea4b2512` | **Backwards-compat tested** | Prior runtime; CI verifies SDK still works against it |
-| Older `runtime-*` tags | Best-effort | Not in CI; expected to work but not guaranteed |
+| `carbonyl-agent` | Runtime hash | Carbonyl release | CI status |
+|---|---|---|---|
+| `2026.5.x` (current) | [`runtime-9b3ba53adcd8d330`](https://github.com/jmagly/carbonyl/releases/tag/runtime-9b3ba53adcd8d330) | v0.2.0-alpha.4 (M147 — adds `--carbonyl-cookie-flush-interval-ms`, #51) | **Supported** — default for `carbonyl-agent install` |
+| `2026.4.x` and earlier | [`runtime-dd69bef0ea4b2512`](https://github.com/jmagly/carbonyl/releases/tag/runtime-dd69bef0ea4b2512) | v0.2.0-alpha.3 (M147) | **Backwards-compat tested** — CI verifies SDK still works against it |
+| any | older `runtime-*` tags | various | Best-effort; not in CI |
 
-Pin a specific runtime in your project by writing the hash into `.carbonyl-runtime-version` (one `runtime-hash=<hash>` line). The `carbonyl-agent install` command reads it. Override on the command line with `--tag runtime-<hash>` for a one-off install.
+The canonical runtime tag list lives at [github.com/jmagly/carbonyl/releases](https://github.com/jmagly/carbonyl/releases) (mirror: [git.integrolabs.net/roctinam/carbonyl](https://git.integrolabs.net/roctinam/carbonyl)). The current pin for this checkout is in [`.carbonyl-runtime-version`](.carbonyl-runtime-version).
+
+**Pinning a different runtime**: write one `runtime-hash=<hash>` line into `.carbonyl-runtime-version`. The `carbonyl-agent install` command reads it. Override on the command line with `--tag runtime-<hash>` for a one-off install.
+
+**`CARBONYL_BIN` override**: if you set `CARBONYL_BIN=/path/to/carbonyl`, the SDK uses that binary unconditionally — the runtime hash matrix above does not apply. You are responsible for ensuring the binary is a compatible Carbonyl build. See [Binary Search Order](#binary-search-order) for the full precedence chain.
 
 ### Docker fallback (opt-in)
 
