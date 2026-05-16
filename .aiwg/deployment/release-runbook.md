@@ -38,17 +38,26 @@ Only performed once, before the first release. Complete before attempting v0.1.0
 
 ### 0.4. Verify via TestPyPI (recommended before first prod publish)
 
-1. Configure a second pending publisher on [TestPyPI](https://test.pypi.org/manage/account/publishing/) with the same settings
-2. Add a `workflow_dispatch` trigger to `.github/workflows/release.yml` that publishes to TestPyPI instead of PyPI
-3. Run the workflow manually, verify package appears at [https://test.pypi.org/project/carbonyl-agent/](https://test.pypi.org/project/carbonyl-agent/)
-4. In a clean venv: `pip install --index-url https://test.pypi.org/simple/ carbonyl-agent`
+1. Configure a second pending publisher on [TestPyPI](https://test.pypi.org/manage/account/publishing/):
+   - **PyPI Project Name**: `carbonyl-agent`
+   - **Owner**: `jmagly`
+   - **Repository name**: `carbonyl-agent`
+   - **Workflow name**: `release-testpypi.yml`  ⚠ different from production
+   - **Environment name**: `release-testpypi`  ⚠ different from production
+2. Create the matching `release-testpypi` GitHub environment at [https://github.com/jmagly/carbonyl-agent/settings/environments](https://github.com/jmagly/carbonyl-agent/settings/environments). No required reviewers needed for dry-runs.
+3. Trigger `.github/workflows/release-testpypi.yml` manually from the GitHub Actions UI (the workflow is `workflow_dispatch`-only). Supply the current `pyproject.toml` version (no leading `v`) as the `version` input — the workflow verifies it matches `pyproject.toml` before building.
+4. Verify the package appears at [https://test.pypi.org/project/carbonyl-agent/](https://test.pypi.org/project/carbonyl-agent/).
+5. In a clean venv: `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ carbonyl-agent` (the `--extra-index-url` lets pip resolve runtime dependencies — TestPyPI doesn't mirror the full dep graph).
 
 ### 0.5. Confirm readiness
 
-- [ ] PyPI pending publisher created
+- [ ] PyPI pending publisher created (workflow: `release.yml`, env: `release`)
 - [ ] GitHub `release` environment exists
 - [ ] `.github/workflows/release.yml` `publish` job uses `pypa/gh-action-pypi-publish@release/v1` with `id-token: write` permission
-- [ ] (Optional) TestPyPI dry-run succeeded
+- [ ] (Optional, recommended for first-of-a-line releases) TestPyPI dry-run succeeded
+  - [ ] TestPyPI pending publisher created (workflow: `release-testpypi.yml`, env: `release-testpypi`)
+  - [ ] GitHub `release-testpypi` environment exists
+  - [ ] `release-testpypi.yml` ran successfully via `workflow_dispatch` and the artefact is visible at https://test.pypi.org/project/carbonyl-agent/
 
 ## 1. Pre-Release Checklist
 

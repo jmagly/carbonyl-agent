@@ -1,0 +1,76 @@
+name: Release (TestPyPI dry-run)
+
+# Manual-only TestPyPI publish for pre-release verification.
+#
+# Mirrors the production `release.yml` build pipeline but pushes the
+# resulting sdist + wheel to https://test.pypi.org instead of PyPI.
+# Use this before each first-of-a-line release (v0.1.0, v1.0.0, etc.)
+# to confirm the trusted-publisher wiring works end-to-end without
+# polluting the real PyPI index.
+#
+# Refs: roctinam/carbonyl-agent#12 (acceptance: "Tested via TestPyPI first")
+#       .aiwg/deployment/release-runbook.md §0.4
+#
+# Trusted publisher requirements on TestPyPI (one-time, see runbook §0.4):
+#   - Pending publisher: PyPI Project Name `carbonyl-agent`, Owner
+#     `jmagly`, Repository `carbonyl-agent`, Workflow `release-testpypi.yml`,
+#     Environment `release-testpypi`.
+#   - GitHub environment `release-testpypi` must exist on
+#     jmagly/carbonyl-agent (Settings → Environments → New).
+#
+# Unlike `release.yml`, this workflow does NOT run on tag push. It is
+# `workflow_dispatch`-only — invoke manually from the GitHub Actions
+# UI with the version to publish. The version field is checked against
+# pyproject.toml the same way the production workflow checks the tag.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (must match pyproject.toml; no leading v)'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify input version matches pyproject.toml
+        run: |
+          INPUT_VERSION="${{ inputs.version }}"
+          PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [ "$INPUT_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::Input version '$INPUT_VERSION' does not match pyproject.toml version '$PYPROJECT_VERSION'"
+            echo "::error::Bump pyproject.toml first, or re-run with the correct version string."
+            exit 1
+          fi
+          echo "Building carbonyl-agent ${INPUT_VERSION} for TestPyPI"
+      - run: pip install hatch twine
+      - run: hatch build
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-testpypi
+          path: dist/
+
+  publish-testpypi:
+    runs-on: ubuntu-latest
+    needs: [build]
+    environment:
+      name: release-testpypi
+      url: https://test.pypi.org/project/carbonyl-agent/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-testpypi
+          path: dist/
+      - name: Publish to TestPyPI via trusted publisher (OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
