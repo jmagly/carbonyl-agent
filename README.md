@@ -558,6 +558,35 @@ The canonical runtime tag list lives at [github.com/jmagly/carbonyl/releases](ht
 
 **`CARBONYL_BIN` override**: if you set `CARBONYL_BIN=/path/to/carbonyl`, the SDK uses that binary unconditionally — the runtime hash matrix above does not apply. You are responsible for ensuring the binary is a compatible Carbonyl build. See [Binary Search Order](#binary-search-order) for the full precedence chain.
 
+### Airgap / offline install (#95)
+
+`carbonyl-agent install` downloads a ~75 MB tarball from the GitHub or Gitea release for `roctinam/carbonyl`. Hosts without that network access have three options:
+
+**Option 1 — `--from-file`**: download the tarball on a connected host, carry it across, install from the local file.
+
+```bash
+# On a connected host: preview the URL you need to fetch
+carbonyl-agent install --dry-run
+# → [dry-run] Would GET: https://git.integrolabs.net/.../x86_64-unknown-linux-gnu.tgz
+# → [dry-run] Would also fetch: .../SHA256SUMS
+
+# Fetch both files (any tool: curl, wget, browser)
+curl -O https://git.integrolabs.net/.../x86_64-unknown-linux-gnu.tgz
+curl -O https://git.integrolabs.net/.../SHA256SUMS
+
+# Carry across, then on the airgapped host:
+SHA=$(awk '/x86_64-unknown-linux-gnu.tgz/{print $1}' SHA256SUMS)
+carbonyl-agent install --from-file x86_64-unknown-linux-gnu.tgz --checksum "$SHA"
+```
+
+The `--checksum` argument is recommended; without it `--from-file` prints a warning and skips integrity verification.
+
+**Option 2 — pre-staged install directory**: extract the tarball directly into `~/.local/share/carbonyl/bin/<triple>/` (the default discovery path), then skip the install command entirely. The SDK finds the binary on the next `CarbonylBrowser()` call.
+
+**Option 3 — `CARBONYL_BIN` env var**: if the runtime lives outside the default path, set `CARBONYL_BIN=/path/to/carbonyl` and the SDK uses it directly. Highest priority in the search order — overrides everything else.
+
+**Proxy support**: `carbonyl-agent install` uses `urllib.request`, which honors `HTTPS_PROXY` / `https_proxy` for HTTPS URLs out of the box. `--dry-run` reports the active proxy setting.
+
 ### Docker fallback (opt-in)
 
 When no local binary is installed, the SDK can fall back to `docker run fathyb/carbonyl` — but this is opt-in for supply-chain safety:
