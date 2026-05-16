@@ -156,20 +156,12 @@ async fn start_responder(
     Ok((listen_addr, rx, cert_der))
 }
 
-async fn capture_one(listener: TcpListener, acceptor: TlsAcceptor) -> Captured {
+/// Handle a single accepted TCP connection: peek the ClientHello,
+/// complete the TLS handshake, send the server h2 preface SETTINGS
+/// frame immediately, then read whatever the client sends. Returns
+/// a `Captured` describing what was observed on this one connection.
+async fn handle_one_connection(tcp: tokio::net::TcpStream, acceptor: TlsAcceptor) -> Captured {
     let mut captured = Captured::default();
-    let stream_result = timeout(Duration::from_secs(15), listener.accept()).await;
-    let (tcp, _peer) = match stream_result {
-        Ok(Ok(pair)) => pair,
-        Ok(Err(e)) => {
-            captured.error = Some(format!("accept error: {e}"));
-            return captured;
-        }
-        Err(_) => {
-            captured.error = Some("accept timed out — no client connected within 15s".into());
-            return captured;
-        }
-    };
     let mut peek_buf = vec![0u8; 8192];
     if let Ok(n) = tcp.peek(&mut peek_buf).await {
         peek_buf.truncate(n);
@@ -183,7 +175,28 @@ async fn capture_one(listener: TcpListener, acceptor: TlsAcceptor) -> Captured {
                 .alpn_protocol()
                 .map(|b| String::from_utf8_lossy(b).into_owned());
             captured.handshake_complete = true;
-            let total = Duration::from_millis(800);
+
+            // RFC 7540 §3.5: the server connection preface "MUST be the
+            // first frame the server sends in the HTTP/2 connection."
+            // Chrome 148's HTTP/2 client strictly enforces this — it
+            // sends its own preface (24-byte magic + SETTINGS) only
+            // AFTER it receives the server's SETTINGS frame. Older
+            // Chrome versions sent the preface eagerly; that's why
+            // the original ordering (read first, then write SETTINGS
+            // after the read window expired) deadlocked starting at
+            // 148. Send the empty SETTINGS frame immediately on ALPN
+            // negotiation, then read the client preface.
+            //
+            // Frame layout: length=0, type=4 (SETTINGS), flags=0, stream=0
+            //   Refs: roctinam/carbonyl-agent#107
+            const SERVER_PREFACE_SETTINGS: [u8; 9] = [0, 0, 0, 4, 0, 0, 0, 0, 0];
+            if let Err(e) = tls.write_all(&SERVER_PREFACE_SETTINGS).await {
+                captured.error = Some(format!("server preface write failed: {e}"));
+            } else {
+                let _ = tls.flush().await;
+            }
+
+            let total = Duration::from_millis(1500);
             let between = Duration::from_millis(100);
             let start = Instant::now();
             let mut buf = vec![0u8; 4096];
@@ -195,16 +208,16 @@ async fn capture_one(listener: TcpListener, acceptor: TlsAcceptor) -> Captured {
                     Ok(Ok(n)) => captured.h2_bytes.extend_from_slice(&buf[..n]),
                     Ok(Err(_)) => break,
                     Err(_) => {
-                        if !captured.h2_bytes.is_empty() {
+                        // Stop early once we have at least the magic
+                        // preface (24 bytes) + a full SETTINGS frame
+                        // header (9 bytes) — anything past that is
+                        // bonus (likely the SETTINGS payload).
+                        if captured.h2_bytes.len() >= 24 + 9 {
                             break;
                         }
                     }
                 }
             }
-            // Send a minimal h2 SETTINGS frame back so Chrome's h2
-            // state machine doesn't choke before sending its own.
-            // Frame: length=0, type=4 (SETTINGS), flags=0, stream=0
-            let _ = tls.write_all(&[0, 0, 0, 4, 0, 0, 0, 0, 0]).await;
             let _ = tls.shutdown().await;
         }
         Err(e) => {
@@ -212,6 +225,117 @@ async fn capture_one(listener: TcpListener, acceptor: TlsAcceptor) -> Captured {
         }
     }
     captured
+}
+
+/// Accept connections in a loop until we've collected at least one
+/// with a full h2 client preface (24-byte magic + a SETTINGS frame
+/// header), or the overall budget expires. Returns the "best" capture:
+/// preference is given to a connection that yielded h2 bytes; among
+/// those, the one with the most bytes wins. If no connection produced
+/// h2 bytes, the connection with the largest ClientHello is returned
+/// (Chrome's preconnect ClientHello is identical to its navigation
+/// ClientHello in modern versions, so this is still a valid fixture
+/// for ClientHello-based analyses).
+///
+/// Refs: roctinam/carbonyl-agent#107 — Chrome 148+ opens preconnect
+/// connections that complete TLS but never send the h2 preface. The
+/// real navigation connection is opened in parallel. We need to drain
+/// the listener to find it.
+async fn capture_one(listener: TcpListener, acceptor: TlsAcceptor) -> Captured {
+    let overall_budget = Duration::from_secs(15);
+    let per_conn_budget = Duration::from_secs(8);
+    let start = Instant::now();
+    let mut best: Option<Captured> = None;
+    let mut handles: Vec<tokio::task::JoinHandle<Captured>> = Vec::new();
+
+    while start.elapsed() < overall_budget {
+        let remaining = overall_budget.saturating_sub(start.elapsed());
+        let accept_t = std::cmp::min(remaining, Duration::from_millis(500));
+        match timeout(accept_t, listener.accept()).await {
+            Ok(Ok((tcp, _peer))) => {
+                let acceptor = acceptor.clone();
+                handles.push(tokio::spawn(async move {
+                    timeout(per_conn_budget, handle_one_connection(tcp, acceptor))
+                        .await
+                        .unwrap_or_else(|_| Captured {
+                            error: Some("per-connection timeout".into()),
+                            ..Default::default()
+                        })
+                }));
+            }
+            Ok(Err(e)) => {
+                if best.is_none() {
+                    best = Some(Captured {
+                        error: Some(format!("accept error: {e}")),
+                        ..Default::default()
+                    });
+                }
+                break;
+            }
+            Err(_) => {
+                // accept timed out for this slice; loop checks overall budget
+            }
+        }
+
+        // Drain any completed handlers so we can early-exit as soon as
+        // we have a good capture.
+        let mut still_running = Vec::with_capacity(handles.len());
+        for h in handles.drain(..) {
+            if h.is_finished() {
+                if let Ok(c) = h.await {
+                    best = Some(pick_best(best.take(), c));
+                }
+            } else {
+                still_running.push(h);
+            }
+        }
+        handles = still_running;
+
+        if best
+            .as_ref()
+            .map(|c| c.h2_bytes.len() >= 24 + 9)
+            .unwrap_or(false)
+        {
+            break;
+        }
+    }
+
+    // Drain remaining handlers — give them a brief grace period to
+    // finish what they're doing.
+    let drain_deadline = Instant::now() + Duration::from_secs(2);
+    for h in handles {
+        let remaining = drain_deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            h.abort();
+            continue;
+        }
+        if let Ok(Ok(c)) = timeout(remaining, h).await {
+            best = Some(pick_best(best.take(), c));
+        }
+    }
+
+    best.unwrap_or_else(|| Captured {
+        error: Some("no client connected within 15s".into()),
+        ..Default::default()
+    })
+}
+
+fn pick_best(prev: Option<Captured>, new: Captured) -> Captured {
+    match prev {
+        None => new,
+        Some(p) => {
+            // Prefer a capture with h2 bytes
+            if new.h2_bytes.len() > p.h2_bytes.len() {
+                new
+            } else if !p.h2_bytes.is_empty() {
+                p
+            } else if new.client_hello_bytes.len() > p.client_hello_bytes.len() {
+                new
+            } else {
+                p
+            }
+        }
+    }
 }
 
 async fn capture_with_browser(

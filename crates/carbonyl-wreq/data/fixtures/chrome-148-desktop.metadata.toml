@@ -2,18 +2,18 @@
 fixture_id = "chrome-148-desktop"
 browser_product = "Google Chrome"
 platform = "Linux x86_64"
-captured_at = "2026-05-16T02:12:12Z"
+captured_at = "2026-05-16T04:29:53Z"
 captured_by = "carbonyl-agent capture_real_browser test"
 capture_method = "inline TLS+h2 responder + headless browser; loopback only"
-negotiated_alpn = "<none>"
+negotiated_alpn = "h2"
 
 [artifacts]
 client_hello_path = "chrome-148-desktop.client_hello.bin"
-client_hello_sha256 = "e5975d6805ad8743e5acf0c38c5867c5a961f739db3716ff368fd77cd85f5d73"
-client_hello_size_bytes = 1765
+client_hello_sha256 = "6aabf5ef3f19afda8b34ddeb40ef149b79237ea7a532e52f59c315a3b6415a1c"
+client_hello_size_bytes = 1812
 h2_settings_path = "chrome-148-desktop.h2_settings.bin"
-h2_settings_sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-h2_settings_size_bytes = 0
+h2_settings_sha256 = "7b3adff36a4d97f1b0193a52b2dc2a9a662031d472dd037c29de20d849b477ec"
+h2_settings_size_bytes = 540
 
 # Note: the JA4 cross-check against the FoxIO database (per
 # fixtures-plan.md §3.2 step 11) was NOT performed at capture time —

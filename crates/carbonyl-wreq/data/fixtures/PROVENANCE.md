@@ -14,7 +14,7 @@ metadata (timestamps, alpn, byte sizes) lives in the corresponding
 
 | Fixture ID | Browser | Version | Platform | Captured | ClientHello SHA-256 | h2 SETTINGS SHA-256 |
 |---|---|---|---|---|---|---|
-| chrome-148-desktop | Google Chrome | 148.0.7778.167 | Linux x86_64 | 2026-05-16 | `e5975d6805ad8743e5acf0c38c5867c5a961f739db3716ff368fd77cd85f5d73` | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` (empty — see below) |
+| chrome-148-desktop | Google Chrome | 148.0.7778.167 | Linux x86_64 | 2026-05-16 | `6aabf5ef3f19afda8b34ddeb40ef149b79237ea7a532e52f59c315a3b6415a1c` | `7b3adff36a4d97f1b0193a52b2dc2a9a662031d472dd037c29de20d849b477ec` |
 
 ## Capture method notes
 
@@ -30,23 +30,51 @@ The capture pipeline runs entirely on `loopback` (127.0.0.1):
 4. The responder's TCP layer peeks the first 8KiB before handing
    the stream to rustls — the **ClientHello bytes are captured
    here**, before TLS handshake completion.
-5. rustls then attempts the handshake. In the chrome-148-desktop
-   capture, the handshake did NOT complete (Chrome rejected the
-   self-signed cert despite the SPKI flag — likely
-   headless=new-mode hardening that the SPKI flag doesn't bypass).
-6. The h2 SETTINGS frame would normally be captured post-handshake;
-   that's empty for this fixture. h2 SETTINGS values for
-   `CHROME_148_DESKTOP` come from the persona spec's
-   `network.http2_akamai` field (Chrome 147 ground truth from
-   prior W3A.6 capture work — wire-shape preserved across the 147→148
-   minor revision per industry observation).
+5. rustls accepts the TLS handshake and immediately sends the
+   server-side h2 connection preface (an empty `SETTINGS` frame,
+   per RFC 7540 §3.5). This is critical for Chrome 148+: unlike
+   earlier versions, Chrome 148 strictly waits for the server
+   preface before sending its own preface + SETTINGS. Sending
+   `SETTINGS` after the read loop (the pre-`#107` behavior)
+   deadlocked the h2 channel and produced an empty h2 capture.
+6. The responder accepts **multiple concurrent connections** and
+   returns the one that yielded h2 bytes. Chrome 148's network
+   service opens parallel preconnect sockets that complete the
+   TLS handshake without sending any HTTP/2 data; the real
+   navigation socket is opened in parallel. Single-accept
+   responders catch the preconnect and miss the real socket.
+7. The captured `chrome-148-desktop.h2_settings.bin` contains the
+   complete client preface: 24-byte magic (`PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n`),
+   a `SETTINGS` frame, a `WINDOW_UPDATE` frame, the navigation
+   `HEADERS` frame, and a `SETTINGS` ACK. Parsing yields the
+   `network.http2_akamai` values directly (see below).
 
-This is a pragmatic compromise: the **ClientHello is real-Chrome-148
-ground truth** (1765 bytes byte-for-byte from Chrome's TLS stack via
-BoringSSL), and the **h2 settings are derived ground truth** from the
-persona spec's earlier capture. A future fixture pass with a
-system-trusted cert (via `mkcert` or equivalent) would let the
-handshake complete and capture h2 SETTINGS directly from Chrome 148.
+### Real Chrome 148 h2 fingerprint (parsed from the capture)
+
+| Setting | ID | Value |
+|---|---|---|
+| `HEADER_TABLE_SIZE` | 0x01 | 65536 |
+| `ENABLE_PUSH` | 0x02 | 0 |
+| `INITIAL_WINDOW_SIZE` | 0x04 | 6291456 |
+| `MAX_HEADER_LIST_SIZE` | 0x06 | 262144 |
+| `WINDOW_UPDATE` (stream 0) | — | +15663105 |
+
+Reconstructed Akamai-string form:
+
+```
+1:65536,2:0,4:6291456,6:262144|15663105|0|m,a,s,p
+```
+
+**Note: structural divergence from the persona spec.** The persona
+spec's `network.http2_akamai` for Chrome 147 declared
+`1:65536,2:0,3:1000,4:6291456,6:262144|15663105|0|m,a,s,p` — including
+`MAX_CONCURRENT_STREAMS=1000` (setting 3). The real Chrome 148
+client no longer advertises `MAX_CONCURRENT_STREAMS` in its preface
+SETTINGS frame; the wire-shape was NOT preserved across the 147→148
+boundary as previously assumed in this document. Downstream personas
+should update their `network.http2_akamai` template accordingly. This
+divergence is in scope for the follow-up persona refresh, not for
+the recapture work in `#107`.
 
 ## JA4 cross-check
 
@@ -62,7 +90,8 @@ the capture's structural integrity.
 
 ```bash
 sha256sum -c <<EOF
-e5975d6805ad8743e5acf0c38c5867c5a961f739db3716ff368fd77cd85f5d73  chrome-148-desktop.client_hello.bin
+6aabf5ef3f19afda8b34ddeb40ef149b79237ea7a532e52f59c315a3b6415a1c  chrome-148-desktop.client_hello.bin
+7b3adff36a4d97f1b0193a52b2dc2a9a662031d472dd037c29de20d849b477ec  chrome-148-desktop.h2_settings.bin
 EOF
 ```
 
@@ -73,3 +102,10 @@ rm -rf /tmp/chrome-fixture-capture
 cargo test -p carbonyl-wreq --test capture_real_browser \
   -- --ignored --test-threads=1 capture_chrome_desktop --nocapture
 ```
+
+The capture is non-deterministic in the SHA-256 sense — each run
+generates a fresh self-signed cert and Chrome's ClientHello varies
+slightly (GREASE values, session-ticket extension content) — so the
+hashes in this document update on each recapture. The **structural
+shape** (TLS record layout, h2 preface contents, the SETTINGS values
+above) is stable across runs.
