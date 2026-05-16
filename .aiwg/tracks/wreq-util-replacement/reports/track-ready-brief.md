@@ -34,7 +34,7 @@ The SDLC docset for the wreq-util replacement track is ready for review. All req
 **Planning** (`planning/`):
 
 - `iteration-plan.md` — Three iterations: A (Chrome desktop proof + `wreq` API investigation), B (five-family rollout + `wreq-util` removal), C (license audit cleanup + new-preset runbook). Per-iteration scope items, quality gates, and parallelism map.
-- `migration-strategy.md` — Feature-flag lifecycle (`carbonyl-wreq/preset-registry` exists for one minor version), dual-CI matrix during transition, per-iteration rollback procedures, downstream-communication plan.
+- `migration-strategy.md` — Git-level iteration-boundary rollback (feature flag dropped per 2026-05-15 track decision); dual-CI matrix during the Iteration A dual-path window; per-iteration revert procedures; downstream-communication plan.
 
 **Reports** (`reports/`):
 
@@ -56,17 +56,17 @@ Each ADR has a "Consequences — Negative" section documenting the trade-offs (v
 
 | Iteration | Scope | Quality gate |
 |-----------|-------|--------------|
-| A | Chrome 147 desktop preset; `wreq` API investigation; off-by-default feature flag; L2 responder scaffold; one fixture | Both old and new paths green in CI; Chrome L2 conformance passes |
-| B | Four remaining family captures; complete registry; flag flipped ON; `wreq_util::Emulation` deleted; `wreq-util` removed from `Cargo.toml` | All five families green; `cargo about` clean on full workspace; no `wreq_util` references in source |
+| A | Chrome 147 desktop preset; `wreq` API investigation; new path added alongside legacy via test-only helper (no feature flag); L2 responder scaffold; one fixture | Both old and new paths green in CI; Chrome L2 conformance passes; production still routes through legacy path |
+| B | Four remaining family captures; complete registry; production cutover to new path; `wreq_util::Emulation` deleted; `wreq-util` removed from `Cargo.toml` | All five families green; `cargo about` clean on full workspace; no `wreq_util` references in source |
 | C | Full-workspace license script; regenerated `THIRD_PARTY_LICENSES.txt`; wheel verification; adding-a-preset runbook; close #99 | Wheel contains updated license file; runbook is one-hour-actionable; #99 closed; #88 notified |
 
 ## Open items / known risks warranting maintainer review
 
 1. **`wreq` API shape unknown** — The single biggest construction risk is whether `wreq` 5.x exposes a low-level TLS profile API or whether we have to either submit an upstream PR or reach into `wreq` internals. Iteration A item 1 is the investigation. If the investigation surfaces surprises, an ADR-W02 addendum is required before continuing. The design doc flags this explicitly.
 
-2. **Persona completeness audit needed** — ADR-W02 assumes the five canonical personas in `carbonyl-fingerprint` declare every wire field with sufficient fidelity that the preset backstop is only filling in family/version/platform-derived defaults, not real wire bytes the persona was supposed to own. Before flipping the inversion in Iteration A, the personas should be audited. If gaps are found, they need to be filled in the persona before the code change, not after. This is a recommended pre-Iteration-A check; not strictly blocking but cheaper to do now than to discover during conformance testing.
+2. **Persona completeness audit — RESOLVED (now a pre-track gate)** — Per 2026-05-15 track decision, the audit is no longer "recommended" but **required before Iteration A begins**. Filed as a separate issue under EPIC #100. The audit produces `.aiwg/tracks/wreq-util-replacement/reports/persona-audit-report.md` and may surface ADR-W02 revisions that need to land before construction.
 
-3. **Safari iOS fixture capture access** — `fixtures-plan.md` flags this as an open question. We need access to either an iOS device on the target iOS version or an iOS simulator running on Apple silicon. Without it, the `safari-26-ios` fixture cannot be captured and Iteration B's five-family conformance gate can't close. Recommend confirming hardware/simulator access before Iteration B starts; if neither is available, scope-reduce to four families and document Safari iOS as a follow-up.
+3. **Safari iOS fixture capture — RESOLVED (in scope)** — Per 2026-05-15 track decision, Safari iOS stays in scope (user confirmed Mac + iPhone access). If access becomes unavailable during Iteration B, scope-reduces to four families with Safari iOS as a follow-up issue, per the existing plan.
 
 4. **`fixtures/PROVENANCE.md` not yet populated** — The provenance file is referenced extensively but doesn't exist yet. It gets populated in Iteration A as the first fixture is captured. Worth confirming with the maintainer that the provenance schema (`fixtures-plan.md` §3.2 step 12) is the desired shape before the first capture.
 

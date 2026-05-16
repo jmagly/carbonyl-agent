@@ -1,11 +1,19 @@
 # Iteration Plan — wreq-util Replacement
 
-**Status**: Draft
+**Status**: Revised 2026-05-15 — feature flag dropped per track decision; persona-completeness audit added as pre-Iteration-A gate
 **Date**: 2026-05-15
 **Track**: wreq-util-replacement
 **Refs**: roctinam/carbonyl-agent#99, blocks #88
 
-The track is split into three iterations. Each iteration is independently mergeable, leaves the workspace in a green state, and produces a measurable outcome. The break points are deliberately chosen so a rollback at any iteration boundary leaves the prior state intact.
+The track is split into three iterations. Each iteration is independently mergeable, leaves the workspace in a green state, and produces a measurable outcome. The break points are deliberately chosen so a `git revert` of any iteration's merge commit leaves the prior state intact.
+
+## Pre-track gate — persona-completeness audit
+
+**Filed as separate issue** (see EPIC #100 for child link). Must complete before Iteration A begins. Verifies the persona schema actually carries everything the in-house presets need (JA4, h2 SETTINGS, ALPN, header order). If gaps exist, ADR-W02 (persona-first) needs revision before construction.
+
+### Rollback model (revised)
+
+Original docset proposed an `carbonyl-wreq/preset-registry` feature flag for in-binary rollback. Dropped in favor of git-level rollback at iteration boundaries — each iteration is a single PR small enough that `git revert <merge-commit>` is sufficient. NFR-W-07 updated accordingly.
 
 ## Iteration A — Chrome desktop proof of concept
 
@@ -17,7 +25,7 @@ The track is split into three iterations. Each iteration is independently mergea
 
 - Confirm `wreq` 5.x API can be driven directly without `wreq_util::Emulation`. If yes, proceed; if no, the design doc gains an addendum and an upstream PR is filed before continuing.
 - Vendor the Chrome 147 desktop preset under the new typed registry.
-- Wire it behind an off-by-default feature flag `carbonyl-wreq/preset-registry`.
+- Add the new path alongside the existing `wreq_util::Emulation` path. **No feature flag** — both paths compile and the legacy path remains the default in Iteration A. The new path is exercised by tests only.
 - Capture the Chrome 147 desktop fixture per `fixtures-plan.md`.
 - Build out Layer 2 conformance scaffolding (responder, capture machinery) for one family.
 
@@ -26,22 +34,23 @@ The track is split into three iterations. Each iteration is independently mergea
 1. Investigation: `wreq` 5.x exposes the lower-level TLS profile API we need — write an addendum to ADR-W02 documenting the actual shape.
 2. Create `crates/carbonyl-wreq/src/presets/{mod.rs,chrome.rs}` per `design-preset-registry.md` with one entry: `CHROME_147_DESKTOP`.
 3. Capture `chrome-147-desktop` fixture per `fixtures-plan.md` (HITL step).
-4. Add the `preset-registry` feature flag to `Cargo.toml`. When enabled, `WreqClient::build` uses the new path; when disabled, the existing `wreq_util::Emulation` path.
-5. Build the L2 responder (`tests/conformance/responder.rs`) and one wire-conformance test for Chrome 147 desktop.
-6. CI workflow update: add a job that runs `cargo test -p carbonyl-wreq --features preset-registry --test conformance_layer2` against the new path.
+4. Wire the new path alongside the existing one — `WreqClient::build` keeps using `wreq_util::Emulation` for production calls; the new registry path is reachable only via a new test-only helper (e.g. `WreqClient::build_via_registry()`). No `Cargo.toml` feature flag.
+5. Build the L2 responder (`tests/conformance/responder.rs`) and one wire-conformance test for Chrome 147 desktop targeting the new path via the test helper.
+6. CI workflow update: add a job that runs `cargo test -p carbonyl-wreq --test conformance_layer2` (no feature flags needed).
 
 ### Quality gate
 
-- `cargo build --workspace --features carbonyl-wreq/preset-registry` succeeds.
-- `cargo test --workspace --features carbonyl-wreq/preset-registry` succeeds.
-- `cargo test --workspace` (without the feature) still succeeds — old path intact.
-- The Chrome 147 desktop L2 conformance test passes against the new path.
+- `cargo build --workspace` succeeds.
+- `cargo test --workspace` succeeds — both new and legacy paths covered.
+- The Chrome 147 desktop L2 conformance test passes against the new path via the test helper.
 - The same test, run against the OLD path, also passes against the same fixture (sanity: the fixture isn't wrong).
+- Production `WreqClient::build` still routes through `wreq_util::Emulation` — no behavior change in shipped code yet.
 
 ### Out of scope for Iteration A
 
 - Firefox / Safari presets (Iteration B).
-- Removal of `wreq-util` (Iteration B → C).
+- Removal of `wreq-util` (Iteration B).
+- Production cutover from legacy to new path (Iteration B).
 - Persona-version drift handling beyond Chrome 147 (Iteration C).
 
 ### Decision-points / parallelism
@@ -60,7 +69,7 @@ Sequential gate: investigation outcome (item 1) determines whether item 2's desi
 
 - Extend the registry to all five canonical families.
 - Capture the four remaining fixtures.
-- Flip the feature flag default to ON.
+- **Cutover**: route production `WreqClient::build` through the new registry path (delete the test-only helper from Iteration A).
 - Remove `wreq_util::Emulation` references from `client.rs`.
 - Remove `wreq-util` from `Cargo.toml`.
 
@@ -71,7 +80,7 @@ Sequential gate: investigation outcome (item 1) determines whether item 2's desi
 3. Add `presets/safari.rs::{SAFARI_26_MACOS, SAFARI_26_IOS}`.
 4. Add `presets/chrome.rs::CHROME_147_MOBILE_ANDROID`.
 5. Extend L2 conformance with the remaining four fixtures.
-6. Flip `preset-registry` feature default to ON in `Cargo.toml`.
+6. Cutover: route production `WreqClient::build` through the new registry path. Delete the test-only helper introduced in Iteration A.
 7. Delete `persona_to_emulation`, `PendingConfig::emulation`, and `use wreq_util::*` from `client.rs`. Rewrite the module docstring (current lines 1–33) to describe the persona-first model.
 8. Remove `wreq-util` from `Cargo.toml`. Confirm `cargo build --workspace` still succeeds.
 

@@ -125,18 +125,18 @@ The procedure must be executable by a single maintainer in under one hour assumi
 
 **Requirement**: The preset registry module is pure data and lookup logic. No `unsafe` blocks. No FFI. No `transmute`. Compiles under `forbid(unsafe_code)`.
 
-## NFR-W-07: Backward Compatibility During Migration (HIGH)
+## NFR-W-07: Iteration-Boundary Rollback (HIGH)
 
 | Attribute | Specification |
 |-----------|---------------|
 | ID | NFR-W-07 |
 | Category | Migration / Rollback |
 | Priority | High |
-| Verification | Iteration A merge gate retains the old path under a feature flag for one minor version |
+| Verification | Each iteration merges as a discrete reverting-capable commit; `cargo test --workspace` green at every iteration boundary |
 
-**Requirement**: Iteration A (Chrome-only proof) introduces the new path behind an off-by-default feature flag `carbonyl-wreq/preset-registry`. Iterations B and C flip the default; Iteration C removes the old path and the flag entirely. During this window, both paths compile and pass tests, allowing instant rollback if a wire-conformance regression is detected post-merge.
+**Requirement** (revised per track decision, 2026-05-15): Rollback safety lives at the **iteration boundary**, not behind a runtime feature flag. Each iteration is its own PR. Each iteration leaves `main` in a buildable, test-green state. If a wire-conformance regression is detected post-merge of any iteration, the rollback procedure is a `git revert` of the iteration's merge commit. The original SDLC docset proposed a `carbonyl-wreq/preset-registry` feature flag for in-binary rollback — that was dropped in favor of git-level rollback after the iteration plan was reviewed (single-PR-per-iteration is sufficient when iterations are small and the legacy path is removed at Iteration B rather than Iteration C).
 
-See `@.aiwg/tracks/wreq-util-replacement/planning/migration-strategy.md` for the rollback procedure.
+See `@.aiwg/tracks/wreq-util-replacement/planning/migration-strategy.md` for the simplified rollback procedure.
 
 ## Reasoning
 

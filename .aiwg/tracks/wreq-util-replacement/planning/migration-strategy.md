@@ -1,158 +1,89 @@
-# Migration Strategy — wreq-util → In-House Preset Registry
+# Migration Strategy — wreq-util Replacement
 
-**Status**: Draft
-**Date**: 2026-05-15
+**Status**: Revised 2026-05-15 — feature-flag mechanism dropped; rollback at iteration-boundary git granularity
 **Track**: wreq-util-replacement
-**Refs**: roctinam/carbonyl-agent#99, NFR-W-07
+**Refs**: roctinam/carbonyl-agent#99, blocks #88
 
-This document describes the incremental migration path from the current `wreq_util::Emulation`-mediated path to the persona-first, preset-backstop path. It defines the feature-flag lifecycle, the rollback procedure, and the per-iteration switch state.
+## Goal
 
-## 1. Feature-flag lifecycle
+Move `carbonyl-wreq` from `wreq_util::Emulation`-driven configuration to direct persona-driven configuration via an in-house typed preset registry, without breaking the workspace at any merge boundary.
 
-A Cargo feature `carbonyl-wreq/preset-registry` gates the new path. The flag exists for one minor version only — long enough to validate the new path in CI alongside the old, short enough that it does not become a permanent fork.
+## Rollback model
 
-| Iteration | Feature state | Default | Behavior |
-|-----------|--------------|---------|----------|
-| Pre-A | Feature absent | n/a | Only old path (`wreq_util::Emulation`) |
-| A | Feature added | OFF | Both paths compile; both pass tests; CI runs both |
-| B | Feature flipped to ON; old path deleted | ON | Only new path remains; old call sites removed |
-| C | Feature removed | n/a | Single path; flag deletion is a no-op cleanup |
+Rollback lives at the **git commit granularity** of each iteration's merge commit, not behind a runtime feature flag. The original docset proposed an `carbonyl-wreq/preset-registry` Cargo feature for in-binary rollback. That was dropped after track review for the following reasons:
 
-The flag is therefore a brief transition device, not a permanent compatibility shim. Its purpose is to allow Iteration A to land independently of Iteration B without committing to the design before the proof of concept passes.
+- Iterations are individually small (6, 8, 5 atomic items respectively).
+- The legacy `wreq_util::Emulation` path is preserved through Iteration A and only deleted in Iteration B — the dual-path window is on `main` for one PR cycle, not multiple releases.
+- `git revert <merge-commit>` produces a buildable, test-green state at every iteration boundary by construction (because each iteration's quality gate requires that).
+- A Cargo feature adds permanent surface area for a temporary problem.
 
-### 1.1 Cargo.toml shape during Iteration A
+## Per-iteration migration mechanics
 
-```toml
-# crates/carbonyl-wreq/Cargo.toml
-[features]
-default = []
-preset-registry = []  # Iteration A path; opt-in
-python = ["dep:pyo3"]
-```
+### Iteration A — add the new path, don't ship it
 
-### 1.2 Conditional compilation shape
+- New module `crates/carbonyl-wreq/src/presets/` is introduced.
+- Production `WreqClient::build()` continues to route through `wreq_util::Emulation` — no behavior change in shipped code.
+- The new path is reachable only via a test-only helper (e.g. `WreqClient::build_via_registry()` gated by `#[cfg(test)]` or a `pub(crate)` helper used only from `tests/`).
+- L2 wire-conformance test exercises the new path against the captured Chrome 147 desktop fixture.
+- **Rollback**: `git revert` of the merge commit. Removes the new module + test. No production cutover happened, so no production regression possible.
 
-```rust
-// crates/carbonyl-wreq/src/client.rs (during Iteration A only)
+### Iteration B — cutover and cleanup
 
-impl WreqClient {
-    pub fn build(self) -> Result<wreq::Client, WreqError> {
-        #[cfg(feature = "preset-registry")]
-        return self.build_via_preset_registry();
+- Production `WreqClient::build()` switches to the new registry path. Test-only helper from Iteration A is deleted.
+- All five family presets present.
+- All five conformance tests passing.
+- `wreq_util::Emulation` use sites deleted from `client.rs`.
+- `wreq-util` removed from `Cargo.toml`.
+- **Rollback**: `git revert` of the merge commit. Restores both `wreq-util` and the legacy path. The Iteration A artifacts (presets module, conformance scaffolding) remain — they're harmless when the legacy path is restored.
 
-        #[cfg(not(feature = "preset-registry"))]
-        return self.build_via_wreq_util_emulation();
-    }
-}
-```
+### Iteration C — license closeout
 
-Two `build_via_*` methods exist side by side. Both call paths are exercised in CI. When Iteration B begins, the `#[cfg(not(...))]` branch and the `build_via_wreq_util_emulation` method are deleted; the flag becomes vacuous and is removed in Iteration C.
+- `scripts/gen-third-party-licenses.sh` updated to scan the full workspace.
+- Regenerated `THIRD_PARTY_LICENSES.txt` committed.
+- Wheel built and inspected for the new license file.
+- `.aiwg/architecture/runbooks/adding-a-preset.md` authored.
+- #99 closed.
+- **Rollback**: `git revert` restores the per-crate scoped script. Wheel reverts to the prior license file. No code regression — Iteration B already shipped the wreq-util removal.
 
-## 2. CI matrix during the transition
+## Pre-iteration gate
 
-During Iteration A and into the start of Iteration B, CI runs the test suite twice per PR:
+A persona-completeness audit (filed as a separate issue under EPIC #100) must complete before Iteration A. The audit verifies that the persona schema actually carries all the data the in-house presets need (JA4, h2 SETTINGS, ALPN, header order). If it doesn't, ADR-W02 needs revision and the design doc needs updating before construction.
 
-```yaml
-# .gitea/workflows/test.yml (sketch)
-jobs:
-  test-legacy:
-    name: Test (wreq-util path, default)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo test --workspace --features carbonyl-wreq/python
+The audit is not part of any iteration — it's a one-shot pre-track verification that produces a written report under `.aiwg/tracks/wreq-util-replacement/reports/persona-audit-report.md`.
 
-  test-new:
-    name: Test (preset-registry path)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo test --workspace --features carbonyl-wreq/preset-registry,carbonyl-wreq/python
-```
+## Risk mitigations
 
-Both jobs must pass before a PR merges to main. The dual-job CI is what makes the rollback procedure (§3) cheap: at any point during Iteration A or early Iteration B, reverting the feature default to OFF restores known-good behavior.
+### Risk: Iteration A merges, then a real-browser update changes the Chrome 147 fingerprint
 
-When Iteration B reaches its quality gate (all five families green on the new path, `wreq-util` removable), the legacy job is deleted in the same PR that removes `wreq-util` from `Cargo.toml`.
+If Chrome 147 stops emitting the captured fingerprint between Iteration A merge and Iteration B cutover, the new path stays correct (it matches the captured snapshot) but real-world traffic may drift. Mitigation: the snapshot remains the contract — we re-capture and update the fixture in a separate PR, not as part of the rollout. JA4 cross-validation in CI catches the drift.
 
-## 3. Rollback procedure
+### Risk: Downstream consumers import wreq_util types via re-export
 
-### 3.1 During Iteration A (new path is opt-in)
+If `carbonyl-wreq` (or its Python binding) re-exports `wreq_util::Emulation` types, Iteration B's deletion breaks consumers. Mitigation: before deleting in Iteration B item 7, run `cargo build --features carbonyl-wreq/python` and `grep -r wreq_util` against any known consumers. If found, the re-export is itself a bug (we shouldn't be exposing third-party crate types) — file as a precursor and fix before continuing.
 
-A regression on the new path does not affect production callers — the feature is OFF by default. Rollback is "revert the PR that introduced the regression" with no urgency. No coordination required with downstream consumers.
+### Risk: Wire conformance test passes for new path but breaks against real browser
 
-### 3.2 During Iteration B (transition window)
+The captured fixture is a single point-in-time observation. If our preset doesn't capture some context-dependent behavior (e.g., browser changes ClientHello based on prior server response), the test passes but production fails. Mitigation: JA4 cross-validation against a public database (ja4db or equivalent) at capture time. If our captured JA4 doesn't match the published JA4 for the same browser version, the capture is suspect.
 
-Once the feature default flips to ON and the old `wreq_util::Emulation` path is deleted, a regression requires a real rollback. Procedure:
+## CI policy
 
-1. **Identify**: a wire-conformance test fails on a fixture that previously passed, OR a downstream consumer reports a fingerprint mismatch in production.
-2. **Stop the bleed**: tag the last good commit as `last-good-wreq-util-removal-N`. If a wheel has shipped with the regression, yank it from the index (per the standard release runbook).
-3. **Revert**: `git revert <commit>` of the Iteration B PR that deleted the legacy path. This brings back `persona_to_emulation`, `PendingConfig::emulation`, and the `wreq-util` dependency.
-4. **Reinstate dual-CI**: confirm both jobs pass post-revert.
-5. **Investigate**: open an issue describing the regression with a Layer 2 diff (which field diverged, which fixture, which persona). The investigation may surface a registry bug, a `wreq` API misuse, or a fixture issue.
-6. **Re-attempt**: once the regression is understood and fixed, re-do the Iteration B closing PR.
+For the duration of Iteration A (when the dual-path window is on `main`), CI runs:
 
-Time budget for steps 1–4: same day. Investigation timeline: depends on root cause.
+- `cargo test --workspace` — exercises both paths
+- `cargo test -p carbonyl-wreq --test conformance_layer2` — the new path's specific conformance test
+- `cargo build --features carbonyl-wreq/python` — the Python binding build (catches re-export issues early)
 
-### 3.3 Post-Iteration C (cleanup complete)
+Once Iteration B merges, the `--features` build matrix simplifies (legacy path is gone).
 
-After Iteration C closes, there is no rollback to `wreq-util` short of re-vendoring it. The only legitimate "rollback" path post-C is a forward fix.
+## Definition of done for this strategy
 
-This is intentional: the whole point of the track is to remove the GPL dependency. A graceful rollback to a GPL dependency is not a real option for distribution; it is a development-only escape hatch that ceases to be relevant once the track lands.
-
-## 4. Backward compatibility considerations
-
-### 4.1 Public API surface
-
-The `carbonyl-wreq` crate's public API does not change:
-
-- `WreqClient::new()` — unchanged
-- `WreqClient::apply_persona_typed(&Persona)` — unchanged signature
-- `WreqClient::build() -> Result<wreq::Client, WreqError>` — unchanged signature
-- The `HttpClient` and `ApplyInspector` trait implementations — unchanged
-
-The only public-shape change is the deletion of `PendingConfig::emulation` and `persona_to_emulation`. Both are eligible for deletion because:
-
-- `PendingConfig::emulation` is only meaningful when `wreq_util` is on the dep graph; with `wreq-util` removed, the field has no type.
-- `persona_to_emulation` is a free function exported from `client.rs`. Searching the workspace (and the W3B Phase 2 dependent crates) for `persona_to_emulation` callers should return zero results outside this crate's own tests; if any callers exist, they are pre-W3B-Phase-2.5 dead code.
-
-Document the deletions in `CHANGELOG.md` at Iteration C's close as a breaking change for any consumer that imported them directly.
-
-### 4.2 Persona schema
-
-No changes. The persona schema is intentionally unchanged by this track — the entire point of the inversion (ADR-W02) is that the persona was already the right source of truth; we're rearranging how the code consumes it.
-
-### 4.3 Behavior at the wire layer
-
-Pre-track: the closest-preset path produced wire output close to (but not exactly matching) the persona's declared shape. The "Chrome 137 stands in for Chrome 147" approximation introduced known divergence captured in #82.
-
-Post-track: the persona-first path produces wire output matching the persona's declared shape exactly, modulo the preset backstop for fields the persona does not declare. The wire output is expected to be CLOSER to the persona spec than the legacy path was — not strictly identical to the legacy path.
-
-This is a feature, not a regression. But it means the L2 conformance baseline must be re-established at Iteration A: the fixture is the real-browser capture, not the legacy path's output. If a downstream consumer was relying on the legacy path's specific output bytes, that reliance was always fragile (the persona could change). The conformance suite documents the new contract.
-
-## 5. Communication plan
-
-| Audience | When | Channel | Message |
-|----------|------|---------|---------|
-| #99 watchers | Iteration A starts | Issue comment | Track started; PR for Iteration A linked |
-| #88 watchers | Iteration C closes | Issue comment | `wreq-util` removed; license blocker cleared; #88 unblocked |
-| Downstream consumers (W3B integrators) | Iteration B PR opens | Mention in PR body + an issue tagged `breaking-change` if anyone imported `persona_to_emulation` | Notify of upcoming deletions |
-| Sole maintainer (self) | Each iteration's quality gate | n/a | Review checklist against this strategy doc before merging |
-
-## 6. Risk vs. mitigation summary
-
-| Risk | When it manifests | Mitigation |
-|------|-------------------|------------|
-| New path passes structural tests but emits subtly different bytes than the legacy path produced | Iteration A | Side-by-side L2 conformance runs (both paths against the same fixture) catch divergence before flag flip |
-| `wreq` API limitations force unsafe code or upstream PR | Iteration A item 1 | Investigation is first; if blocked, gate-stop and re-evaluate ADR-W02 |
-| Downstream consumer breaks on deletion of `persona_to_emulation` | Iteration B item 7 | Workspace grep before deletion; advance-notice issue if any callers found |
-| Wheel build picks up stale license file | Iteration C | Inspect built wheel before tagging; CI gate on `THIRD_PARTY_LICENSES.txt` presence in wheel zip |
-| Iteration B drags on; flag becomes permanent | Throughout B | Time-boxed: if flag exists at end of Iteration C planning, halt feature work and finish removal first |
+- All three iterations merge cleanly to `main`.
+- Each iteration's merge commit is independently revertable on the commit graph (no merges-of-merges, no rebases that bury the iteration boundary).
+- The wreq-replacement runbook is published before Iteration C closes.
 
 ## References
 
 - @.aiwg/tracks/wreq-util-replacement/planning/iteration-plan.md
+- @.aiwg/tracks/wreq-util-replacement/requirements/nfr.md (NFR-W-07, revised)
 - @.aiwg/tracks/wreq-util-replacement/architecture/adr-002-persona-as-source-of-truth.md
-- @.aiwg/tracks/wreq-util-replacement/requirements/nfr.md §NFR-W-07
-- @.aiwg/architecture/runbooks/wreq-replacement.md - Parent escape-hatch SOP (different scope: `wreq` itself)
-- @crates/carbonyl-wreq/Cargo.toml
-- @scripts/gen-third-party-licenses.sh
+- @.aiwg/tracks/wreq-util-replacement/testing/test-plan.md
