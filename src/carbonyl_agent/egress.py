@@ -76,6 +76,14 @@ if TYPE_CHECKING:
 
     from carbonyl_agent.persona_apply import Persona
 
+    # WreqTransport's runtime import is inside `__init__` (kept lazy
+    # so the optional carbonyl_wreq native module isn't required at
+    # import time). Mirror it here at module-scope under TYPE_CHECKING
+    # so pdoc and other static-introspection tools can resolve the
+    # `self._wreq_transport: "WreqTransport | None"` annotation.
+    #   Refs: roctinam/carbonyl-agent#96
+    from carbonyl_agent.wreq_transport import WreqTransport  # noqa: F401
+
 
 class EgressAuditMode(enum.Enum):
     """How aggressively to enforce JA4 conformance per request.

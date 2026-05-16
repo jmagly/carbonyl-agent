@@ -34,7 +34,7 @@ import shutil
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -175,9 +175,19 @@ class SessionManager:
             lock.unlink(missing_ok=True)
         return p
 
-    def list(self, *, include_snapshots: bool = True) -> list[dict[str, Any]]:
-        """Return list of session metadata dicts sorted by created_at."""
-        results: list[dict[str, Any]] = []
+    def list(self, *, include_snapshots: bool = True) -> List[dict[str, Any]]:
+        """Return list of session metadata dicts sorted by created_at.
+
+        The return annotation uses ``typing.List`` instead of the bare
+        builtin ``list`` because this method's name shadows the builtin
+        inside the class body; at annotation-evaluation time (mypy,
+        pdoc, etc.) ``list[dict[str, Any]]`` would resolve to
+        ``self.list[...]`` and fail with "'function' object is not
+        subscriptable".
+
+        Refs: roctinam/carbonyl-agent#96
+        """
+        results: List[dict[str, Any]] = []
         for d in sorted(self._root.iterdir()):
             if not d.is_dir():
                 continue
