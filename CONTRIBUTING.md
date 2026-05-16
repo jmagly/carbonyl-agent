@@ -2,6 +2,8 @@
 
 ## Development Setup
 
+### Python SDK
+
 ```bash
 # Clone the repository
 git clone https://git.integrolabs.net/roctinam/carbonyl-agent.git
@@ -17,6 +19,46 @@ pip install -e ".[dev]" hypothesis mypy ruff pytest-cov
 # Install the Carbonyl runtime binary (optional — needed for integration/E2E tests)
 carbonyl-agent install
 ```
+
+### Rust workspace prerequisites
+
+The `crates/carbonyl-wreq` crate depends on `wreq` → `boring-sys2` (BoringSSL
+fork). The boring-sys2 build script runs `bindgen` over the BoringSSL C headers
+and needs both a C toolchain AND a working libclang with access to `<stddef.h>`.
+Without these, `cargo build -p carbonyl-wreq` panics with a confusing
+`'stddef.h' file not found` error from inside the boring-sys2 build script
+(`Refs: roctinam/carbonyl-agent#108`).
+
+Install once per dev host:
+
+```bash
+# Debian / Ubuntu
+sudo apt-get install -y clang cmake libclang-dev libssl-dev pkg-config python3-dev
+
+# Fedora / RHEL
+sudo dnf install -y clang clang-devel cmake openssl-devel pkgconf-pkg-config python3-devel
+```
+
+Then preflight-check the environment before the first cargo build:
+
+```bash
+./scripts/check-build-env.sh
+# ✓ Build environment OK (clang 18.1.3, cmake 3.28.3)
+
+cargo test -p carbonyl-wreq --no-run
+```
+
+If you see `'stddef.h' file not found` despite having `libclang-dev` installed
+(common on minimal containers without `libclang-rt-*-dev`), point bindgen at
+gcc's sysroot in `.cargo/config.toml` or your shell env:
+
+```bash
+export BINDGEN_EXTRA_CLANG_ARGS="-I$(gcc -print-file-name=include)"
+```
+
+The CI workflow (`.gitea/workflows/check.yml`) installs the same set on the
+`rust:latest` container before every clippy / test job, so green CI is the
+authoritative reference for a known-good environment.
 
 ## Running Tests
 
