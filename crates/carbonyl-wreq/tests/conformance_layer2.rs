@@ -222,6 +222,107 @@ async fn layer2_chrome_147() {
     assert_layer2_for_fixture(&fixture, "chrome-147-stable-linux", &capture);
 }
 
+// ----- New-path (build_via_registry) parallel tests — Iteration A item 5 -----
+//
+// These exercise `WreqClient::build_via_registry()` against the same
+// LocalTlsResponder + ConformanceFixture machinery the legacy tests
+// use. With the preset registry empty (no concrete entries until
+// captured fixtures land), the new path produces wreq's defaults +
+// persona-declared fields only — so the divergence set is wider than
+// the legacy path's. As preset entries are populated from captured
+// fixtures (Iteration A item 3, Iteration B items 1a-1d), the
+// expected_partial_mismatches_via_registry list shrinks toward equality
+// with the legacy table.
+
+fn expected_partial_mismatches_via_registry(_label: &str) -> &'static [&'static str] {
+    // Empty preset registry → wreq defaults dominate → every wire field
+    // diverges from the persona spec. This is the BASELINE the new
+    // path is measured against; preset entries shrink the gap.
+    &[
+        "wire.ja4",
+        "wire.h2_settings",
+        "wire.h2_window",
+        "wire.akamai_string",
+    ]
+}
+
+async fn drive_wreq_via_registry_through_responder(
+    fixture: &ConformanceFixture,
+) -> CapturedHandshake {
+    let (responder, captured_rx) = LocalTlsResponder::start_one_shot()
+        .await
+        .expect("responder must bind");
+    let listen_addr = responder.listen_addr;
+
+    let persona = fixture.persona.clone();
+    let client_task = tokio::spawn(async move {
+        let mut client = WreqClient::new();
+        client
+            .apply_persona_typed(&persona)
+            .expect("apply_persona must succeed");
+        let wreq_client = client
+            .build_via_registry()
+            .expect("build_via_registry must succeed");
+        let url = format!("https://127.0.0.1:{}/", listen_addr.port());
+        let _ = wreq_client.get(&url).send().await;
+    });
+
+    let captured = tokio::time::timeout(Duration::from_secs(15), captured_rx)
+        .await
+        .expect("responder reports within timeout")
+        .expect("responder send did not fail");
+    let _ = client_task.await;
+    captured
+}
+
+fn assert_layer2_via_registry(
+    fixture: &ConformanceFixture,
+    label: &'static str,
+    capture: &CapturedHandshake,
+) {
+    assert!(
+        capture.handshake_complete,
+        "[{label}/registry] TLS handshake failed: error={:?}",
+        capture.error
+    );
+    let snap = snapshot_from_capture(capture);
+    let report = match snap {
+        Some(s) => fixture.assert_wire_state(&s),
+        None => ConformanceReport {
+            mismatches: vec![ConformanceMismatch {
+                field: "wire.snapshot_construction",
+                expected: "successful snapshot from capture".into(),
+                actual: format!("snapshot=None, h2_bytes={}b", capture.h2_bytes.len()),
+            }],
+        },
+    };
+    let actual_fields: std::collections::BTreeSet<&'static str> =
+        report.mismatches.iter().map(|m| m.field).collect();
+    let expected_fields: std::collections::BTreeSet<&'static str> =
+        expected_partial_mismatches_via_registry(label).iter().copied().collect();
+
+    // The new path's expected divergence is a SUPERSET of the legacy
+    // path's gap (wreq defaults diverge from the persona on more
+    // fields than wreq_util's tuned presets do). Assert subset
+    // containment rather than exact equality so each preset entry
+    // population narrows the gap monotonically.
+    for field in &actual_fields {
+        assert!(
+            expected_fields.contains(field),
+            "[{label}/registry] unexpected mismatch field {:?}. Expected gap superset: {:?}. \
+             Actual: {:?}. Report: {:#?}",
+            field, expected_fields, actual_fields, report.mismatches
+        );
+    }
+}
+
+#[tokio::test]
+async fn layer2_chrome_147_via_registry() {
+    let fixture = ConformanceFixture::chrome_147_stable_linux();
+    let capture = drive_wreq_via_registry_through_responder(&fixture).await;
+    assert_layer2_via_registry(&fixture, "chrome-147-stable-linux", &capture);
+}
+
 #[tokio::test]
 async fn layer2_firefox_150() {
     let fixture = ConformanceFixture::firefox_150_stable_linux();

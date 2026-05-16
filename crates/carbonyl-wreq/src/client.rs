@@ -39,6 +39,8 @@ use carbonyl_fingerprint::http::{
 use carbonyl_fingerprint::schema::BrowserFamily;
 use carbonyl_fingerprint::Persona;
 
+use crate::presets::{self, BrowserVersion, Platform};
+
 /// HTTP/2 SETTINGS frame identifiers (RFC 9113 §6.5.2). Surfaced as
 /// constants so the Phase 2.2 mapping doesn't bury magic numbers in
 /// the `apply_h2_settings` body.
@@ -246,6 +248,222 @@ pub fn persona_to_emulation(persona: &Persona) -> wreq_util::Emulation {
             } else {
                 Safari18_3_1
             }
+        }
+    }
+}
+
+impl WreqClient {
+    /// **Test-only** alternate build path: route through the in-house
+    /// preset registry + a hand-built `wreq::EmulationProvider` instead
+    /// of `wreq_util::Emulation::*`. Per Iteration A item 4 (#101) /
+    /// ADR-W02 / `adr-002-addendum-wreq-api-shape.md`.
+    ///
+    /// Production [`Self::build`] is unchanged — it still uses
+    /// `wreq_util::Emulation` until Iteration B (#102) flips the
+    /// cutover. This helper exists so the L2 conformance suite can
+    /// measure the new path's wire output against the same fixtures the
+    /// legacy path is measured against.
+    ///
+    /// # Behavior with empty preset registry
+    ///
+    /// `presets::preset_for` returns `None` until concrete entries land
+    /// (each requires a captured fixture per `fixtures-plan.md`). When
+    /// it returns `None`, this helper falls back to: persona-declared
+    /// fields + `TlsConfig::default()` + `Http2Config::default()`. The
+    /// resulting wire output will diverge significantly from real
+    /// browsers — that's the conformance suite's job to measure, and
+    /// the divergence list documents what each preset entry needs to
+    /// fix when populated.
+    ///
+    /// # Why a separate method
+    ///
+    /// Iteration A's quality gate requires production `WreqClient::build`
+    /// to remain unchanged (no shipped-code behavior change yet). A
+    /// parallel build path lets the new code compile and be exercised
+    /// by tests without affecting any production caller.
+    pub fn build_via_registry(self) -> Result<wreq::Client, WreqError> {
+        let provider = persona_to_emulation_provider(&self.pending);
+        wreq::Client::builder()
+            .emulation(provider)
+            .cert_verification(false)
+            .build()
+            .map_err(WreqError::Build)
+    }
+}
+
+/// Construct a `wreq::EmulationProvider` from recorded persona state.
+///
+/// When `presets::preset_for` returns `Some`, preset values fill gaps
+/// the persona doesn't declare (per ADR-W02's persona-first model).
+/// When it returns `None`, only persona-declared fields populate the
+/// provider; everything else is wreq's defaults.
+///
+/// Field encodings follow the addendum to ADR-W02 (`adr-002-addendum-wreq-api-shape.md`).
+fn persona_to_emulation_provider(pending: &PendingConfig) -> wreq::EmulationProvider {
+    let preset = preset_for_pending(pending);
+
+    // ----- TLS -----
+    let mut tls = wreq::TlsConfig::default();
+    tls.alpn_protos = alpn_from_persona_or_preset(&pending.alpn, preset);
+    if let Some(p) = preset {
+        if let Some(cipher) = p.tls.cipher_list {
+            tls.cipher_list = Some(std::borrow::Cow::Borrowed(cipher));
+        }
+        if let Some(sigs) = p.tls.sigalgs_list {
+            tls.sigalgs_list = Some(std::borrow::Cow::Borrowed(sigs));
+        }
+        if let Some(ext) = p.tls.extension_permutation_indices {
+            tls.extension_permutation_indices = Some(std::borrow::Cow::Borrowed(ext));
+        }
+        tls.grease_enabled = p.tls.grease_enabled;
+        tls.permute_extensions = p.tls.permute_extensions;
+        // `supported_groups` (raw u16 IANA codes in the preset table)
+        // requires translation to `wreq::SslCurve` at this point — but
+        // `SslCurve` is an opaque enum without a public IANA-code
+        // constructor, so the mapping table belongs alongside the
+        // first concrete preset entry. Until then, leave `tls.curves`
+        // at the wreq default. Documented divergence point.
+        let _ = p.tls.supported_groups;
+    }
+
+    // ----- HTTP/2 -----
+    let mut h2 = wreq::Http2Config::builder().build();
+    apply_h2_settings_to_config(&mut h2, &pending.h2_settings);
+    if pending.h2_window.0 != 0 {
+        h2.initial_connection_window_size = Some(pending.h2_window.0);
+    } else if let Some(p) = preset {
+        h2.initial_connection_window_size = Some(p.h2.initial_connection_window);
+    }
+    // Note: `h2.headers_pseudo_order` and `h2.priority` need the
+    // same wreq-types translation as `tls.curves` and land alongside
+    // the first concrete preset entry.
+
+    // ----- Headers -----
+    let mut headers = http::HeaderMap::new();
+    let mut headers_order_vec: Vec<http::HeaderName> = Vec::new();
+    for (name, value) in &pending.headers {
+        if let (Ok(hn), Ok(hv)) = (
+            http::HeaderName::from_bytes(name.as_bytes()),
+            http::HeaderValue::from_str(value),
+        ) {
+            headers.insert(hn.clone(), hv);
+            headers_order_vec.push(hn);
+        }
+    }
+    if let Some(p) = preset {
+        // Apply preset header order if persona didn't supply enough
+        // ordering signal. Persona's recorded order is the
+        // invocation order from `apply_persona`; preset's
+        // `default_order` is the wire-realistic order.
+        for header_name in p.headers.default_order {
+            if let Ok(hn) = http::HeaderName::from_bytes(header_name.as_bytes()) {
+                if !headers_order_vec.contains(&hn) {
+                    headers_order_vec.push(hn);
+                }
+            }
+        }
+        // Apply preset static defaults for headers the persona didn't
+        // emit (Accept, Accept-Encoding, sec-fetch-*, Priority, etc.).
+        for (name, value) in p.headers.static_defaults {
+            if let (Ok(hn), Ok(hv)) = (
+                http::HeaderName::from_bytes(name.as_bytes()),
+                http::HeaderValue::from_str(value),
+            ) {
+                headers.entry(hn).or_insert(hv);
+            }
+        }
+    }
+
+    // TypedBuilder fixes the chain at compile time. `tls_config`,
+    // `http2_config`, `default_headers` use `setter(into)` and accept
+    // `Option<T>` directly. `headers_order` uses `setter(strip_option,
+    // into)` and takes the inner `Cow` directly — we always pass an
+    // owned (possibly empty) Cow rather than skip the setter, since
+    // skipping would leave positions inconsistent across branches.
+    let headers_opt = if headers.is_empty() {
+        None
+    } else {
+        Some(headers)
+    };
+    let order_cow: std::borrow::Cow<'static, [http::HeaderName]> =
+        std::borrow::Cow::Owned(headers_order_vec);
+    wreq::EmulationProvider::builder()
+        .tls_config(tls)
+        .http2_config(h2)
+        .default_headers(headers_opt)
+        .headers_order(order_cow)
+        .build()
+}
+
+/// Map persona ALPN list → wreq's three-variant `AlpnProtos` enum.
+///
+/// wreq exposes only `HTTP1`, `HTTP2`, `ALL`. Arbitrary ALPN lists
+/// (e.g. `["h3", "h2"]`) round to `ALL` since wreq has no per-protocol
+/// public constructor. For the five canonical personas this is exact:
+/// all five declare `["h2", "http/1.1"]` which maps cleanly to `ALL`.
+fn alpn_from_persona_or_preset(
+    persona_alpn: &[String],
+    preset: Option<&'static presets::PresetTable>,
+) -> wreq::AlpnProtos {
+    let alpn_list: &[String] = if !persona_alpn.is_empty() {
+        persona_alpn
+    } else if let Some(p) = preset {
+        // Coerce preset's &[&str] into a comparable shape via early
+        // return — borrowing-lifetimes prevent a clean unified branch.
+        return alpn_from_str_slice(p.tls.alpn_default);
+    } else {
+        return wreq::AlpnProtos::ALL;
+    };
+    let strs: Vec<&str> = alpn_list.iter().map(String::as_str).collect();
+    alpn_from_str_slice(&strs)
+}
+
+fn alpn_from_str_slice(alpn: &[&str]) -> wreq::AlpnProtos {
+    let has_h2 = alpn.iter().any(|p| *p == "h2");
+    let has_h11 = alpn.iter().any(|p| *p == "http/1.1");
+    match (has_h2, has_h11) {
+        (true, true) => wreq::AlpnProtos::ALL,
+        (true, false) => wreq::AlpnProtos::HTTP2,
+        (false, true) => wreq::AlpnProtos::HTTP1,
+        (false, false) => wreq::AlpnProtos::ALL,
+    }
+}
+
+/// Look up the preset matching the persona-derived family/version/platform.
+///
+/// Recovers `BrowserVersion` and `Platform` from the recorded persona
+/// state without re-parsing the persona itself; pendingConfig carries
+/// the persona-derived h2/headers data but not the family triple, so
+/// for now we infer Chrome desktop as a placeholder. Iteration B's
+/// cutover replaces this inference with explicit family/version/platform
+/// fields on `PendingConfig` (per `design-preset-registry.md` §3 sketch).
+fn preset_for_pending(_pending: &PendingConfig) -> Option<&'static presets::PresetTable> {
+    // The registry is empty until concrete entries land alongside
+    // captured fixtures (Iteration A item 3 / Iteration B items 1a-1d).
+    // The chrome-147-desktop preset would be looked up here once it
+    // exists; until then `preset_for` always returns None.
+    presets::preset_for(
+        BrowserFamily::Chrome,
+        BrowserVersion {
+            major: 147,
+            minor: 0,
+        },
+        Platform::Desktop,
+    )
+}
+
+/// Translate persona-recorded H2 SETTINGS entries into the
+/// per-field shape `wreq::Http2Config` exposes.
+fn apply_h2_settings_to_config(h2: &mut wreq::Http2Config, settings: &H2Settings) {
+    for (id, value) in &settings.entries {
+        match *id {
+            h2_setting::HEADER_TABLE_SIZE => h2.header_table_size = Some(*value),
+            h2_setting::ENABLE_PUSH => h2.enable_push = Some(*value != 0),
+            h2_setting::MAX_CONCURRENT_STREAMS => h2.max_concurrent_streams = Some(*value),
+            h2_setting::INITIAL_WINDOW_SIZE => h2.initial_stream_window_size = Some(*value),
+            h2_setting::MAX_FRAME_SIZE => h2.max_frame_size = Some(*value),
+            h2_setting::MAX_HEADER_LIST_SIZE => h2.max_header_list_size = Some(*value),
+            _ => {} // experimental setting IDs (8/9) — not exposed by wreq
         }
     }
 }
