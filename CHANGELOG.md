@@ -7,6 +7,38 @@ and this project uses [CalVer](https://calver.org/) (`YYYY.M.PATCH`, PEP 440-com
 
 ## [Unreleased]
 
+## [2026.5.1] - 2026-05-17
+
+Maintenance release. Real-browser fingerprint refresh (Chrome 147 → 148, Firefox 150 desktop preset wired from a captured ClientHello), airgap install support, audit-log rotation, and the GitHub-first release pipeline that ships this tag.
+
+### Added
+
+- Airgap install via `carbonyl-agent install --from-file <tarball>` and `--dry-run` for offline / sandboxed hosts that can't reach Gitea release assets directly. (#95, #117)
+- Size-based rotation for the egress audit log at `~/.local/state/carbonyl-agent/egress-audit.log` — caps file size and rotates to numbered backups so long-running daemons don't accumulate unbounded audit history. (#93, #116)
+- TestPyPI dry-run workflow (`.github/workflows/release-testpypi.yml`) — manual `workflow_dispatch` publish to TestPyPI for first-of-a-line release verification, mirroring the production release build pipeline. (#12 follow-up, #112)
+- `scripts/check-build-env.sh` preflight that surfaces missing Rust prerequisites (clang, cmake, libclang-dev, libssl-dev, pkg-config, python3-dev) before they manifest as opaque BoringSSL/boring-sys2 build failures. Documented in README. (#109)
+- PyPI classifiers (Programming Language, Topic, Operating System, etc.) and a runtime compatibility matrix in the install docs covering supported Linux distributions and arch triples. (#90, #92)
+- Firefox 150.0.3 desktop preset (`FIREFOX_150_DESKTOP`) in `carbonyl-wreq` populated from a real-browser ClientHello capture (1874 bytes, SHA-256 `3416dc48ef…`). Wired through `preset_for` and exercised by the legacy and `via_registry` Layer-2 conformance paths. The h2 SETTINGS for Firefox are sourced from the persona spec backstop until a Firefox-trusted cert path lands. (#102)
+- `carbonyl-wreq` Chromium-family chained issue (#118) and HITL-deferred capture tracker (#119) filed for the next iteration of the wreq-util replacement track.
+
+### Changed
+
+- Persona corpus refreshed from Chrome 147 to Chrome 148 across `carbonyl-fingerprint` template registry and conformance fixtures. Existing personas validated against the 148 baseline. (#114 + corpus refresh)
+- Real Chrome 148 h2 SETTINGS recaptured against the current Chrome network stack. The new capture no longer advertises `MAX_CONCURRENT_STREAMS` (setting 3) — `CHROME_148_DESKTOP` drops it to match observed wire bytes, eliminating a Layer-2 mismatch. (#110, #114)
+- pdoc documentation bundle cleaned (no warnings) and CI now fails on pdoc warnings to keep the bundle clean going forward. (#96, #115)
+- `.github/workflows/release.yml` is now Phase-1-ready: GitHub release ships from `build` directly; PyPI publish is gated behind the `ENABLE_PYPI_PUBLISH` repo variable. Flip the variable to `true` after #12's PyPI/TestPyPI trusted-publisher setup is complete to enable Phase 2 (strict PyPI gate before GitHub release).
+
+### Fixed
+
+- Removed stale "TODO; see entry point" comments referring to Rule H (HKDF-Expand deterministic noise-seed derivation) — Rule H is implemented in `seed::derive_canvas_noise` / `seed::derive_audio_noise`. Added Rule H to the enforced-rules list and dropped it from the "deliberately not implemented" set. (#91)
+- Rust-crates CI (`check.yml`) checkout step on `pull_request` events: Gitea sets `GITHUB_REF_NAME` to the PR number (e.g. `109`), not a branch name. Replaced `git clone --branch ${GITHUB_REF_NAME}` with explicit fetch-by-SHA so the workflow works on both push and pull_request events. (#107, #108, #111)
+- Documented Rust toolchain prerequisites in the contributor-onboarding section of the README; the build-env preflight script (above) shifts these failures left from "opaque link error after 4 minutes of compilation" to "explicit missing-package report in 2 seconds." (#109)
+
+### Known issues
+
+- `wreq-util` (transitive dep of `carbonyl-wreq`) remains licensed GPL-3.0; the wreq feature is dev-only and the GPL crate is not redistributed in the wheel. Replacement track continues via in-house preset registry (#99, #100). Iteration B closed with Chrome 148 + Firefox 150 captured (#102); mobile-chrome / safari-macos / safari-ios captures deferred as HITL-blocked on physical devices (#119); Chromium-family variants (Brave, Chromium, Edge, Opera, Vivaldi, Arc) scoped for the next iteration (#118).
+- PyPI publish remains skipped (Phase 1 of the release pipeline) — releases ship as GitHub releases at https://github.com/jmagly/carbonyl-agent/releases until #12's PyPI / TestPyPI trusted-publisher setup is completed on the web UI. The release pipeline is wired and one repo-variable flip away from full PyPI publishing.
+
 ## [2026.5.0] - 2026-05-15
 
 ### Added
