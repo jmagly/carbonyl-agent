@@ -138,6 +138,7 @@ pub fn preset_for(
 ) -> Option<&'static PresetTable> {
     match (family, version.major, platform) {
         (BrowserFamily::Chrome, 148, Platform::Desktop) => Some(&chrome::CHROME_148_DESKTOP),
+        (BrowserFamily::Firefox, 150, Platform::Desktop) => Some(&firefox::FIREFOX_150_DESKTOP),
         _ => None,
     }
 }
@@ -213,7 +214,7 @@ mod tests {
     }
 
     #[test]
-    fn preset_for_unknown_returns_none() {
+    fn preset_for_firefox_150_returns_desktop_entry() {
         let p = preset_for(
             BrowserFamily::Firefox,
             BrowserVersion {
@@ -222,6 +223,32 @@ mod tests {
             },
             Platform::Desktop,
         );
-        assert!(p.is_none(), "Firefox preset not yet captured");
+        let p = p.expect("Firefox 150 desktop preset should exist");
+        assert_eq!(p.family, BrowserFamily::Firefox);
+        assert_eq!(p.version.major, 150);
+        assert_eq!(p.provenance_id, "firefox-150-desktop");
+        // Firefox does NOT emit GREASE.
+        assert_eq!(p.tls.grease_enabled, Some(false));
+        // Firefox does NOT permute extensions.
+        assert_eq!(p.tls.permute_extensions, Some(false));
+        // Pseudo-header order differs from Chrome.
+        assert_eq!(
+            p.h2.pseudo_header_order,
+            &[":method", ":path", ":authority", ":scheme"]
+        );
+    }
+
+    #[test]
+    fn preset_for_unknown_returns_none() {
+        // Safari 26 not yet captured.
+        let p = preset_for(
+            BrowserFamily::Safari,
+            BrowserVersion {
+                major: 26,
+                minor: 0,
+            },
+            Platform::Desktop,
+        );
+        assert!(p.is_none(), "Safari preset not yet captured");
     }
 }

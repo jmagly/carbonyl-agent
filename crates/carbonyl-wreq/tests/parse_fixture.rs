@@ -126,6 +126,8 @@ fn cipher_to_openssl_name(id: u16) -> Option<&'static str> {
         0xc030 => "ECDHE-RSA-AES256-GCM-SHA384",
         0xcca9 => "ECDHE-ECDSA-CHACHA20-POLY1305",
         0xcca8 => "ECDHE-RSA-CHACHA20-POLY1305",
+        0xc009 => "ECDHE-ECDSA-AES128-SHA",
+        0xc00a => "ECDHE-ECDSA-AES256-SHA",
         0xc013 => "ECDHE-RSA-AES128-SHA",
         0xc014 => "ECDHE-RSA-AES256-SHA",
         0x009c => "AES128-GCM-SHA256",
@@ -251,5 +253,65 @@ fn parse_chrome_148() {
     eprintln!("    }},");
     eprintln!("    provenance_id: \"chrome-148-desktop\",");
     eprintln!("}};");
+    eprintln!("================================================================\n");
+}
+
+#[test]
+#[ignore = "one-shot fixture parser; run on-demand to populate preset entries"]
+fn parse_firefox_150() {
+    let path = fixture_path("firefox-150-desktop", "client_hello.bin");
+    let bytes = fs::read(&path).unwrap_or_else(|e| panic!("read {:?}: {}", path, e));
+
+    let p = parse_client_hello(&bytes);
+
+    eprintln!("\n========== firefox-150-desktop ClientHello ==========");
+    eprintln!("TLS legacy version : 0x{:04x}", p.tls_version);
+    eprintln!("Cipher suites ({}):", p.cipher_suites.len());
+    let cipher_names: Vec<String> = p
+        .cipher_suites
+        .iter()
+        .filter(|c| !is_grease(**c))
+        .filter_map(|c| cipher_to_openssl_name(*c).map(|s| s.to_string()))
+        .collect();
+    for c in &p.cipher_suites {
+        let mark = if is_grease(*c) { " [GREASE]" } else { "" };
+        let name = cipher_to_openssl_name(*c).unwrap_or("?");
+        eprintln!("  0x{:04x}{} {}", c, mark, name);
+    }
+    eprintln!("\nExtensions in order ({}):", p.extensions.len());
+    for e in &p.extensions {
+        let mark = if is_grease(*e) { " [GREASE]" } else { "" };
+        eprintln!("  0x{:04x}{}", e, mark);
+    }
+    eprintln!("\nALPN: {:?}", p.alpn);
+    eprintln!("\nSupported groups ({}):", p.supported_groups.len());
+    for g in &p.supported_groups {
+        let mark = if is_grease(*g) { " [GREASE]" } else { "" };
+        eprintln!("  0x{:04x}{}", g, mark);
+    }
+    eprintln!("\nSignature algorithms ({}):", p.signature_algorithms.len());
+    let sigalg_names: Vec<String> = p
+        .signature_algorithms
+        .iter()
+        .filter_map(|s| sigalg_to_openssl_name(*s).map(|n| n.to_string()))
+        .collect();
+    for s in &p.signature_algorithms {
+        let name = sigalg_to_openssl_name(*s).unwrap_or("?");
+        eprintln!("  0x{:04x} {}", s, name);
+    }
+    eprintln!(
+        "\ngrease_in_extensions: {} (Firefox does NOT emit GREASE)",
+        p.grease_in_extensions
+    );
+
+    let groups_filtered: Vec<String> = p
+        .supported_groups
+        .iter()
+        .filter(|g| !is_grease(**g))
+        .map(|g| format!("0x{:04x}", g))
+        .collect();
+    eprintln!("\nsupported_groups (no GREASE): &[{}]", groups_filtered.join(", "));
+    eprintln!("cipher_list: \"{}\"", cipher_names.join(":"));
+    eprintln!("sigalgs_list: \"{}\"", sigalg_names.join(":"));
     eprintln!("================================================================\n");
 }

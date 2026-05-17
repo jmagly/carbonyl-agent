@@ -344,6 +344,13 @@ async fn layer2_firefox_150() {
 }
 
 #[tokio::test]
+async fn layer2_firefox_150_via_registry() {
+    let fixture = ConformanceFixture::firefox_150_stable_linux();
+    let capture = drive_wreq_via_registry_through_responder(&fixture).await;
+    assert_layer2_via_registry(&fixture, "firefox-150-stable-linux", &capture);
+}
+
+#[tokio::test]
 async fn layer2_safari_26_macos() {
     let fixture = ConformanceFixture::safari_26_macos();
     let capture = drive_wreq_through_responder(&fixture).await;

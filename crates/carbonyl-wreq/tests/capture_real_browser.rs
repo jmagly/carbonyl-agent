@@ -588,6 +588,13 @@ async fn capture_firefox_desktop() {
         .unwrap_or("unknown");
     let fixture_id = format!("firefox-{major}-desktop");
 
+    // Snap-confined Firefox (Ubuntu default) cannot write to /tmp; the
+    // profile must live under $HOME. Use $HOME/.cache so the path works
+    // for both snap and native installs.
+    let home = std::env::var("HOME").expect("HOME unset");
+    let profile_path = format!("{home}/.cache/firefox-fixture-capture");
+    std::fs::create_dir_all(&profile_path).expect("create profile dir");
+
     capture_with_browser(
         &fixture_id,
         "Mozilla Firefox",
@@ -597,7 +604,7 @@ async fn capture_firefox_desktop() {
                 "--headless".to_string(),
                 "--no-remote".to_string(),
                 "--profile".to_string(),
-                "/tmp/firefox-fixture-capture".to_string(),
+                profile_path.clone(),
                 url.to_string(),
             ]
         },

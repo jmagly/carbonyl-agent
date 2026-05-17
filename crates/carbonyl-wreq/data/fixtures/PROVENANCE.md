@@ -15,6 +15,33 @@ metadata (timestamps, alpn, byte sizes) lives in the corresponding
 | Fixture ID | Browser | Version | Platform | Captured | ClientHello SHA-256 | h2 SETTINGS SHA-256 |
 |---|---|---|---|---|---|---|
 | chrome-148-desktop | Google Chrome | 148.0.7778.167 | Linux x86_64 | 2026-05-16 | `6aabf5ef3f19afda8b34ddeb40ef149b79237ea7a532e52f59c315a3b6415a1c` | `7b3adff36a4d97f1b0193a52b2dc2a9a662031d472dd037c29de20d849b477ec` |
+| firefox-150-desktop | Mozilla Firefox | 150.0.3 | Linux x86_64 | 2026-05-17 | `3416dc48ef2cf51946508a8a4e2925a1c4d8b9404f0b159aab987df5e83f5fd5` | _(empty — handshake aborted; see note below)_ |
+
+### Firefox 150 capture notes
+
+The Firefox capture's ClientHello was recorded successfully (1874 bytes,
+SHA-256 above), but the TLS handshake aborted with `BadCertificate` —
+Firefox does not accept the responder's self-signed cert via an
+SPKI-bypass flag the way Chrome does. As a result, no h2 SETTINGS
+frames were observed and `firefox-150-desktop.h2_settings.bin` is empty.
+
+The `FIREFOX_150_DESKTOP` preset in
+`crates/carbonyl-wreq/src/presets/firefox.rs` uses the captured TLS
+fields (cipher list, extension order, supported_groups, sigalgs) for
+the TLS layer and the persona-declared `network.http2_akamai` values
+(`1:65536,4:131072,5:16384|12517377|0|m,p,a,s`, from
+`crates/carbonyl-fingerprint/src/conformance.rs:771`) for the h2 layer
+until a fixture with a Firefox-trusted cert (or a different bypass
+mechanism, such as a `cert9.db` profile with the responder cert
+imported) lands.
+
+Firefox 150 ClientHello highlights (parsed from the capture):
+
+- 16 cipher suites in fixed order, **no GREASE**
+- Extensions in fixed order, **no permutation** (Chrome 110+ randomizes)
+- Supported groups: `X25519MLKEM768, x25519, secp256r1, secp384r1, secp521r1, ffdhe2048, ffdhe3072`
+- ALPN: `h2, http/1.1`
+- 11 signature algorithms starting `ecdsa_secp256r1_sha256`
 
 ## Capture method notes
 
