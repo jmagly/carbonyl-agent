@@ -27,8 +27,9 @@
 //!
 //! # Coverage (v1)
 //!
-//! All hard rules from the SCHEMA.md table are enforced *except*
-//! deterministic noise-seed derivation (TODO; see entry point):
+//! All hard rules from the SCHEMA.md table are enforced, including
+//! deterministic noise-seed derivation (rule H, via [`seed::derive_canvas_noise`]
+//! and [`seed::derive_audio_noise`]):
 //!
 //! 1. `user_agent.full` contains `browser_version` as a substring
 //!    (browser-agnostic — every family embeds its own version in the UA)
@@ -45,6 +46,9 @@
 //! 8. Linux personas MUST NOT advertise an ANGLE/DirectX WebGL renderer
 //! 9. `network.http2_akamai` matches the canonical Chrome H2 fingerprint
 //! 10. `locale.timezone` is plausible for `accept_language` (en-US, en-GB)
+//! 11. Rule H: `persona.canvas.noise_seed` and `persona.audio.noise_seed`
+//!     are HKDF-Expand-derived from `persona.id` (lossless, deterministic
+//!     replay across sessions)
 
 use crate::registry::ChromeRegistry;
 use crate::schema::{BrowserFamily, Persona};

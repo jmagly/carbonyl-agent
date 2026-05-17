@@ -16,11 +16,12 @@
 //!   move out of this file into the corpus loader (separate commit).
 //! - **Multi-class** — Firefox, Safari, mobile classes need schema
 //!   extensions that aren't in `schema.rs` today.
-//! - **Deterministic noise-seed derivation** (rule H) — sampler emits
-//!   random `u64` for `canvas`/`audio` seeds. Once the seed-derivation
-//!   scheme is locked in (HKDF-Expand with stable info labels per the
-//!   `validator::TODO(rule-H)` note), the sampler will derive seeds from
-//!   the persona id and the validator will start enforcing rule H.
+//!
+//! Rule H (deterministic noise-seed derivation) IS implemented in v1:
+//! sampler derives `canvas`/`audio` seeds from the persona id via
+//! HKDF-Expand SHA-256 (see [`seed::derive_canvas_noise`] /
+//! [`seed::derive_audio_noise`]); the validator enforces it on every
+//! validated persona.
 //!
 //! # API
 //!
