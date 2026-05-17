@@ -310,7 +310,10 @@ fn parse_firefox_150() {
         .filter(|g| !is_grease(**g))
         .map(|g| format!("0x{:04x}", g))
         .collect();
-    eprintln!("\nsupported_groups (no GREASE): &[{}]", groups_filtered.join(", "));
+    eprintln!(
+        "\nsupported_groups (no GREASE): &[{}]",
+        groups_filtered.join(", ")
+    );
     eprintln!("cipher_list: \"{}\"", cipher_names.join(":"));
     eprintln!("sigalgs_list: \"{}\"", sigalg_names.join(":"));
     eprintln!("================================================================\n");
