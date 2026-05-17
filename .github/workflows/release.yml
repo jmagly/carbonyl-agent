@@ -1,13 +1,24 @@
 name: Release
 
-# Tag-triggered PyPI publish via OIDC trusted publisher.
+# Tag-triggered release pipeline.
 #
 # CI (lint, typecheck, test, audit) runs on Gitea — see .gitea/workflows/ci.yml.
-# This workflow exists only because PyPI's trusted-publisher feature requires
-# GitHub Actions (or GitLab/Google Cloud/ActiveState — Gitea Actions is not
-# supported). When a v* tag is pushed (Gitea origin → GitHub mirror), this
-# workflow builds the sdist + wheel and publishes them to PyPI without any
-# stored API token.
+# This workflow exists for two reasons:
+#   1. To publish the sdist + wheel as a GitHub release at the tag (always on).
+#   2. To publish those same artefacts to PyPI via OIDC trusted-publisher
+#      (gated on the `ENABLE_PYPI_PUBLISH` repo variable being `'true'` —
+#      requires the one-time PyPI/TestPyPI setup from #12 to be complete).
+#
+# Phase 1 (current, until #12 is closed): `publish` (PyPI) is skipped via the
+# repo variable gate; the GitHub release ships from `build` directly. Tag
+# pushes produce a complete release on
+# https://github.com/jmagly/carbonyl-agent/releases with the wheel + sdist
+# attached, but nothing is sent to PyPI.
+#
+# Phase 2 (after #12 is closed): set repository variable
+# `ENABLE_PYPI_PUBLISH=true` in Settings → Secrets and variables → Actions →
+# Variables. The next tag push will run the publish job; the GitHub release
+# then runs after publish as the strict release gate.
 #
 # Refs: roctinam/carbonyl-agent#11, #12
 
@@ -41,6 +52,11 @@ jobs:
           path: dist/
 
   publish:
+    # PyPI publish — gated on ENABLE_PYPI_PUBLISH repo variable.
+    # Skipped in Phase 1 (pre-#12 completion). To enable: Settings →
+    # Secrets and variables → Actions → Variables → add `ENABLE_PYPI_PUBLISH`
+    # with value `true`. Then close #12.
+    if: vars.ENABLE_PYPI_PUBLISH == 'true'
     runs-on: ubuntu-latest
     needs: [build]
     environment:
@@ -57,11 +73,16 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
 
   github-release:
-    # Mirrors the Gitea release to GitHub so both registries show the
-    # same release notes for the tag. Runs after publish so PyPI is the
-    # source of truth on release artefacts (#18).
+    # GitHub release — always runs. Depends on `build` directly so the
+    # release ships even when the PyPI publish job is gated off (Phase 1).
+    # When PyPI publish is enabled (Phase 2), `needs: [build, publish]`
+    # would be the strict ordering; for now we keep `needs: [build]` and
+    # rely on the gate. If publish runs and fails, github-release still
+    # runs — that is intentional during Phase 1 so a transient PyPI hiccup
+    # never blocks the GitHub release (which is the source of truth
+    # pre-#12). Reconsider after #12 closes.
     runs-on: ubuntu-latest
-    needs: [publish]
+    needs: [build]
     permissions:
       contents: write
     steps:
