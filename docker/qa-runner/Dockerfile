@@ -126,7 +126,8 @@ COPY xorg.conf.d/ /etc/X11/xorg.conf.d/
 # --- Entrypoint ------------------------------------------------------------
 
 COPY entrypoint.sh /usr/local/bin/carbonyl-agent-qa-entrypoint
-RUN chmod +x /usr/local/bin/carbonyl-agent-qa-entrypoint
+COPY sync-virtual-input.sh /usr/local/bin/sync-virtual-input
+RUN chmod +x /usr/local/bin/carbonyl-agent-qa-entrypoint /usr/local/bin/sync-virtual-input
 
 # --- Carbonyl runtime ------------------------------------------------------
 # Installed from a pre-built tarball when available. Until roctinam/

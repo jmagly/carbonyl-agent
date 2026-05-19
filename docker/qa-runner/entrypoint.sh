@@ -157,6 +157,27 @@ export CARBONYL_GL_FLAGS="$CHROMIUM_GL_FLAGS"
 
 echo "[entrypoint] Xorg ready on $DISPLAY (mode=$MODE, pid=$XORG_PID)" >&2
 
+# --- /dev/input/ mount-namespace mitigation (carbonyl-agent#120) -----------
+# Docker's container /dev is a regular tmpfs, not devtmpfs, so kernel
+# device-node creation for uinput-registered devices does not propagate.
+# /sys/class/input/eventN exists inside the container (sysfs is host-shared)
+# but /dev/input/eventN does not — udev/Xorg have nothing to bind to.
+#
+# Closed #52 / #54 fixed udevd liveness; this is a separate mount-namespace
+# gap. Mitigation: mknod nodes for container-CREATED virtual (uinput)
+# devices only — filter by checking /sys/devices/virtual/input/ ancestry,
+# so host hardware visible via shared sysfs is NOT exposed in /dev.
+#
+# Boot-time once-pass plus a background watcher to handle devices created
+# at test time by UinputEmitter.open().
+
+if [[ "$(id -u)" == "0" ]] && command -v sync-virtual-input >/dev/null 2>&1; then
+  /usr/local/bin/sync-virtual-input --once 2>&1 | grep -v '^$' >&2 || true
+  /usr/local/bin/sync-virtual-input --watch >/tmp/sync-virtual-input.log 2>&1 &
+  SVI_PID=$!
+  echo "[entrypoint] sync-virtual-input watcher started (pid=$SVI_PID)" >&2
+fi
+
 # --- Re-trigger input udev events post-Xorg (carbonyl-agent#54 cycle 8) ----
 # Xorg's libudev hot-plug listener may not be receiving runtime add events
 # for /dev/input/* devices despite Option "AutoAddDevices" "true". Cycle 7
@@ -214,6 +235,6 @@ echo "[entrypoint] exec: $*" >&2
 # --- Graceful shutdown -----------------------------------------------------
 # Kill Xorg when the container's main command exits, so the container
 # stops cleanly instead of lingering on Xorg.
-trap "kill $XORG_PID 2>/dev/null || true" EXIT
+trap "kill ${XORG_PID:-} ${SVI_PID:-} 2>/dev/null || true" EXIT
 
 exec "$@"
