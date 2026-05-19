@@ -8,4 +8,4 @@
 # When the X11 ozone variant is needed, the corresponding tarball is
 # `runtime-x11-<hash>` at the same release.
 
-runtime-hash=9b3ba53adcd8d330
+runtime-hash=8f070d2720157bd0
