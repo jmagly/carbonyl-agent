@@ -7,6 +7,14 @@ and this project uses [CalVer](https://calver.org/) (`YYYY.M.PATCH`, PEP 440-com
 
 ## [Unreleased]
 
+## [2026.5.2] - 2026-05-18
+
+Runtime pin bump for the M148 release cut on `roctinam/carbonyl`.
+
+### Changed
+
+- `.carbonyl-runtime-version` pinned to `8f070d2720157bd0`, the M148 (148.0.7778.167) baseline shipped in carbonyl runtime v0.2.0-alpha.5. `carbonyl-agent install` (default `--tag`) and the qa-runner Docker image now consume the M148 runtime tarball. Triggers automatic qa-runner image rebuild via `.gitea/workflows/build-qa-runner.yml`. (roctinam/carbonyl#70)
+
 ## [2026.5.1] - 2026-05-17
 
 Maintenance release. Real-browser fingerprint refresh (Chrome 147 → 148, Firefox 150 desktop preset wired from a captured ClientHello), airgap install support, audit-log rotation, and the GitHub-first release pipeline that ships this tag.
