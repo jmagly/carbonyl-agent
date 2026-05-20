@@ -17,11 +17,18 @@ import os
 import sqlite3
 import stat
 from pathlib import Path
-from unittest import mock
 
 import pytest
 
 from carbonyl_agent import cookies as ck
+
+# Chromium decrypt path needs the `cookies` extra (cryptography). Skip the
+# whole class of tests cleanly when it isn't installed rather than erroring
+# at fixture setup.
+_requires_crypto = pytest.mark.skipif(
+    not ck._CRYPTO_AVAILABLE,
+    reason="cryptography not installed (pip install 'carbonyl-agent[cookies]')",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +62,8 @@ def firefox_profile(tmp_path: Path) -> ck.ProfileInfo:
 @pytest.fixture
 def chromium_profile(tmp_path: Path) -> ck.ProfileInfo:
     """Create a fake Chromium profile with encrypted cookies in `Cookies` SQLite."""
+    if not ck._CRYPTO_AVAILABLE:
+        pytest.skip("cryptography not installed (pip install 'carbonyl-agent[cookies]')")
     profile_dir = tmp_path / "Default"
     profile_dir.mkdir()
     db_path = profile_dir / "Cookies"
@@ -146,6 +155,7 @@ def test_copy_then_read_tolerates_open_source(firefox_profile: ck.ProfileInfo) -
 # Chromium decrypt path (no real libsecret — mock the passphrase fetch)
 # ---------------------------------------------------------------------------
 
+@_requires_crypto
 def test_read_chromium_decrypts_value(
     chromium_profile: ck.ProfileInfo,
     monkeypatch: pytest.MonkeyPatch,
@@ -324,6 +334,7 @@ def test_discover_profiles_missing_root_returns_empty(
 # Chromium PKCS#7 padding edge cases
 # ---------------------------------------------------------------------------
 
+@_requires_crypto
 def test_decrypt_chromium_value_rejects_bad_padding() -> None:
     key = ck._derive_chromium_key(ck._CHROMIUM_LINUX_FALLBACK_PW)
     # Encrypt a plaintext block but corrupt the last byte so padding is invalid.
@@ -337,6 +348,7 @@ def test_decrypt_chromium_value_rejects_bad_padding() -> None:
         ck.decrypt_chromium_value(blob, key)
 
 
+@_requires_crypto
 def test_decrypt_chromium_value_handles_empty_blob() -> None:
     key = ck._derive_chromium_key(ck._CHROMIUM_LINUX_FALLBACK_PW)
     assert ck.decrypt_chromium_value(b"", key) == ""

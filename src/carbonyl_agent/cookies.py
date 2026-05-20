@@ -16,10 +16,9 @@ import json
 import os
 import shutil
 import sqlite3
-import stat
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Literal, Optional
@@ -28,9 +27,9 @@ from typing import Iterable, Literal, Optional
 # Firefox cookies are unencrypted; carbonyl-agent users who only need FF
 # import shouldn't be forced to install cryptography/secretstorage.
 try:
+    from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    from cryptography.hazmat.primitives import hashes
     _CRYPTO_AVAILABLE = True
 except ImportError:
     _CRYPTO_AVAILABLE = False
@@ -205,7 +204,8 @@ def _libsecret_safe_storage_password(browser: BrowserKind) -> bytes:
         )
     for item in collection.get_all_items():
         if item.get_label() == label:
-            return item.get_secret()
+            secret = item.get_secret()
+            return bytes(secret)
     # No stored secret → Chromium's documented default.
     return _CHROMIUM_LINUX_FALLBACK_PW
 
@@ -222,7 +222,8 @@ def _derive_chromium_key(passphrase: bytes) -> bytes:
         salt=_CHROMIUM_LINUX_SALT,
         iterations=_CHROMIUM_LINUX_ITERATIONS,
     )
-    return kdf.derive(passphrase)
+    derived: bytes = kdf.derive(passphrase)
+    return derived
 
 
 def decrypt_chromium_value(blob: bytes, key_v10: bytes) -> str:
@@ -243,7 +244,8 @@ def decrypt_chromium_value(blob: bytes, key_v10: bytes) -> str:
         pad_len = padded[-1]
         if pad_len < 1 or pad_len > 16:
             raise ValueError("decryption produced invalid PKCS#7 padding")
-        return padded[:-pad_len].decode("utf-8", errors="replace")
+        plaintext: str = padded[:-pad_len].decode("utf-8", errors="replace")
+        return plaintext
     if blob[:3] == b"v20":
         raise NotImplementedError(
             "Chromium v20 app-bound encryption is not supported. "
@@ -444,7 +446,7 @@ def write_to_session_profile(profile_dir: Path, records: list[CookieRecord]) -> 
     return n
 
 
-def list_imported(profile_dir: Path) -> list[dict]:
+def list_imported(profile_dir: Path) -> list[dict[str, object]]:
     """Return imported cookies with provenance. Values are NEVER returned."""
     cookies_db = profile_dir / "Default" / "Network" / "Cookies"
     if not cookies_db.is_file():
@@ -516,7 +518,7 @@ def is_sensitive_domain(domain: str) -> bool:
     return False
 
 
-def audit_log_append(entry: dict) -> None:
+def audit_log_append(entry: dict[str, object]) -> None:
     """Append one JSON line. Cookie VALUES must never appear in `entry`.
 
     Caller is responsible for redaction; this function will refuse to write

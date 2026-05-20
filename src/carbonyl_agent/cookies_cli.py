@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional
 
 from carbonyl_agent import cookies as ck
 from carbonyl_agent.session import SessionManager
@@ -111,8 +110,8 @@ def _authorization_prompt(
     sys.stderr.write(f"║ Latest expiry: {latest_str}\n")
     sys.stderr.write(f"║ Destination: {destination}\n")
     if sensitive:
-        sys.stderr.write(f"║\n")
-        sys.stderr.write(f"║ RISK: This domain is on the sensitive denylist.\n")
+        sys.stderr.write("║\n")
+        sys.stderr.write("║ RISK: This domain is on the sensitive denylist.\n")
         sys.stderr.write(f"║ Importing these cookies grants full account access for {domain}.\n")
     sys.stderr.write(f"╚{banner}╝\n")
 
@@ -252,7 +251,9 @@ def cmd_revoke(args: argparse.Namespace) -> int:
     return 0
 
 
-def register_subparser(subparsers: argparse._SubParsersAction) -> None:
+def register_subparser(
+    subparsers: "argparse._SubParsersAction[argparse.ArgumentParser]",
+) -> None:
     p = subparsers.add_parser(
         "cookies",
         help="Import session cookies from a host browser (per-domain authorization)",
@@ -283,4 +284,5 @@ def register_subparser(subparsers: argparse._SubParsersAction) -> None:
 
 
 def dispatch(args: argparse.Namespace) -> int:
-    return args.func(args)
+    result: int = args.func(args)
+    return result

@@ -83,7 +83,7 @@ jobs:
               set -euxo pipefail
               apt-get update -qq
               apt-get install -y -qq --no-install-recommends git build-essential >/dev/null
-              pip install -q -e ".[dev,egress]" mypy
+              pip install -q -e ".[dev,egress,cookies]" mypy
               mypy --strict src/carbonyl_agent/
             '
 
@@ -124,7 +124,7 @@ jobs:
               set -euxo pipefail
               apt-get update -qq
               apt-get install -y -qq --no-install-recommends git build-essential >/dev/null
-              pip install -q -e ".[dev,egress]" hypothesis
+              pip install -q -e ".[dev,egress,cookies]" hypothesis
               pytest tests/ -x -q --tb=short --ignore=tests/e2e --ignore=tests/benchmarks
             '
 
