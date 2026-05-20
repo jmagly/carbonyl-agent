@@ -2,6 +2,23 @@
 
 Runtime container for Phase 0+ QA of the Carbonyl Trusted Automation Initiative. Hosts Xorg so `ozone_platform=x11` Carbonyl can render to a real framebuffer, with uinput passthrough for agent-driven input and capture tooling for observability.
 
+## Three supported runtime modes
+
+Trusted-input browser QA against carbonyl supports three runtimes. They are all first-class — pick the one that matches your isolation and ergonomic requirements.
+
+| Mode | Isolation | Trusted-input completeness | When to use | Known constraint |
+|---|---|---|---|---|
+| **Bare metal** | None (host Xorg / uinput) | Full — host udev binds runtime uinput devices to host Xorg | Solo dev box; trusted environment; iterating on SDK code | Host hardware is visible to the test; not for multi-tenant |
+| **Docker (this repo)** | Container netns + uid | Partial — `/dev/input/event*` populated via `sync-virtual-input` mknod helper (commit `5b3fa6e`); Xorg binding requires the worker-spawn fix tracked in `roctinam/carbonyl-agent#121` | Sandboxed local QA where Xorg binding isn't required (smoke tests, non-trusted-input paths, click-via-libcarbonyl tests) | systemd-udevd in the container netns does not spawn workers on Docker 29.4.3 + kernel 6.17 + the default seccomp profile — full Xorg binding is deferred to the VM path |
+| **VM (`agentic-sandbox` `browser-qa` loadout)** | Full kernel isolation | Full — operator-validated 7/7 acceptance in agentic-sandbox v2026.5.5 | Trusted-input pipelines, CI runs, untrusted-site automation | Higher resource cost; cold-start latency for fresh VMs |
+
+**Quick chooser**:
+- "I just need to run the SDK against Chromium with `isTrusted=true` events" → **VM**
+- "I want a quick sandboxed smoke test of carbonyl rendering / non-trusted paths" → **Docker**
+- "I'm iterating on `UinputEmitter` or `CarbonylBrowser` code" → **Bare metal**
+
+The rest of this README covers the Docker mode. For VM, see [`agentic-sandbox` `browser-qa` loadout](https://git.integrolabs.net/roctinam/agentic-sandbox/src/branch/main/images/qemu/loadouts/profiles/browser-qa.yaml) and [`scripts/validate-browser-qa.sh`](https://git.integrolabs.net/roctinam/agentic-sandbox/src/branch/main/scripts/validate-browser-qa.sh). For bare metal, run the SDK directly with `carbonyl-agent install` and a host-side Xorg (no special setup beyond the host `99-uinput.rules` rule documented below).
+
 ## What's inside
 
 - **Xorg core** plus `dummy` (CPU) and `modesetting` (GPU) video drivers; entrypoint picks one based on `CARBONYL_GPU_MODE`
@@ -73,18 +90,35 @@ CARBONYL_RUN_MODE=root ./run.sh   # force root mode (default on hosts without ud
 - **No udev rule** → `--user 0` (root in container), `--device=/dev/uinput`. Zero host setup; works anywhere.
 - **Udev rule installed** (via `sudo scripts/setup-uinput-host.sh`) → non-root `agent` user, `--group-add <host-input-gid>`. Tighter isolation.
 
-### Mode trade-off (Xorg input hot-plug)
+### What works inside Docker (and what doesn't)
 
-Trusted-input QA tests that drive Chromium with `UinputEmitter`'s **runtime-created** keyboard / pointer devices need Xorg to see hot-plug events for those devices. Xorg hot-plug uses `NETLINK_KOBJECT_UEVENT`, which is per-network-namespace, so a udev daemon must run **inside the container's netns** to deliver those events. udev needs root to bind kernel netlink.
+This image is the right tool for sandboxed smoke tests and any path that does **not** require Xorg to bind runtime-created uinput devices. Per `roctinam/carbonyl-agent#121`, on Docker 29.4.3 + kernel 6.17 + the default seccomp profile, `systemd-udevd` inside the container netns does not spawn workers — so `KERNEL[]` events fire but no `UDEV[]` events are broadcast, and Xorg's libudev subscription never sees the new device. The mount-namespace gap (`/dev/input/event*` not populated) is closed by the `sync-virtual-input` mknod helper shipped in commit `5b3fa6e`; the worker-spawn gap is not.
 
-| Mode | `uinput.click()` | `uinput.mouse_path()` | `uinput.type_text()` |
+| Capability | Bare metal | Docker (this repo) | VM (`browser-qa`) |
 |---|---|---|---|
-| **root** (default if no host udev rule) | ✅ | ✅ | ✅ |
-| **nonroot** (host udev rule installed) | ✅ | ❌ | ❌ |
+| `xset q` / Xorg startup | ✅ | ✅ | ✅ |
+| `scrot` / `ffmpeg` / `x11vnc` capture | ✅ | ✅ | ✅ |
+| `python-uinput` device creation | ✅ | ✅ | ✅ |
+| `/dev/input/event*` materialized | ✅ | ✅ (mknod helper) | ✅ |
+| `xinput list` shows runtime uinput devices | ✅ | ❌ (`#121`) | ✅ |
+| `UinputEmitter.click()` reaches Chromium | ✅ | ⚠️ via libcarbonyl button-event path only | ✅ |
+| `UinputEmitter.type_text()` / `mouse_path()` | ✅ | ❌ (`#121`) | ✅ |
+| `tests/layer1` trusted-input suite passes | ✅ | ❌ (`#121`) | ✅ |
+| Host hardware isolation | ❌ | ✅ | ✅ |
+| Multi-tenant safe | ❌ | ⚠️ container-level | ✅ |
 
-If your QA suite includes Layer 1 trust regressions (`test_keystroke_trust`, `test_click_preceded_by_move` and similar — `roctinam/carbonyl-agent#52`), use **root mode**. The container starts a `systemd-udevd` from the entrypoint when launched with `--user 0`, which lets Xorg dynamically register every uinput device the SDK creates.
+**Bottom line for Docker**: use it for what works above, and use the VM path for anything that requires Xorg-bound trusted input. Both are supported; pick the one matching your test's needs.
 
-If your suite only exercises mouse-button events (Layer 6 profile persistence, click-trust tests), nonroot mode remains correct and hot-plug isn't needed.
+### root vs nonroot operator mode (Docker only)
+
+Independently of the `#121` worker-spawn issue, the Docker mode supports two operator-account configurations:
+
+| Mode | `uinput` device write access | When to use |
+|---|---|---|
+| **root** (default if no host udev rule) | ✅ via `--user 0` | Zero host setup, works anywhere |
+| **nonroot** (host udev rule installed) | ✅ via `--group-add <host-input-gid>` | Tighter operator isolation |
+
+`run.sh` auto-detects which mode the host is set up for. Neither mode bypasses `#121`'s Xorg-binding limitation.
 
 ### Compose
 
@@ -202,9 +236,12 @@ The `run.sh` wrapper hides this distinction: it picks whichever mode the host is
 
 **If you can't modify host udev and don't want root**: the agent SDK can emit uinput from *outside* the container (on the host) and the Carbonyl-inside-the-container still sees the events via X, because Xorg reads `/dev/input/eventN` from the shared kernel. This is actually the canonical Phase 0 pattern — W0.4's tests do exactly that.
 
-## Status (2026-04-29)
+## Status (2026-05-20)
 
+- ✅ **Three runtime modes supported.** Bare metal, Docker (this repo), and VM (`agentic-sandbox` `browser-qa` loadout, shipped in v2026.5.5). Pick per the chooser above.
 - ✅ **Carbonyl x11 runtime ships.** `roctinam/carbonyl#57` and `#63` (X-mirror) closed in `v0.2.0-alpha.3`. Use `runtime-x11-<hash>` Gitea releases as `CARBONYL_RUNTIME_URL`. With `CARBONYL_X_MIRROR=1` set, the runtime mirrors compositor frames into a real X window so `scrot`/`ffmpeg`/`x11vnc` capture works alongside the terminal render.
+- ✅ **Mount-namespace fix shipped (`#120` first half).** `sync-virtual-input` mknod helper (commit `5b3fa6e`) populates `/dev/input/event*` for runtime-created uinput devices in the container. Host hardware is filtered out — only `/sys/devices/virtual/input/`-rooted devices are exposed.
+- ⚠️ **Xorg-binding limitation in Docker (`#121`).** systemd-udevd in the container netns does not spawn workers on this Docker/kernel combination, so Xorg never sees the new devices. Documented as a Docker-mode constraint; the VM mode covers the same workload without the constraint. Probing for the minimum capability set that fixes the worker spawn was abandoned after the privileged-flag probe destabilized the host kernel.
 - ✅ **End-to-end validation runs in CI.** `roctinam/carbonyl/scripts/test-x-mirror.sh` exercises both pipelines (terminal SGR stream + X framebuffer pixel histogram) inside this image on every `build-runtime.yml` x11 build. See commit `eee943d`.
 - 🔵 **Image-publish workflow** is the remaining piece — `roctinam/carbonyl-agent#35` CI track. Today the image is built locally / inline by `build-runtime.yml`'s validation step.
 - **Image size**: ~1.5 GB with the real x11 runtime included.
