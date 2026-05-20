@@ -7,6 +7,24 @@ and this project uses [CalVer](https://calver.org/) (`YYYY.M.PATCH`, PEP 440-com
 
 ## [Unreleased]
 
+## [2026.5.3] - 2026-05-20
+
+Cookie/token import from host browsers, plus three-mode QA-runner documentation.
+
+### Added
+
+- `carbonyl-agent cookies {import,list,revoke}` — import authenticated session cookies from a host browser (Chrome / Chromium / Brave / Edge / Firefox) into a carbonyl session's user-data-dir. Per-domain authorization prompt on every import, sensitive-domain denylist (banks, SSO providers, payment processors, primary email) that requires `--allow-sensitive` AND typing the domain to confirm, libsecret-backed Chromium decrypt, copy-then-read of the source SQLite (tolerates an open source browser), mode `0600` on every file written, audit log at `~/.local/share/carbonyl-agent/cookie-imports.log` that records cookie *names* but never *values*. Optional `[cookies]` extra ships `cryptography>=42` + `secretstorage>=3.3`; Firefox import works on stdlib alone. (#122)
+- `docker/qa-runner/README.md` refactor — documents three first-class runtime modes (bare metal / Docker / VM) with a capability matrix per mode and a chooser pointing trusted-input workloads at the `agentic-sandbox` `browser-qa` loadout. (#120, #121)
+
+### Changed
+
+- `.gitea/workflows/ci.yml` typecheck and test jobs now install the `[cookies]` extra so `cryptography` + `secretstorage` stubs are resolvable and the Chromium-decrypt test path runs under all three Python versions.
+
+### Closed
+
+- #121 — systemd-udevd Xorg binding inside Docker documented as a known Docker-mode constraint; the VM-mode path covers the trusted-input workload.
+- #122 — cookie/token import feature with per-domain authorization gate.
+
 ## [2026.5.2] - 2026-05-18
 
 Runtime pin bump for the M148 release cut on `roctinam/carbonyl`.

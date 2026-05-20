@@ -204,6 +204,32 @@ A file lock prevents accidental dual-open of the same persona; a second open rai
 
 `persona=` and `session=` are mutually exclusive on the constructor; pick one per browser instance.
 
+### Cookie import from host browser
+
+The `carbonyl-agent cookies` subcommand imports authenticated session cookies from a host browser (Chrome / Chromium / Brave / Edge / Firefox) into a carbonyl session — useful when logging in inside the headless runtime is fragile (canvas/React login flows, MFA prompts that need the host UI). Every import is gated by a per-domain authorization prompt; cookie *values* never appear in logs or audit output.
+
+```bash
+# Import x.com cookies from Firefox into a named session.
+carbonyl-agent cookies import --from firefox --domain x.com --persist-to-session x-qa
+
+# Multiple domains, multiple profiles — interactive picker if --profile is omitted.
+carbonyl-agent cookies import --from chrome --domain x.com,linkedin.com
+
+# Sensitive domains (banks, SSO providers, primary email) are default-refused.
+# --allow-sensitive opens a second gate that requires typing the domain.
+carbonyl-agent cookies import --from chrome --domain mail.google.com --allow-sensitive
+
+# Inspect and revoke.
+carbonyl-agent cookies list
+carbonyl-agent cookies revoke --session x-qa --domain x.com
+```
+
+Source matrix on Linux: Firefox cookies are unencrypted SQLite (no extra deps); Chromium-family cookies are AES-128-CBC under the libsecret "Safe Storage" passphrase (requires the `[cookies]` extra). Install the extra with `pip install 'carbonyl-agent[cookies]'`.
+
+A locked keyring → command refuses with a remediation message; it never tries to auto-unlock. All written files are mode `0600`, owned by the invoking user. The audit log lives at `~/.local/share/carbonyl-agent/cookie-imports.log` and records `(timestamp, source browser + profile, domain, cookie names, destination, operator decision)` — cookie names only, never values.
+
+`cookies list` shows imported cookies with source provenance per cookie. `cookies revoke` blanks imported cookies' values without touching cookies the session created natively.
+
 ---
 
 ## Daemon Mode
