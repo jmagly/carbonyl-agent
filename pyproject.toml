@@ -52,6 +52,15 @@ bench = [
 docs = [
     "pdoc>=14.0",
 ]
+# Cookie/token import from host browsers (carbonyl-agent#122).
+# - `cryptography` is required to decrypt Chromium-family cookies (AES-128-CBC
+#   under libsecret-derived keys).
+# - `secretstorage` reads the libsecret 'Safe Storage' passphrase on Linux.
+# Firefox import works without this extra (cookies are plaintext SQLite).
+cookies = [
+    "cryptography>=42",
+    "secretstorage>=3.3",
+]
 # W3B (#44) — persona-bound HTTP egress. Phase 1 ships an httpx-backed
 # client with audit/drift detection; Phase 2 will swap in a Rust wreq
 # backend behind the same HttpClient trait for actual JA4 emission.

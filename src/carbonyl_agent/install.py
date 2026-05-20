@@ -440,6 +440,9 @@ def main() -> None:
     p_dattach = daemon_sub.add_parser("attach", help="Interactive REPL for a live daemon")
     p_dattach.add_argument("session")
 
+    from carbonyl_agent import cookies_cli
+    cookies_cli.register_subparser(sub)
+
     args = parser.parse_args()
 
     if getattr(args, "debug", False):
@@ -461,6 +464,8 @@ def main() -> None:
         }
         dispatch[args.daemon_command](args)
         sys.exit(0)
+    elif args.command == "cookies":
+        sys.exit(cookies_cli.dispatch(args))
     else:
         parser.print_help()
         sys.exit(0)
