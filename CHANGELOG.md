@@ -153,7 +153,9 @@ publisher (#12), follows once the publisher is configured.
 - `carbonyl-agent install` now reads `.carbonyl-runtime-version` for the default `--tag` value when one is not specified on the CLI. `runtime-latest` becomes a deliberate opt-out rather than the silent default. The installer prints which path was taken (pin / env / latest-sentinel / unpinned) so operators can spot drift (#39)
 
 
-## [0.1.0] - Unreleased
+## Foundational Features (pre-v0.1.0a1)
+
+Initial feature inventory referenced verbatim by the v0.1.0a1 release entry above. Kept for historical record; not an active "Unreleased" section.
 
 ### Added
 - `CarbonylBrowser` — PTY-driven browser automation with pyte terminal emulation
