@@ -230,6 +230,8 @@ A locked keyring → command refuses with a remediation message; it never tries 
 
 `cookies list` shows imported cookies with source provenance per cookie. `cookies revoke` blanks imported cookies' values without touching cookies the session created natively.
 
+For working with Google search, Gmail, LinkedIn, X, Reddit, and similar sites whose bot challenge fires on cold sessions, see [`docs/google-workflow.md`](docs/google-workflow.md) for the recommended cookie-import recipe.
+
 ---
 
 ## Daemon Mode
