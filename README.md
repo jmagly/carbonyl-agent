@@ -17,7 +17,7 @@ pip install carbonyl-agent
 carbonyl-agent install
 ```
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
 [![Carbonyl M147](https://img.shields.io/badge/carbonyl-M147-green?style=flat-square)](https://git.integrolabs.net/roctinam/carbonyl)
 
@@ -691,7 +691,7 @@ PRs and issues welcome at [git.integrolabs.net/roctinam/carbonyl-agent](https://
 
 ## License
 
-**MIT License** — see [LICENSE](LICENSE).
+**GNU Affero General Public License v3.0** — see [LICENSE](LICENSE).
 
 ---
 

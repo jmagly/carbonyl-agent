@@ -21,7 +21,7 @@ version = "0.0.1a1"
 description = "PyO3 bindings for the carbonyl-fingerprint Rust crate (persona schema + validator)"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = { text = "AGPL-3.0-only" }
 authors = [
     { name = "Joseph Magly" },
 ]
@@ -32,7 +32,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Operating System :: POSIX :: Linux",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Topic :: Software Development :: Libraries",
     "Development Status :: 3 - Alpha",
 ]
