@@ -21,6 +21,8 @@ carbonyl-agent install
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
 [![Carbonyl M147](https://img.shields.io/badge/carbonyl-M147-green?style=flat-square)](https://git.integrolabs.net/roctinam/carbonyl)
 
+[![Built With AIWG](https://aiwg.io/assets/badges/built-with-aiwg-dark.png)](https://aiwg.io)
+
 [**Get Started**](#-quick-start) · [**Session API**](#-session-persistence) · [**Daemon Mode**](#-daemon-mode) · [**Bot Detection**](#-bot-detection-flags) · [**Examples**](examples/)
 
 </div>
