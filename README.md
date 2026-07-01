@@ -578,7 +578,7 @@ Each `carbonyl-agent` release pins a Carbonyl runtime hash. CI runs the full E2E
 
 | `carbonyl-agent` | Runtime hash | Carbonyl release | CI status |
 |---|---|---|---|
-| `2026.5.x` (current) | [`runtime-9b3ba53adcd8d330`](https://github.com/jmagly/carbonyl/releases/tag/runtime-9b3ba53adcd8d330) | v0.2.0-alpha.4 (M147 — adds `--carbonyl-cookie-flush-interval-ms`, #51) | **Supported** — default for `carbonyl-agent install` |
+| `2026.5.x` (current) | [`v0.2.0-alpha.17`](https://github.com/jmagly/carbonyl/releases/tag/v0.2.0-alpha.17) | v0.2.0-alpha.17 (M148) | **Supported** — default for `carbonyl-agent install` |
 | `2026.4.x` and earlier | [`runtime-dd69bef0ea4b2512`](https://github.com/jmagly/carbonyl/releases/tag/runtime-dd69bef0ea4b2512) | v0.2.0-alpha.3 (M147) | **Backwards-compat tested** — CI verifies SDK still works against it |
 | any | older `runtime-*` tags | various | Best-effort; not in CI |
 
