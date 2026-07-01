@@ -584,29 +584,29 @@ Each `carbonyl-agent` release pins a Carbonyl runtime hash. CI runs the full E2E
 
 The canonical runtime tag list lives at [github.com/jmagly/carbonyl/releases](https://github.com/jmagly/carbonyl/releases) (mirror: [git.integrolabs.net/roctinam/carbonyl](https://git.integrolabs.net/roctinam/carbonyl)). The current pin for this checkout is in [`.carbonyl-runtime-version`](.carbonyl-runtime-version).
 
-**Pinning a different runtime**: write one `runtime-hash=<hash>` line into `.carbonyl-runtime-version`. The `carbonyl-agent install` command reads it. Override on the command line with `--tag runtime-<hash>` for a one-off install.
+**Pinning a different runtime**: prefer `runtime-tag=v<version>` in `.carbonyl-runtime-version` for end-user installs. Semantic tags download the public GitHub release asset first, fall back to the Gitea mirror, verify the `.sha256` sidecar, and assert `carbonyl --version` after extraction. `runtime-hash=<hash>` remains supported for internal/source-builder Gitea runtime releases. Override on the command line with `--tag v<version>` or `--tag runtime-<hash>` for a one-off install.
 
 **`CARBONYL_BIN` override**: if you set `CARBONYL_BIN=/path/to/carbonyl`, the SDK uses that binary unconditionally — the runtime hash matrix above does not apply. You are responsible for ensuring the binary is a compatible Carbonyl build. See [Binary Search Order](#binary-search-order) for the full precedence chain.
 
 ### Airgap / offline install (#95)
 
-`carbonyl-agent install` downloads a ~75 MB tarball from the GitHub or Gitea release for `roctinam/carbonyl`. Hosts without that network access have three options:
+`carbonyl-agent install` downloads a runtime tarball from the GitHub or Gitea release for `roctinam/carbonyl`. Hosts without that network access have three options:
 
 **Option 1 — `--from-file`**: download the tarball on a connected host, carry it across, install from the local file.
 
 ```bash
 # On a connected host: preview the URL you need to fetch
 carbonyl-agent install --dry-run
-# → [dry-run] Would GET: https://git.integrolabs.net/.../x86_64-unknown-linux-gnu.tgz
-# → [dry-run] Would also fetch: .../SHA256SUMS
+# → [dry-run] Candidate (GitHub public release): https://github.com/...
+# → [dry-run] Checksum: https://github.com/...tgz.sha256
 
 # Fetch both files (any tool: curl, wget, browser)
-curl -O https://git.integrolabs.net/.../x86_64-unknown-linux-gnu.tgz
-curl -O https://git.integrolabs.net/.../SHA256SUMS
+curl -O https://github.com/.../carbonyl-<version>-x86_64-unknown-linux-gnu.tgz
+curl -O https://github.com/.../carbonyl-<version>-x86_64-unknown-linux-gnu.tgz.sha256
 
 # Carry across, then on the airgapped host:
-SHA=$(awk '/x86_64-unknown-linux-gnu.tgz/{print $1}' SHA256SUMS)
-carbonyl-agent install --from-file x86_64-unknown-linux-gnu.tgz --checksum "$SHA"
+SHA=$(awk '{print $1}' carbonyl-<version>-x86_64-unknown-linux-gnu.tgz.sha256)
+carbonyl-agent install --from-file carbonyl-<version>-x86_64-unknown-linux-gnu.tgz --checksum "$SHA"
 ```
 
 The `--checksum` argument is recommended; without it `--from-file` prints a warning and skips integrity verification.

@@ -2,8 +2,10 @@
 """
 carbonyl-agent install — Download and install the Carbonyl runtime binary.
 
-The runtime is hosted on the Gitea releases for roctinam/carbonyl, tagged
-as `runtime-<hash>` where the hash encodes the Chromium version + patches.
+Hash-pinned runtimes are hosted on the Gitea releases for roctinam/carbonyl,
+tagged as `runtime-<hash>` where the hash encodes the Chromium version +
+patches. Semantic `v*` runtime tags use public GitHub release assets first,
+with the Gitea release as a fallback mirror.
 
 Usage:
     carbonyl-agent install [--tag runtime-<hash>] [--dest ~/.local/share/carbonyl/bin]
@@ -59,13 +61,19 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 
 from carbonyl_agent import runtime_pin
 
 GITEA_BASE = os.environ.get("GITEA_BASE", "https://git.integrolabs.net")
 GITEA_REPO = "roctinam/carbonyl"
+GITHUB_RELEASE_BASE = os.environ.get(
+    "CARBONYL_GITHUB_RELEASE_BASE",
+    "https://github.com/jmagly/carbonyl",
+)
 
 # Default install directory (same location _local_binary() checks)
 DEFAULT_DEST = Path.home() / ".local" / "share" / "carbonyl" / "bin"
@@ -73,6 +81,16 @@ DEFAULT_DEST = Path.home() / ".local" / "share" / "carbonyl" / "bin"
 # Sentinel meaning "resolve to the latest release at install time" (drift-prone).
 # Use this only when explicitly opting out of the pin file. See `runtime_pin`.
 LATEST_TAG = runtime_pin.LATEST_SENTINEL
+
+
+@dataclass(frozen=True)
+class RuntimeDownload:
+    label: str
+    url: str
+    asset_name: str
+    checksum_url: str | None
+    require_checksum: bool
+    expected_version: str | None
 
 
 def _platform_triple() -> str:
@@ -100,6 +118,57 @@ def _resolve_tag(tag: str) -> str:
     except Exception as exc:
         print(f"Warning: could not resolve latest tag: {exc}", file=sys.stderr)
         return tag
+
+
+def _is_semantic_tag(tag: str) -> bool:
+    return tag.startswith("v")
+
+
+def _semantic_version(tag: str) -> str | None:
+    if not _is_semantic_tag(tag):
+        return None
+    return tag[1:]
+
+
+def _asset_name_for_tag(tag: str, triple: str) -> str:
+    version = _semantic_version(tag)
+    if version:
+        return f"carbonyl-{version}-{triple}.tgz"
+    return f"{triple}.tgz"
+
+
+def _download_candidates(tag: str, triple: str) -> list[RuntimeDownload]:
+    asset_name = _asset_name_for_tag(tag, triple)
+    version = _semantic_version(tag)
+    if version:
+        return [
+            RuntimeDownload(
+                label="GitHub public release",
+                url=f"{GITHUB_RELEASE_BASE}/releases/download/{tag}/{asset_name}",
+                asset_name=asset_name,
+                checksum_url=f"{GITHUB_RELEASE_BASE}/releases/download/{tag}/{asset_name}.sha256",
+                require_checksum=True,
+                expected_version=version,
+            ),
+            RuntimeDownload(
+                label="Gitea release mirror",
+                url=f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/{asset_name}",
+                asset_name=asset_name,
+                checksum_url=f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/{asset_name}.sha256",
+                require_checksum=True,
+                expected_version=version,
+            ),
+        ]
+    return [
+        RuntimeDownload(
+            label="Gitea runtime release",
+            url=f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/{asset_name}",
+            asset_name=asset_name,
+            checksum_url=f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/SHA256SUMS",
+            require_checksum=False,
+            expected_version=None,
+        )
+    ]
 
 
 def _sha256_file(path: Path) -> str:
@@ -132,6 +201,28 @@ def _fetch_sha256sums(tag: str, triple: str) -> str | None:
     return None
 
 
+def _fetch_checksum_url(checksum_url: str, asset_name: str) -> str | None:
+    """Fetch a checksum sidecar or SHA256SUMS file and return the asset digest."""
+    req = urllib.request.Request(checksum_url)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            text: str = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None
+        raise
+    for line in text.splitlines():
+        parts = line.strip().split(None, 1)
+        if not parts:
+            continue
+        digest = parts[0].lower()
+        if len(parts) == 1:
+            return digest
+        if parts[1].strip() == asset_name:
+            return digest
+    return None
+
+
 def _verify_checksum(
     tarball: Path,
     tag: str,
@@ -139,6 +230,9 @@ def _verify_checksum(
     *,
     pinned_checksum: str | None = None,
     skip_verify: bool = False,
+    checksum_url: str | None = None,
+    asset_name: str | None = None,
+    require_remote: bool = False,
 ) -> None:
     """Verify the SHA-256 checksum of *tarball*.
 
@@ -154,6 +248,16 @@ def _verify_checksum(
     if pinned_checksum:
         expected = pinned_checksum.lower()
         source = "--checksum flag"
+    elif checksum_url and asset_name:
+        expected = _fetch_checksum_url(checksum_url, asset_name)
+        source = checksum_url
+        if expected is None:
+            message = f"SHA-256 checksum not found at {checksum_url}"
+            if require_remote:
+                print(f"ERROR: {message}", file=sys.stderr)
+                sys.exit(1)
+            print(f"Warning: {message}; skipping checksum verification.", file=sys.stderr)
+            return
     else:
         expected = _fetch_sha256sums(tag, triple)
         source = "SHA256SUMS"
@@ -176,6 +280,31 @@ def _verify_checksum(
         sys.exit(1)
 
     print(f"Checksum OK ({source})")
+
+
+def _validate_binary_version(binary: Path, expected_version: str | None) -> None:
+    if expected_version is None:
+        return
+    expected = f"Carbonyl {expected_version}"
+    result = subprocess.run([str(binary), "--version"], capture_output=True, text=True)
+    actual = result.stdout.strip()
+    if result.returncode != 0:
+        print(
+            f"ERROR: could not validate Carbonyl runtime version: {binary}",
+            file=sys.stderr,
+        )
+        if result.stderr:
+            print(result.stderr.strip(), file=sys.stderr)
+        sys.exit(1)
+    if actual != expected:
+        print(
+            f"\nERROR: Carbonyl runtime version mismatch!\n"
+            f"  Expected: {expected}\n"
+            f"  Got:      {actual}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(f"Version OK ({actual})")
 
 
 def _extract_tarball(tarball: Path, install_dir: Path) -> Path:
@@ -255,6 +384,7 @@ def cmd_install(args: argparse.Namespace) -> int:
             )
         print(f"Extracting {src} → {install_dir} ...")
         binary = _extract_tarball(src, install_dir)
+        _validate_binary_version(binary, _semantic_version(args.tag or ""))
         print(f"Installed: {binary}")
         return 0
 
@@ -275,7 +405,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         tag_input = args.tag
     tag = _resolve_tag(tag_input) if not dry_run else tag_input
 
-    url = f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/{triple}.tgz"
+    candidates = _download_candidates(tag, triple)
 
     if binary.exists() and not args.force:
         print(f"Already installed: {binary}")
@@ -290,11 +420,15 @@ def cmd_install(args: argparse.Namespace) -> int:
         # HTTPS_PROXY but not HTTP_PROXY for https:// URLs.
         print(f"[dry-run] Platform: {triple}")
         print(f"[dry-run] Tag: {tag} (input {tag_input!r}, not resolved against the API)")
-        print(f"[dry-run] Would GET: {url}")
-        print(f"[dry-run] Would also fetch: "
-              f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/SHA256SUMS")
+        for candidate in candidates:
+            print(f"[dry-run] Candidate ({candidate.label}): {candidate.url}")
+            if candidate.checksum_url:
+                print(f"[dry-run] Checksum: {candidate.checksum_url}")
         print(f"[dry-run] Would extract to: {install_dir}")
         print(f"[dry-run] Final binary path: {binary}")
+        expected_version = candidates[0].expected_version
+        if expected_version:
+            print(f"[dry-run] Would validate: carbonyl --version == Carbonyl {expected_version}")
         proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
         if proxy:
             print(f"[dry-run] Network: HTTPS_PROXY={proxy} (urllib honors this for https://)")
@@ -302,24 +436,45 @@ def cmd_install(args: argparse.Namespace) -> int:
             print("[dry-run] Network: no HTTPS_PROXY set (direct connection)")
         return 0
 
-    print(f"Downloading {url} ...")
     install_dir.mkdir(parents=True, exist_ok=True)
 
     with tempfile.NamedTemporaryFile(suffix=".tgz", delete=False) as tmp:
         tmp_path = Path(tmp.name)
 
     try:
-        req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=120) as resp, open(tmp_path, "wb") as f:
-            total = int(resp.headers.get("Content-Length", 0))
-            downloaded = 0
-            while chunk := resp.read(65536):
-                f.write(chunk)
-                downloaded += len(chunk)
-                if total:
-                    pct = downloaded * 100 // total
-                    print(f"\r  {pct}% ({downloaded // 1024 // 1024} MB)", end="", flush=True)
-        print()
+        selected: RuntimeDownload | None = None
+        errors: list[str] = []
+        for candidate in candidates:
+            print(f"Downloading {candidate.url} ...")
+            req = urllib.request.Request(candidate.url)
+            try:
+                with urllib.request.urlopen(req, timeout=120) as resp, open(tmp_path, "wb") as f:
+                    total = int(resp.headers.get("Content-Length", 0))
+                    downloaded = 0
+                    while chunk := resp.read(65536):
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total:
+                            pct = downloaded * 100 // total
+                            print(
+                                f"\r  {pct}% ({downloaded // 1024 // 1024} MB)",
+                                end="",
+                                flush=True,
+                            )
+                print()
+                selected = candidate
+                break
+            except urllib.error.URLError as exc:
+                tmp_path.write_bytes(b"")
+                errors.append(f"{candidate.url}: {exc}")
+                print(f"Warning: download failed from {candidate.label}: {exc}", file=sys.stderr)
+
+        if selected is None:
+            print("\nERROR: could not download a compatible Carbonyl runtime.", file=sys.stderr)
+            print("Attempted URLs:", file=sys.stderr)
+            for err in errors:
+                print(f"  - {err}", file=sys.stderr)
+            return 1
 
         _verify_checksum(
             tmp_path,
@@ -327,15 +482,19 @@ def cmd_install(args: argparse.Namespace) -> int:
             triple,
             pinned_checksum=getattr(args, "checksum", None),
             skip_verify=getattr(args, "no_verify", False),
+            checksum_url=selected.checksum_url,
+            asset_name=selected.asset_name,
+            require_remote=selected.require_checksum,
         )
 
         print(f"Extracting to {install_dir} ...")
         binary = _extract_tarball(tmp_path, install_dir)
+        _validate_binary_version(binary, selected.expected_version)
         print(f"Installed: {binary}")
 
     except urllib.error.HTTPError as exc:
-        print(f"\nERROR: {exc.code} {exc.reason} — {url}", file=sys.stderr)
-        print("Check that the tag exists and the Gitea server is reachable.", file=sys.stderr)
+        print(f"\nERROR: {exc.code} {exc.reason}", file=sys.stderr)
+        print("Check that the tag exists and a configured release source is reachable.", file=sys.stderr)
         return 1
     finally:
         tmp_path.unlink(missing_ok=True)
@@ -375,7 +534,7 @@ def main() -> None:
     p_install.add_argument(
         "--tag",
         default=None,
-        help="Gitea release tag to download (default: read from "
+        help="Runtime release tag to download (default: read from "
              ".carbonyl-runtime-version pin file; falls back to runtime-latest "
              "if no pin is present)",
     )
