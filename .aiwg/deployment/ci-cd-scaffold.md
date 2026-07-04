@@ -188,5 +188,6 @@ Full procedure lives in `release-runbook.md`. Pre-flight: CI green on `main`, `C
 
 - SLSA provenance via `pypa/gh-action-pypi-publish` attestations.
 - Sigstore signing of wheels.
-- Nightly E2E job against pinned Carbonyl runtime tags.
 - Publish coverage to Codecov / Coveralls for historical tracking.
+
+(The nightly E2E job against the pinned Carbonyl runtime is now implemented — `.gitea/workflows/e2e.yml` runs on a `0 7 * * *` cron.)

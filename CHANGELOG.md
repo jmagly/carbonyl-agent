@@ -75,7 +75,14 @@ clears the third-party license attribution release-blocker.
   `.aiwg/reports/carbonyl-parity-audit-2026-07-04.md` covering the runtime pin,
   trusted-input FFI gaps, distribution drift, and the outstanding backlog.
 
-### Deferred
+### Docs
+
+- Code→docs reconciliation (doc-sync): README runtime-compat matrix + M148 badge
+  updated (dropped the removed prior-runtime CI claim, #127); ADR-003/SAD Docker
+  fallback documented as opt-in (`CARBONYL_ALLOW_DOCKER`) + digest-pinned; ADR-004
+  SHA256 "known gap" marked resolved; ADR-005 + pyproject license notes updated to
+  the AGPL/GPL-3.0-compatible posture (#99); release-runbook + ci-cd-scaffold
+  reconciled to CalVer and current CI. Audit: `.aiwg/reports/doc-sync-audit-2026-07-04.md`.
 
 - **GPG release-signature verification** in `install.py` (upstream added
   per-asset GPG signatures in carbonyl alpha.15) is deferred to a tracked

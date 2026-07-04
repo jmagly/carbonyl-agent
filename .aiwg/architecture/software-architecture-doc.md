@@ -30,7 +30,7 @@ The architecture described here covers only the Python automation layer: the `ca
 - `README.md`, `CLAUDE.md`, `pyproject.toml`
 - `.aiwg/intake/project-intake.md`
 - Source tree: `src/carbonyl_agent/` (browser.py, daemon.py, session.py, screen_inspector.py, install.py)
-- ADR-001 through ADR-004 (this directory)
+- ADR-001 through ADR-005 (this directory)
 - Upstream: `roctinam/carbonyl` (Chromium fork + Rust FFI)
 
 ---
@@ -46,7 +46,7 @@ The architecture described here covers only the Python automation layer: the `ca
 | G5 | **Zero binary modifications** | The SDK must drive the upstream Carbonyl binary as-is, without patches or rebuilds. Decouples SDK releases from Chromium release cycles. |
 | G6 | **Local-only execution boundary** | The daemon is strictly local; authentication relies on filesystem permissions of the Unix socket. |
 | G7 | **Supply-chain integrity** | Runtime binary is downloaded over HTTPS from Gitea releases (install.py line 24). SHA256 checksum verification is enforced before extraction (install.py `_verify_checksum`). |
-| G8 | **Graceful fallback** | When no local binary is installed, fall back to Docker (`ghcr.io/jmagly/carbonyl`) so first-time users can smoke-test without the installer (browser.py lines 227–248). |
+| G8 | **Graceful fallback** | When no local binary is installed and `CARBONYL_ALLOW_DOCKER=1` is set, fall back to the digest-pinned `ghcr.io/jmagly/carbonyl@sha256:…` image so first-time users can opt in to a smoke-test without the installer (browser.py:461–482). |
 
 ---
 

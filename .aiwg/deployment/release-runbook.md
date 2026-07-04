@@ -66,7 +66,7 @@ Complete **all** items before tagging. Check off as you go.
 - [ ] `main` branch CI is green on Gitea **and** GitHub for the latest commit
 - [ ] All iteration stories for this release are merged and closed
 - [ ] `CHANGELOG.md` has a finalized section for the new version (move items out of `Unreleased`, add release date, preserve Keep-a-Changelog format)
-- [ ] `pyproject.toml` `version` field bumped (semver: PATCH for bugfix, MINOR for additive, MAJOR for breaking)
+- [ ] `pyproject.toml` `version` field bumped (CalVer `YYYY.M.PATCH`, no leading zeros — reset PATCH to 0 on a new `YYYY.M`, else increment PATCH; see docs/versioning.md)
 - [ ] `README.md` install and quick-start examples verified in a fresh venv
 - [ ] All ADRs reflect the shipped design; no pending ADRs in `drafts/`
 - [ ] `.aiwg/security/threat-model.md` reviewed; no HIGH unmitigated items unless explicitly accepted
@@ -89,8 +89,8 @@ git checkout main
 git pull origin main
 git status  # must be clean
 
-# Tag
-VERSION="0.1.0"
+# Tag  (project uses CalVer: YYYY.M.PATCH, no leading zeros — see docs/versioning.md)
+VERSION="2026.7.0"
 git tag -a "v${VERSION}" -m "carbonyl-agent v${VERSION}"
 
 # Push to Gitea (origin) first

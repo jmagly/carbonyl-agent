@@ -19,7 +19,7 @@ carbonyl-agent install
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
-[![Carbonyl M147](https://img.shields.io/badge/carbonyl-M147-green?style=flat-square)](https://git.integrolabs.net/roctinam/carbonyl)
+[![Carbonyl M148](https://img.shields.io/badge/carbonyl-M148-green?style=flat-square)](https://git.integrolabs.net/roctinam/carbonyl)
 
 [![Built With AIWG](https://aiwg.io/assets/badges/built-with-aiwg-dark.png)](https://aiwg.io)
 
@@ -574,12 +574,12 @@ unreachable.
 
 ### Runtime compatibility matrix (#21, #92)
 
-Each `carbonyl-agent` release pins a Carbonyl runtime hash. CI runs the full E2E suite (`tests/e2e/`) against the current and prior runtimes so SDK-vs-runtime drift is caught before it reaches users.
+Each `carbonyl-agent` release pins a Carbonyl runtime. CI runs the full E2E suite (`tests/e2e/`) against the current pinned runtime so SDK-vs-runtime drift is caught before it reaches users. (A prior-runtime regression leg was removed as chronically unreliable — see #127.)
 
-| `carbonyl-agent` | Runtime hash | Carbonyl release | CI status |
+| `carbonyl-agent` | Runtime | Carbonyl release | CI status |
 |---|---|---|---|
-| `2026.5.x` (current) | [`v0.2.0-alpha.17`](https://github.com/jmagly/carbonyl/releases/tag/v0.2.0-alpha.17) | v0.2.0-alpha.17 (M148) | **Supported** — default for `carbonyl-agent install` |
-| `2026.4.x` and earlier | [`runtime-dd69bef0ea4b2512`](https://github.com/jmagly/carbonyl/releases/tag/runtime-dd69bef0ea4b2512) | v0.2.0-alpha.3 (M147) | **Backwards-compat tested** — CI verifies SDK still works against it |
+| `2026.7.x` (current) | [`v0.2.0-alpha.17`](https://github.com/jmagly/carbonyl/releases/tag/v0.2.0-alpha.17) | v0.2.0-alpha.17 (M148) | **Supported** — default for `carbonyl-agent install` |
+| `2026.4.x` and earlier | older `v0.2.0-alpha.*` tags | v0.2.0-alpha.3 (M147) and earlier | **Best-effort** — no longer exercised in CI (#127) |
 | any | older `runtime-*` tags | various | Best-effort; not in CI |
 
 The canonical runtime tag list lives at [github.com/jmagly/carbonyl/releases](https://github.com/jmagly/carbonyl/releases) (mirror: [git.integrolabs.net/roctinam/carbonyl](https://git.integrolabs.net/roctinam/carbonyl)). The current pin for this checkout is in [`.carbonyl-runtime-version`](.carbonyl-runtime-version).

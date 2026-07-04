@@ -119,7 +119,7 @@ The fallback path preserves Phase 1 behavior exactly so the rollback story is "u
 ### Neutral
 
 - The trait surface lives in `carbonyl-fingerprint` (W3A, #43); `wreq` integration code lives in W3B (#44). Layout is independent of this ADR.
-- License compatibility: MIT/Apache-2.0 dual is compatible with the project's downstream usage. No license escape hatch needed.
+- License compatibility: the `wreq` stack transitively pulls in GPL-3.0 `wreq-util`. The project is AGPL-3.0-only, and GPLv3 §13 makes GPL-3.0 and AGPL-3.0 compatible (attribution required, aggregated in `THIRD_PARTY_LICENSES.txt`; #99). #100 tracks replacing `wreq-util` with an in-house preset registry.
 
 ## Alternatives Considered
 

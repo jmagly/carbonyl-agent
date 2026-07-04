@@ -25,7 +25,7 @@ The SDK must pick one deterministically on every invocation. Consumers need pred
 1. **`CARBONYL_BIN` environment variable** — explicit path override. Checked first. Must point to an executable file.
 2. **`~/.local/share/carbonyl/bin/<triple>/carbonyl`** — the installed location written by `carbonyl-agent install` (install.py lines 60–115). `<triple>` is computed by `_platform_triple()` (e.g. `x86_64-unknown-linux-gnu`, `aarch64-apple-darwin`).
 3. **`carbonyl` on `$PATH`** — resolved via `which carbonyl`. Honors any manual installation the user has done.
-4. **Docker fallback** — if steps 1–3 all return `None`, `open()` constructs a `docker run --rm -it ghcr.io/jmagly/carbonyl ...` command line and spawns that through pexpect instead (browser.py lines 227–248).
+4. **Docker fallback (opt-in)** — if steps 1–3 all return `None` **and `CARBONYL_ALLOW_DOCKER=1` is set**, `open()` spawns the **digest-pinned** `docker run --rm -it ghcr.io/jmagly/carbonyl@sha256:… ...` through pexpect; without the opt-in env var it raises (browser.py:461–482).
 
 ## Consequences
 
@@ -33,7 +33,7 @@ The SDK must pick one deterministically on every invocation. Consumers need pred
 
 - **Explicit override always wins**: Setting `CARBONYL_BIN=/path/to/custom` is the escape hatch for CI, local development of the upstream Carbonyl binary, or testing patched builds. No flag juggling required.
 - **Installer path takes precedence over `$PATH`**: If the user runs `carbonyl-agent install`, that binary is used even if a different Carbonyl is on `$PATH`. This avoids surprise version skew when `pip install -U carbonyl-agent && carbonyl-agent install` bumps the runtime.
-- **Graceful first-run experience**: A developer who never runs the installer but has Docker available still gets a working `CarbonylBrowser` — the SDK transparently shells out to `docker run ghcr.io/jmagly/carbonyl`. This is important for smoke tests and README snippets.
+- **Graceful first-run experience**: A developer who never runs the installer but has Docker available can still get a working `CarbonylBrowser` by opting in with `CARBONYL_ALLOW_DOCKER=1`; the SDK then shells out to the digest-pinned `ghcr.io/jmagly/carbonyl@sha256:…` image. This is useful for smoke tests and README snippets.
 - **`LD_LIBRARY_PATH` is scoped**: When a local binary is used, the SDK sets `LD_LIBRARY_PATH=<binary_dir>` (browser.py line 217) so the adjacent `libcarbonyl.so` resolves without requiring `ldconfig` or system-wide `.so` placement.
 
 ### Negative

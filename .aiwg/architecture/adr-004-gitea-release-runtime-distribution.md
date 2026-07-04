@@ -52,10 +52,10 @@ Tag resolution supports a `runtime-latest` alias resolved via the Gitea API (`/a
 
 ### Negative
 
-- **No SHA256 verification (known gap)**: `cmd_install` currently trusts HTTPS + the Gitea server. An attacker who compromised the Gitea instance or performed a TLS MITM could substitute a malicious binary, and the installer would extract it silently. This is documented in SAD §11 and the intake form. Mitigation plan: publish a signed `SHA256SUMS` manifest per release and verify before extraction.
+- **SHA256 verification (resolved — was a known gap)**: `cmd_install` now downloads the per-asset `.sha256` / `SHA256SUMS` and verifies the tarball before extraction (`_verify_checksum`), with a `--checksum` pin override. The original gap (trusting HTTPS + the server alone, allowing a compromised host or TLS MITM to substitute a binary) is closed; SAD §11 #1 marks it Resolved.
 - **Gitea uptime is a hard dependency**: If `git.integrolabs.net` is down, `carbonyl-agent install` fails. Users can set `GITEA_BASE` to a mirror, but no mirror exists by default. A GitHub-releases fallback is a reasonable follow-up.
 - **Public discoverability is limited**: Gitea releases are not indexed in the same way as PyPI or GitHub. First-time users must read the README to discover the install step.
-- **"Latest" resolution is dynamic**: `_resolve_tag` queries the Gitea API at install time, so reproducible installs require pinning a specific `runtime-<hash>` tag in CI. `LATEST_TAG = "runtime-latest"` (install.py line 31) is a sentinel, not a pinned version.
+- **"Latest" resolution is dynamic**: `_resolve_tag` queries the Gitea API at install time, so reproducible installs require pinning a specific `runtime-<hash>` tag in CI. `LATEST_TAG = runtime_pin.LATEST_SENTINEL` (install.py) is a sentinel, not a pinned version.
 - **Docker fallback becomes the safety net**: Users who can't reach Gitea can still smoke-test via the Docker image (see ADR-003), which somewhat softens the availability concern but does not replace a proper install.
 
 ### Neutral
