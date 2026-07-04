@@ -99,12 +99,27 @@ jobs:
       # files only — no clang/cmake build deps needed.
       - name: third-party license attribution (--check)
         run: |
+          # Install cargo-about from its prebuilt static musl binary rather than
+          # `cargo install` (which compiles for minutes and, under
+          # CARGO_HOME=/tmp/cargo, lands off-PATH). Pin 0.9.0 to match the
+          # version THIRD_PARTY_LICENSES.txt was generated with so --check is
+          # byte-deterministic.
           docker run --rm \
             -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
             -w /workspace \
             -e CARGO_HOME=/tmp/cargo \
             rust:latest \
-            sh -c "cargo install cargo-about --features cli --locked 2>/dev/null || cargo install cargo-about --features cli; scripts/gen-third-party-licenses.sh --check"
+            sh -c '
+              set -eu
+              command -v curl >/dev/null || { apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null; }
+              ABOUT_VER=0.9.0
+              triple=x86_64-unknown-linux-musl
+              curl -fsSL "https://github.com/EmbarkStudios/cargo-about/releases/download/${ABOUT_VER}/cargo-about-${ABOUT_VER}-${triple}.tar.gz" \
+                | tar xz -C /tmp
+              install -m 0755 "/tmp/cargo-about-${ABOUT_VER}-${triple}/cargo-about" /usr/local/bin/cargo-about
+              cargo-about --version
+              scripts/gen-third-party-licenses.sh --check
+            '
 
       # Verifies `.carbonyl-fingerprint-version` matches the resolved
       # wreq SHA in Cargo.lock (per ADR-005 bus-factor mitigation #1,
