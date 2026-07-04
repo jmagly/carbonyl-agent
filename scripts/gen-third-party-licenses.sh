@@ -43,13 +43,20 @@ if [ "$CHECK" = true ]; then
   TMP="$(mktemp -t third-party-XXXXXX.txt)"
   trap 'rm -f "$TMP"' EXIT
   cargo about generate --manifest-path "$MANIFEST" "$TEMPLATE" -o "$TMP"
-  if ! diff -q "$OUTPUT" "$TMP" >/dev/null 2>&1; then
-    echo "ERROR: $OUTPUT is stale. Regenerate with:" >&2
+  # Ignore blank-line and whitespace-only differences (-B -b): cargo-about's
+  # rendering of some crates' license files is not byte-identical across
+  # environments (freshly-fetched crate sources vs a warm registry cache can
+  # differ by a trailing blank line). The gate's job is to catch a new/changed
+  # crate license — never a whitespace-only change — so this stays strict on
+  # content while tolerating environmental noise.
+  if ! diff -q -B -b "$OUTPUT" "$TMP" >/dev/null 2>&1; then
+    echo "ERROR: $OUTPUT is stale (a dependency license changed or a crate is" >&2
+    echo "not covered). Regenerate with:" >&2
     echo "  scripts/gen-third-party-licenses.sh" >&2
-    diff "$OUTPUT" "$TMP" | head -40 >&2
+    diff -B -b "$OUTPUT" "$TMP" | head -40 >&2
     exit 1
   fi
-  echo "OK: $OUTPUT matches generated output."
+  echo "OK: $OUTPUT covers the resolved dependency tree."
 else
   cargo about generate --manifest-path "$MANIFEST" "$TEMPLATE" -o "$OUTPUT"
   echo "Wrote $OUTPUT ($(wc -l < "$OUTPUT") lines)"
