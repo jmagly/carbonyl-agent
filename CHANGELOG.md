@@ -25,12 +25,13 @@ clears the third-party license attribution release-blocker.
   multi-byte input). Bumped `runtime-hash` to `099874f855c74a61` (the alpha.17
   runtime, headless + x11) in lockstep with the tag, and added a lockstep
   invariant note so the two anchors can't silently drift again. (parity audit F1)
-- **e2e prior-runtime leg rotted to a 404** — the `e2e.yml` matrix pinned a
-  `runtime-<hash>` release (`runtime-dd69bef0ea4b2512`) for its regression leg,
-  but upstream prunes stale `runtime-<hash>` cuts (carbonyl v0.2.0-alpha.10), so
-  the install 404'd and the leg failed on every run. Repinned to the durable
-  semantic tag `v0.2.0-alpha.15` (`v*` releases are never pruned) with a note to
-  keep prior legs on semantic tags.
+- **e2e prior-runtime leg was chronically failing** — the `e2e.yml` matrix's
+  regression leg pinned `runtime-dd69bef0ea4b2512`, which upstream pruned
+  (carbonyl v0.2.0-alpha.10, only-latest-runtime policy), so the install 404'd.
+  Repinning to a durable `v*` tag then fails install-time version validation
+  (older carbonyl builds report a stale internal version string). Removed the
+  prior leg — a false-failure probe, not an SDK signal — leaving the meaningful
+  current-runtime leg (which passes). Redesign tracked in #127.
 - **Rust `check.yml` clippy failure** — `rust:latest` clippy rolled to 1.96 and
   now flags `collapsible_match` on the `parse_fixture.rs` extension-parsing arms
   under `-D warnings`. Collapsed the nested `if ext_data.len() >= 2` bodies into
