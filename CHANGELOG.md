@@ -31,6 +31,11 @@ clears the third-party license attribution release-blocker.
   the install 404'd and the leg failed on every run. Repinned to the durable
   semantic tag `v0.2.0-alpha.15` (`v*` releases are never pruned) with a note to
   keep prior legs on semantic tags.
+- **Rust `check.yml` clippy failure** — `rust:latest` clippy rolled to 1.96 and
+  now flags `collapsible_match` on the `parse_fixture.rs` extension-parsing arms
+  under `-D warnings`. Collapsed the nested `if ext_data.len() >= 2` bodies into
+  match guards (behavior-preserving — an unmatched guard falls to the `_ => {}`
+  no-op). Fixed the code rather than allowing the lint.
 
 ### Changed
 

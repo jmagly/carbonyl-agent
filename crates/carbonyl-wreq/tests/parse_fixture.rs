@@ -67,44 +67,40 @@ fn parse_client_hello(bytes: &[u8]) -> Parsed {
                 out.grease_in_extensions = true;
             }
             match ext_type {
-                0x0010 => {
-                    if ext_data.len() >= 2 {
-                        let list_len = u16::from_be_bytes([ext_data[0], ext_data[1]]) as usize;
-                        let mut p = 2;
-                        while p < 2 + list_len && p < ext_data.len() {
-                            let proto_len = ext_data[p] as usize;
-                            p += 1;
-                            if p + proto_len > ext_data.len() {
-                                break;
-                            }
-                            out.alpn.push(
-                                String::from_utf8_lossy(&ext_data[p..p + proto_len]).into_owned(),
-                            );
-                            p += proto_len;
+                // ALPN
+                0x0010 if ext_data.len() >= 2 => {
+                    let list_len = u16::from_be_bytes([ext_data[0], ext_data[1]]) as usize;
+                    let mut p = 2;
+                    while p < 2 + list_len && p < ext_data.len() {
+                        let proto_len = ext_data[p] as usize;
+                        p += 1;
+                        if p + proto_len > ext_data.len() {
+                            break;
                         }
+                        out.alpn.push(
+                            String::from_utf8_lossy(&ext_data[p..p + proto_len]).into_owned(),
+                        );
+                        p += proto_len;
                     }
                 }
-                0x000d => {
-                    if ext_data.len() >= 2 {
-                        let list_len = u16::from_be_bytes([ext_data[0], ext_data[1]]) as usize;
-                        let mut p = 2;
-                        while p + 2 <= 2 + list_len && p + 2 <= ext_data.len() {
-                            out.signature_algorithms
-                                .push(u16::from_be_bytes([ext_data[p], ext_data[p + 1]]));
-                            p += 2;
-                        }
+                // signature_algorithms
+                0x000d if ext_data.len() >= 2 => {
+                    let list_len = u16::from_be_bytes([ext_data[0], ext_data[1]]) as usize;
+                    let mut p = 2;
+                    while p + 2 <= 2 + list_len && p + 2 <= ext_data.len() {
+                        out.signature_algorithms
+                            .push(u16::from_be_bytes([ext_data[p], ext_data[p + 1]]));
+                        p += 2;
                     }
                 }
-                0x000a => {
-                    // supported_groups: 2-byte list length, then u16 IDs
-                    if ext_data.len() >= 2 {
-                        let list_len = u16::from_be_bytes([ext_data[0], ext_data[1]]) as usize;
-                        let mut p = 2;
-                        while p + 2 <= 2 + list_len && p + 2 <= ext_data.len() {
-                            out.supported_groups
-                                .push(u16::from_be_bytes([ext_data[p], ext_data[p + 1]]));
-                            p += 2;
-                        }
+                // supported_groups: 2-byte list length, then u16 IDs
+                0x000a if ext_data.len() >= 2 => {
+                    let list_len = u16::from_be_bytes([ext_data[0], ext_data[1]]) as usize;
+                    let mut p = 2;
+                    while p + 2 <= 2 + list_len && p + 2 <= ext_data.len() {
+                        out.supported_groups
+                            .push(u16::from_be_bytes([ext_data[p], ext_data[p + 1]]));
+                        p += 2;
                     }
                 }
                 _ => {}
