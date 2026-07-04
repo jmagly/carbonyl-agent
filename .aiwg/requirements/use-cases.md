@@ -23,7 +23,7 @@
 5. Consumer calls `browser.close()` to terminate the child process.
 
 **Alternative flows**
-- **1a**. Binary not found locally → SDK falls back to `docker run fathyb/carbonyl` (UC-006).
+- **1a**. Binary not found locally → SDK falls back to `docker run ghcr.io/jmagly/carbonyl` (UC-006).
 - **3a**. PTY reports EOF mid-drain → drain loop exits early; `page_text()` still returns whatever was buffered.
 - **4a**. Consumer calls `find_text()` / `raw_lines()` / `inspector()` instead of `page_text()` for structured queries.
 
@@ -152,7 +152,7 @@
 1. SDK checks `$CARBONYL_BIN`; if set and executable, use it.
 2. Otherwise, SDK checks `~/.local/share/carbonyl/bin/<triple>/carbonyl`; if present and executable, use it.
 3. Otherwise, SDK runs `which carbonyl`; if found and executable, use it.
-4. Otherwise, SDK spawns `bash -c "docker run --rm -it [-v profile:/data/profile] fathyb/carbonyl …"`.
+4. Otherwise, SDK spawns `bash -c "docker run --rm -it [-v profile:/data/profile] ghcr.io/jmagly/carbonyl …"`.
 
 **Alternative flows**
 - **1a**. `$CARBONYL_BIN` is set but not executable → fall through to step 2 (no error).

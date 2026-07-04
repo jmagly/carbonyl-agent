@@ -37,7 +37,7 @@ Keyboard input is written as UTF-8 bytes to the PTY (`_child.send`). Mouse event
 
 - **Zero upstream modifications**: The Carbonyl binary is consumed as shipped. SDK releases are decoupled from Chromium release cadence.
 - **Minimal dependency footprint**: pexpect and pyte are both small, pure-Python, well-maintained libraries.
-- **Works with the Docker fallback**: The same PTY-based driver works whether Carbonyl runs as a local binary or inside `docker run fathyb/carbonyl` (browser.py lines 227–248).
+- **Works with the Docker fallback**: The same PTY-based driver works whether Carbonyl runs as a local binary or inside `docker run ghcr.io/jmagly/carbonyl` (browser.py lines 227–248).
 - **Full mouse + keyboard fidelity**: SGR mouse protocol lets us drive mousemove sequences (browser.py lines 272–301) that are indistinguishable from real terminal input — important for bot-detection evasion on sites like Akamai-protected targets.
 
 ### Negative

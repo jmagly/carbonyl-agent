@@ -13,6 +13,7 @@ from unittest.mock import patch
 import pytest
 
 from carbonyl_agent.install import (
+    _asset_name_for_tag,
     _download_candidates,
     _fetch_checksum_url,
     _fetch_sha256sums,
@@ -224,6 +225,67 @@ def test_download_candidates_runtime_hash_keeps_gitea_asset_shape():
     assert candidates[0].checksum_url and candidates[0].checksum_url.endswith("/SHA256SUMS")
     assert candidates[0].require_checksum is False
     assert candidates[0].expected_version is None
+
+
+# ---------------------------------------------------------------------------
+# Multi-arch resolution coverage (#98)
+#
+# Full multi-arch *execution* test jobs (macos-arm64, linux-aarch64) are gated
+# on runner availability. These tests exercise the arch-independent resolution
+# layer — asset-name + download-URL construction per consumer triple — so the
+# install path is proven for every target arch on the x86_64 CI runner.
+# ---------------------------------------------------------------------------
+
+# The consumer triples #98 targets. macos-arm64 runtime ships upstream since
+# carbonyl v0.2.0-alpha.7; linux-aarch64 runtime is pending upstream
+# (roctinam/carbonyl#67/#116) but the agent-side resolution must be correct now.
+CONSUMER_TRIPLES = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+]
+
+
+@pytest.mark.parametrize("triple", CONSUMER_TRIPLES)
+def test_semantic_tag_resolution_per_triple(triple: str):
+    """A semantic tag resolves to the right GitHub-first asset name + URL for
+    every consumer arch, not just x86_64."""
+    tag = "v0.2.0-alpha.17"
+    assert _asset_name_for_tag(tag, triple) == f"carbonyl-0.2.0-alpha.17-{triple}.tgz"
+
+    candidates = _download_candidates(tag, triple)
+    assert [c.label for c in candidates] == [
+        "GitHub public release",
+        "Gitea release mirror",
+    ]
+    for c in candidates:
+        assert c.asset_name == f"carbonyl-0.2.0-alpha.17-{triple}.tgz"
+        assert f"/download/{tag}/carbonyl-0.2.0-alpha.17-{triple}.tgz" in c.url
+        assert c.checksum_url and c.checksum_url.endswith(f"{triple}.tgz.sha256")
+        assert c.require_checksum is True
+        assert c.expected_version == "0.2.0-alpha.17"
+
+
+@pytest.mark.parametrize("triple", CONSUMER_TRIPLES)
+def test_runtime_hash_resolution_per_triple(triple: str):
+    """A runtime-hash tag resolves to the bare-triple Gitea asset for every
+    consumer arch."""
+    candidates = _download_candidates("runtime-099874f855c74a61", triple)
+    assert len(candidates) == 1
+    assert candidates[0].asset_name == f"{triple}.tgz"
+    assert candidates[0].expected_version is None
+
+
+def test_platform_triple_maps_macos_to_apple_darwin():
+    """darwin/arm64 host resolves to the macos-arm64 consumer triple (#98)."""
+
+    def _fake_run(cmd, *args, **kwargs):
+        arg = cmd[1]  # uname -m / uname -s
+        out = "arm64" if arg == "-m" else "Darwin"
+        return SimpleNamespace(stdout=out + "\n")
+
+    with patch("carbonyl_agent.install.subprocess.run", side_effect=_fake_run):
+        assert _platform_triple() == "arm64-apple-darwin"
 
 
 # ---------------------------------------------------------------------------

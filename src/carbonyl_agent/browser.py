@@ -9,7 +9,7 @@ Binary search order:
     1. CARBONYL_BIN env var (explicit path)
     2. ~/.local/share/carbonyl/bin/<triple>/carbonyl  (installed via `carbonyl-agent install`)
     3. `carbonyl` on $PATH
-    4. Docker fallback: docker run fathyb/carbonyl
+    4. Docker fallback: docker run ghcr.io/jmagly/carbonyl
 
 Usage:
     python -m carbonyl_agent.browser search "search term"
@@ -52,9 +52,12 @@ ROWS = 50
 _DEFAULT_INSTALL_DIR = Path.home() / ".local" / "share" / "carbonyl" / "bin"
 
 # Docker fallback: require explicit opt-in and use a pinned digest.
+# Image is the maintained runtime container published by the jmagly/carbonyl
+# fork (ghcr.io/jmagly/carbonyl, since carbonyl v0.2.0-alpha.10); the original
+# fathyb/carbonyl image has been inactive since early 2023.
 # To update the digest, pull the latest image and run:
-#   docker inspect --format='{{index .RepoDigests 0}}' fathyb/carbonyl
-_DOCKER_IMAGE_DIGEST = "fathyb/carbonyl@sha256:564733cd0e7c4ed82e3eb872df511092f84e848afd807f1c1db82e43c867aab0"
+#   docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/jmagly/carbonyl
+_DOCKER_IMAGE_DIGEST = "ghcr.io/jmagly/carbonyl@sha256:26d990c3e36bb685a2deb3f8a998a441ad606aa4b2469e30e0bfdfffb4712532"
 _DOCKER_FALLBACK_ENV = "CARBONYL_ALLOW_DOCKER"
 
 # ---------------------------------------------------------------------------

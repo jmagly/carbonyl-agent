@@ -47,7 +47,7 @@ reports the active proxy setting.
   2. `~/.local/share/carbonyl/bin/<triple>/carbonyl` (this installer's
      default install location, or whatever `--dest` was used)
   3. `carbonyl` on `$PATH`
-  4. Docker fallback: `docker run fathyb/carbonyl`
+  4. Docker fallback: `docker run ghcr.io/jmagly/carbonyl`
 
 In airgap deployments where the runtime lives in a non-default path,
 set `CARBONYL_BIN=/path/to/carbonyl` to skip discovery.

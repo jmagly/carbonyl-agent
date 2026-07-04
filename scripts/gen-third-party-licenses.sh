@@ -11,12 +11,14 @@
 #   cargo install cargo-about --features cli
 #
 # Scope notes:
-#   - Current scope: carbonyl-fingerprint only (clean license tree).
-#   - carbonyl-wreq is excluded pending resolution of the wreq-util
-#     GPL-3.0 finding documented in #94. The full workspace generation
-#     will succeed once wreq-util is replaced or feature-gated.
+#   - Full workspace: carbonyl-fingerprint + carbonyl-wreq (and their
+#     transitive deps). The project is AGPL-3.0-only, so GPL-3.0 wreq-util
+#     is license-compatible (GPLv3 §13); about.toml accepts it and requires
+#     attribution rather than treating it as a conflict (#99).
+#   - When carbonyl-wreq ships in the wheel (#88), this file already covers
+#     its notices. #100 tracks replacing wreq-util with an in-house registry.
 #
-# Refs: roctinam/carbonyl-agent#94
+# Refs: roctinam/carbonyl-agent#94, #99, #88, #100
 
 set -euo pipefail
 
@@ -24,7 +26,7 @@ cd "$(dirname "$0")/.."
 
 OUTPUT="THIRD_PARTY_LICENSES.txt"
 TEMPLATE="about.hbs"
-MANIFEST="crates/carbonyl-fingerprint/Cargo.toml"
+MANIFEST="Cargo.toml"  # workspace root — covers all members (#99)
 
 if ! command -v cargo-about >/dev/null 2>&1; then
   echo "ERROR: cargo-about not installed. Run:" >&2

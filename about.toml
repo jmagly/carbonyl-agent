@@ -8,7 +8,8 @@
 # for every redistributable component.
 #
 # Regenerate with: scripts/gen-third-party-licenses.sh
-# CI parity check: same script with --check (TODO: wire into ci.yml)
+# CI parity check: same script with --check, wired into .gitea/workflows/check.yml
+# (fails CI if THIRD_PARTY_LICENSES.txt drifts from the resolved dep tree).
 
 # Licenses accepted in the dep tree. Anything outside this list causes
 # `cargo about generate` to fail — forcing a human to triage new deps
@@ -27,6 +28,12 @@ accepted = [
     "CC0-1.0",
     "Zlib",
     "OpenSSL",   # aws-lc-sys / BoringSSL fork attribution
+    "CDLA-Permissive-2.0",  # webpki-root-certs (Mozilla CA data — permissive)
+    # Copyleft, accepted because carbonyl-agent is AGPL-3.0-only (#99):
+    "AGPL-3.0-only",  # this workspace's own crates (carbonyl-fingerprint, carbonyl-wreq)
+    "GPL-3.0",        # wreq-util — GPLv3 §13 makes GPL-3.0 and AGPL-3.0 compatible;
+                      # attribution required, no license conflict for the AGPL wheel.
+                      # (#100 tracks replacing wreq-util with an in-house registry.)
 ]
 
 # Treat unknown licenses as fatal. Surface them at generation time.

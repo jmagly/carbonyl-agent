@@ -619,7 +619,7 @@ The `--checksum` argument is recommended; without it `--from-file` prints a warn
 
 ### Docker fallback (opt-in)
 
-When no local binary is installed, the SDK can fall back to `docker run fathyb/carbonyl` — but this is opt-in for supply-chain safety:
+When no local binary is installed, the SDK can fall back to `docker run ghcr.io/jmagly/carbonyl` (the maintained runtime container) — but this is opt-in for supply-chain safety:
 
 ```bash
 export CARBONYL_ALLOW_DOCKER=1
@@ -737,7 +737,7 @@ Custom AI and blockchain solutions for the digital age.
 
 ## Acknowledgments
 
-Built on top of [Carbonyl](https://github.com/fathyb/carbonyl) by Fathy Boundjadj. The `roctinam/carbonyl` fork is actively maintained through the M147 Chromium line. PTY handling via [pexpect](https://github.com/pexpect/pexpect); terminal parsing via [pyte](https://github.com/selectel/pyte).
+The [`jmagly/carbonyl`](https://github.com/jmagly/carbonyl) repository is the maintained fork of the original [`fathyb/carbonyl`](https://github.com/fathyb/carbonyl), which has been inactive since early 2023. It tracks upstream Chromium stable, currently M148, and publishes runtime tarballs (and a `ghcr.io/jmagly/carbonyl` runtime container) as release assets. PTY handling via [pexpect](https://github.com/pexpect/pexpect); terminal parsing via [pyte](https://github.com/selectel/pyte).
 
 ---
 

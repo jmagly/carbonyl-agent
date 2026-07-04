@@ -7,6 +7,65 @@ and this project uses [CalVer](https://calver.org/) (`YYYY.M.PATCH`, PEP 440-com
 
 ## [Unreleased]
 
+## [2026.7.0] - 2026-07-04
+
+Runtime parity release. Brings the pinned Carbonyl runtime up to the current
+`v0.2.0-alpha.17` cut, fixes a pin split-brain that ran the QA-runner on a
+7-week-old runtime, refreshes the Docker fallback to the maintained image, and
+clears the third-party license attribution release-blocker.
+
+### Fixed
+
+- **Runtime pin split-brain** — `.carbonyl-runtime-version` declared
+  `runtime-tag=v0.2.0-alpha.17` but `runtime-hash=8f070d2720157bd0` (the
+  alpha.5/6 M148 cut). `carbonyl-agent install` resolves via the tag, but the
+  qa-runner build and CI hash-consumers grep `runtime-hash` directly — so the
+  SDK and the qa-runner ran **different runtimes**, and the qa-runner's was
+  missing the alpha.13 input-FFI widening (right-click, key modifiers,
+  multi-byte input). Bumped `runtime-hash` to `099874f855c74a61` (the alpha.17
+  runtime, headless + x11) in lockstep with the tag, and added a lockstep
+  invariant note so the two anchors can't silently drift again. (parity audit F1)
+
+### Changed
+
+- **Docker fallback** now targets the maintained `ghcr.io/jmagly/carbonyl`
+  runtime container (published upstream since carbonyl v0.2.0-alpha.10) instead
+  of the inactive `fathyb/carbonyl` image. `browser.py` pins it by digest
+  (`ghcr.io/jmagly/carbonyl@sha256:26d990c3…`); docstrings, README, CLAUDE.md,
+  and the SDLC design docs updated to match. The historical fathyb attribution
+  in the README acknowledgments is preserved. (parity audit F4a)
+- **Third-party license audit now covers the full Rust workspace** — resolves
+  the AGPL-wheel attribution release-blocker. `scripts/gen-third-party-licenses.sh`
+  generates over the workspace root (not just `carbonyl-fingerprint`);
+  `about.toml` accepts the AGPL-compatible copyleft set (`AGPL-3.0-only` for the
+  project's own crates, `GPL-3.0` for `wreq-util` — GPLv3 §13 makes it compatible
+  with the now-AGPL wheel — plus `CDLA-Permissive-2.0` for the Mozilla CA data);
+  `THIRD_PARTY_LICENSES.txt` regenerated (48 → ~198 crates, now including
+  `wreq-util 2.2.6`). A `--check` step is wired into `.gitea/workflows/check.yml`
+  to fail CI on attribution drift. (#99)
+
+### Added
+
+- Multi-arch install-resolution test coverage — parametrized tests exercise
+  asset-name + download-URL construction and tag-over-hash preference for all
+  three consumer triples (linux-x86_64, linux-aarch64, macos-arm64) on the
+  x86_64 runner. Full multi-arch *execution* jobs remain gated on runner
+  availability (macos-arm64 runtime ships upstream since alpha.7; linux-aarch64
+  runtime pending upstream carbonyl#67/#116). (#98, agent-side)
+- Parity audit + release plan at
+  `.aiwg/reports/carbonyl-parity-audit-2026-07-04.md` covering the runtime pin,
+  trusted-input FFI gaps, distribution drift, and the outstanding backlog.
+
+### Deferred
+
+- **GPG release-signature verification** in `install.py` (upstream added
+  per-asset GPG signatures in carbonyl alpha.15) is deferred to a tracked
+  follow-up. SHA-256 checksum verification remains in place. Signature
+  verification needs the maintainer's signing key pinned by fingerprint and a
+  real signed asset to validate the trust path end-to-end; it will ship once
+  that is designed and tested, rather than as unverified verification code.
+  (parity audit F4b)
+
 ## [2026.5.3] - 2026-05-20
 
 Cookie/token import from host browsers, plus three-mode QA-runner documentation.

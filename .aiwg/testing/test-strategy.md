@@ -45,7 +45,7 @@ Each level has its own pytest marker (`@pytest.mark.unit`, `integration`, `e2e`,
 | Lint | `ruff` |
 | Type check | `mypy --strict` on `src/carbonyl_agent/` |
 | HTTP mocking | `pytest-httpserver` for `install.py` integration |
-| Integration runtime | `docker run fathyb/carbonyl` for CI E2E on Linux |
+| Integration runtime | `docker run ghcr.io/jmagly/carbonyl` for CI E2E on Linux |
 
 All dev tooling lives in `pyproject.toml` under `[project.optional-dependencies] dev`.
 
@@ -64,7 +64,7 @@ Coverage is computed on the unit + integration tiers; E2E runs are additive.
 
 - **Unit**: no external resources. Stub `CarbonylBrowser` with a fake PTY that replays recorded byte streams fixtured under `tests/fixtures/pty/`.
 - **Integration**: local `pytest-httpserver` serves canned Gitea releases JSON and tarballs (generated on the fly). Daemon tests bind to a `tmp_path` socket and use a stub browser object implementing the `CarbonylBrowser` duck-type.
-- **E2E**: `docker run --rm fathyb/carbonyl` invoked through the install/Docker fallback paths. Pages under test: `https://example.com` (stable public) and a local `http.server` serving `tests/fixtures/pages/*.html`.
+- **E2E**: `docker run --rm ghcr.io/jmagly/carbonyl` invoked through the install/Docker fallback paths. Pages under test: `https://example.com` (stable public) and a local `http.server` serving `tests/fixtures/pages/*.html`.
 - **Fixtures**: all binary fixtures ≤ 10 KB each; larger recordings compressed as `.xz`.
 
 ## 7. Environments
@@ -87,7 +87,7 @@ Coverage is computed on the unit + integration tiers; E2E runs are additive.
 - Exit: daemon protocol contract tests pass; install pipeline passes checksum + tarball safety tests.
 
 **E2E tests**
-- Entry: integration tier green, `fathyb/carbonyl` image pullable.
+- Entry: integration tier green, `ghcr.io/jmagly/carbonyl` image pullable.
 - Exit: every public API example in README executes without error.
 
 **Release gate**

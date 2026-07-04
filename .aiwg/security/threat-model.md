@@ -13,7 +13,7 @@
 1. **Network → local disk**: `install.py` downloads runtime tarballs from `git.integrolabs.net` over HTTPS and extracts them under `~/.local/share/carbonyl/bin/`.
 2. **Local process ↔ daemon**: `DaemonClient` talks to a daemon process over a Unix domain socket in `~/.local/share/carbonyl/sessions/<name>.sock`.
 3. **Browser ↔ SDK**: PTY byte stream parsed by `pyte`.
-4. **Docker fallback**: `docker run fathyb/carbonyl` pulls an external image.
+4. **Docker fallback**: `docker run ghcr.io/jmagly/carbonyl` pulls an external image.
 
 ## 2. Assets
 
@@ -32,7 +32,7 @@
 | **T4** | Path traversal in session names — `SessionManager.create("../../etc")` could escape the session root and read/write outside the intended directory, or the daemon socket path could be placed arbitrarily. | Tampering | Low | Low–Medium | Unvalidated string handling | Validate session names against `^[A-Za-z0-9_.-]{1,64}$` at the public API boundary. Raise `ValueError` on mismatch. Regression test with traversal vectors. (US-004) | Maintainer |
 | **T5** | PTY injection from malicious page — a page-controlled byte stream could emit terminal escape sequences that confuse `pyte` or downstream consumers of `page_text()` (e.g., a caller passing the text to a shell). `pyte` itself is robust, but consumers may not sanitize. | Tampering | Low | Low | Relies on `pyte` robustness | Document in README that `page_text()` output is untrusted; add a `safe_text()` helper that strips non-printable characters. Fuzz `pyte` feed path with `hypothesis` (part of test strategy). | Maintainer |
 | **T6** | Dependency compromise — malicious update to `pexpect` or `pyte` via PyPI typosquat or account takeover. | Tampering / Elevation of Privilege | Low–Medium | High | `pyproject.toml` uses lower-bound ranges only | Pin exact versions in a `constraints.txt` used by CI; enable Dependabot/Renovate on GitHub mirror; add `pip-audit` step to CI. Consider moving to hash-pinned `uv lock`. (US-005) | Maintainer |
-| **T7** | Docker fallback pulls untrusted image — `docker run fathyb/carbonyl` runs whatever tag `latest` currently points to on Docker Hub. If `fathyb/carbonyl` is compromised or the user typoed an env override, arbitrary containerized code runs. | Tampering / Elevation of Privilege | Low | High (container runs in user's Docker context) | Implicit trust in `fathyb/carbonyl:latest` | Pin image by digest (`fathyb/carbonyl@sha256:...`) in the fallback code; document the pin in README; surface a warning when falling back; require `CARBONYL_ALLOW_DOCKER=1` env var to opt in. (US-006) | Maintainer |
+| **T7** | Docker fallback pulls untrusted image — `docker run ghcr.io/jmagly/carbonyl` runs whatever tag `latest` currently points to on GHCR (GitHub Container Registry). If `ghcr.io/jmagly/carbonyl` is compromised or the user typoed an env override, arbitrary containerized code runs. | Tampering / Elevation of Privilege | Low | High (container runs in user's Docker context) | Implicit trust in `ghcr.io/jmagly/carbonyl:latest` | Pin image by digest (`ghcr.io/jmagly/carbonyl@sha256:...`) in the fallback code; document the pin in README; surface a warning when falling back; require `CARBONYL_ALLOW_DOCKER=1` env var to opt in. (US-006) | Maintainer |
 
 ## 4. STRIDE Coverage Summary
 

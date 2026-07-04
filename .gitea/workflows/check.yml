@@ -14,12 +14,20 @@ on:
       - 'crates/**'
       - '.gitea/workflows/check.yml'
       - '.carbonyl-fingerprint-version'
+      - 'about.toml'
+      - 'about.hbs'
+      - 'THIRD_PARTY_LICENSES.txt'
+      - 'scripts/gen-third-party-licenses.sh'
   pull_request:
     branches: [main]
     paths:
       - 'crates/**'
       - '.gitea/workflows/check.yml'
       - '.carbonyl-fingerprint-version'
+      - 'about.toml'
+      - 'about.hbs'
+      - 'THIRD_PARTY_LICENSES.txt'
+      - 'scripts/gen-third-party-licenses.sh'
   workflow_dispatch:
 
 jobs:
@@ -83,6 +91,20 @@ jobs:
             -e DEBIAN_FRONTEND=noninteractive \
             rust:latest \
             sh -c "apt-get update -qq && apt-get install -y -qq clang cmake libclang-dev libssl-dev pkg-config python3-dev && cargo test --workspace --all-targets"
+
+      # Third-party attribution parity (#99). Regenerating in --check mode
+      # over the full workspace fails CI if THIRD_PARTY_LICENSES.txt drifts
+      # from the resolved dep tree (e.g. a new/updated crate license that
+      # about.toml doesn't yet accept). cargo-about reads metadata + license
+      # files only — no clang/cmake build deps needed.
+      - name: third-party license attribution (--check)
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/.repo-clone:/workspace" \
+            -w /workspace \
+            -e CARGO_HOME=/tmp/cargo \
+            rust:latest \
+            sh -c "cargo install cargo-about --features cli --locked 2>/dev/null || cargo install cargo-about --features cli; scripts/gen-third-party-licenses.sh --check"
 
       # Verifies `.carbonyl-fingerprint-version` matches the resolved
       # wreq SHA in Cargo.lock (per ADR-005 bus-factor mitigation #1,

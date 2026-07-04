@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "carbonyl-agent"
-version = "2026.5.3"
+version = "2026.7.0"
 description = "Python automation SDK for the Carbonyl headless browser"
 readme = "README.md"
 requires-python = ">=3.11"
