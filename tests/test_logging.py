@@ -84,13 +84,27 @@ class TestEnableDebug:
 
 class TestHandlerSetup:
     def test_handler_attached_only_once(self):
+        from carbonyl_agent import _logging as _logmod
+
+        root = logging.getLogger("carbonyl_agent")
+        # Force a clean, unconfigured baseline. get_logger()'s handler attach is
+        # guarded by a module-global _CONFIGURED flag AND `if not
+        # logger.handlers` — so by the time this test runs mid-session the SDK
+        # handler may already be attached (or, if pytest's logging capture
+        # attached a handler first, may have been skipped entirely). pytest's
+        # LogCaptureHandler also subclasses logging.StreamHandler, so it would
+        # be miscounted. Reset the flag and strip leaked handlers so we measure
+        # only the SDK's own attach-once behaviour.
+        _logmod._CONFIGURED = False
+        root.handlers.clear()
         get_logger("a")
         get_logger("b")
         get_logger("c")
-        # Single StreamHandler regardless of how many sub-loggers we ask for
-        root = logging.getLogger("carbonyl_agent")
-        stream_handlers = [h for h in root.handlers if isinstance(h, logging.StreamHandler)]
-        assert len(stream_handlers) == 1
+        # The SDK attaches exactly one *plain* StreamHandler (to sys.stderr),
+        # regardless of how many sub-loggers we ask for. Match the exact type so
+        # pytest's StreamHandler subclasses are never counted.
+        sdk_handlers = [h for h in root.handlers if type(h) is logging.StreamHandler]
+        assert len(sdk_handlers) == 1
 
     def test_propagation_disabled(self):
         get_logger("test")

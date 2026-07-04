@@ -36,6 +36,13 @@ clears the third-party license attribution release-blocker.
   under `-D warnings`. Collapsed the nested `if ext_data.len() >= 2` bodies into
   match guards (behavior-preserving — an unmatched guard falls to the `_ => {}`
   no-op). Fixed the code rather than allowing the lint.
+- **Flaky `test_handler_attached_only_once`** — the test counted every
+  `logging.StreamHandler` on the `carbonyl_agent` logger, but pytest's
+  `LogCaptureHandler` subclasses `StreamHandler` and leaks onto the logger under
+  the fuller CI test set (`[dev,egress,cookies]` + hypothesis), so the count
+  flaked to 2. Reset the module's configure-once flag and strip leaked handlers
+  first, then count only the SDK's exact-type handler — measuring the real
+  attach-once behaviour independent of test ordering.
 
 ### Changed
 
