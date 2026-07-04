@@ -25,6 +25,12 @@ clears the third-party license attribution release-blocker.
   multi-byte input). Bumped `runtime-hash` to `099874f855c74a61` (the alpha.17
   runtime, headless + x11) in lockstep with the tag, and added a lockstep
   invariant note so the two anchors can't silently drift again. (parity audit F1)
+- **e2e prior-runtime leg rotted to a 404** — the `e2e.yml` matrix pinned a
+  `runtime-<hash>` release (`runtime-dd69bef0ea4b2512`) for its regression leg,
+  but upstream prunes stale `runtime-<hash>` cuts (carbonyl v0.2.0-alpha.10), so
+  the install 404'd and the leg failed on every run. Repinned to the durable
+  semantic tag `v0.2.0-alpha.15` (`v*` releases are never pruned) with a note to
+  keep prior legs on semantic tags.
 
 ### Changed
 

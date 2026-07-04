@@ -42,9 +42,16 @@ jobs:
           - runtime: pinned
             install_args: ""
             label: ".carbonyl-runtime-version (current)"
+          # The prior-runtime regression leg MUST pin a semantic `v*` tag, not
+          # a `runtime-<hash>` release: upstream carbonyl keeps only the latest
+          # runtime cut and prunes stale `runtime-<hash>` releases/tags (carbonyl
+          # v0.2.0-alpha.10, jmagly/carbonyl#144), so a hashed prior leg rots to
+          # a 404. `v*` source releases are never pruned and carry the runtime
+          # tarballs on GitHub. Bump this to the previous release when the pin
+          # advances. (was runtime-dd69bef0ea4b2512, pruned upstream)
           - runtime: previous
-            install_args: "--tag runtime-dd69bef0ea4b2512"
-            label: "runtime-dd69bef0ea4b2512 (prior)"
+            install_args: "--tag v0.2.0-alpha.15"
+            label: "v0.2.0-alpha.15 (prior)"
     name: e2e (${{ matrix.label }})
     steps:
       - name: Checkout (manual git clone)
