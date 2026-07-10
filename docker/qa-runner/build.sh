@@ -1,9 +1,9 @@
 #!/bin/bash
 # build.sh — build carbonyl-agent-qa-runner against the pinned runtime.
 #
-# Reads .carbonyl-runtime-version at the repo root for the runtime hash,
-# constructs the corresponding runtime-x11-<hash> tarball URL, and runs
-# `docker build` with that as the CARBONYL_RUNTIME_URL build arg.
+# Reads .carbonyl-runtime-version at the repo root for the runtime hash when an
+# internal release base is configured, or uses CARBONYL_RUNTIME_URL directly.
+# Then runs `docker build` with that as the CARBONYL_RUNTIME_URL build arg.
 #
 # Override the resolved hash by exporting CARBONYL_RUNTIME_HASH=<hex>.
 # Override the entire URL by exporting CARBONYL_RUNTIME_URL=<url>.
@@ -16,8 +16,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PIN_FILE="$REPO_ROOT/.carbonyl-runtime-version"
-GITEA_BASE="${GITEA_BASE:-https://git.integrolabs.net}"
-GITEA_REPO="${GITEA_REPO:-roctinam/carbonyl}"
+INTERNAL_RELEASE_BASE="${CARBONYL_INTERNAL_RELEASE_BASE:-}"
+INTERNAL_RELEASE_REPO="${CARBONYL_INTERNAL_RELEASE_REPO:-roctinam/carbonyl}"
 
 # --- Resolve the runtime hash ----------------------------------------------
 
@@ -26,7 +26,12 @@ if [[ -n "${CARBONYL_RUNTIME_URL:-}" ]]; then
     echo "Using CARBONYL_RUNTIME_URL: $URL" >&2
 elif [[ -n "${CARBONYL_RUNTIME_HASH:-}" ]]; then
     HASH="$CARBONYL_RUNTIME_HASH"
-    URL="$GITEA_BASE/$GITEA_REPO/releases/download/runtime-x11-$HASH/x86_64-unknown-linux-gnu.tgz"
+    if [[ -z "$INTERNAL_RELEASE_BASE" ]]; then
+        echo "ERROR: CARBONYL_RUNTIME_HASH requires CARBONYL_INTERNAL_RELEASE_BASE." >&2
+        echo "For public builds, pass CARBONYL_RUNTIME_URL=https://github.com/..." >&2
+        exit 2
+    fi
+    URL="$INTERNAL_RELEASE_BASE/$INTERNAL_RELEASE_REPO/releases/download/runtime-x11-$HASH/x86_64-unknown-linux-gnu.tgz"
     echo "Using CARBONYL_RUNTIME_HASH=$HASH" >&2
 else
     if [[ ! -f "$PIN_FILE" ]]; then
@@ -42,7 +47,12 @@ else
         echo "       CARBONYL_RUNTIME_URL." >&2
         exit 2
     fi
-    URL="$GITEA_BASE/$GITEA_REPO/releases/download/runtime-x11-$HASH/x86_64-unknown-linux-gnu.tgz"
+    if [[ -z "$INTERNAL_RELEASE_BASE" ]]; then
+        echo "ERROR: pinned runtime-hash requires CARBONYL_INTERNAL_RELEASE_BASE." >&2
+        echo "For public builds, pass CARBONYL_RUNTIME_URL=https://github.com/..." >&2
+        exit 2
+    fi
+    URL="$INTERNAL_RELEASE_BASE/$INTERNAL_RELEASE_REPO/releases/download/runtime-x11-$HASH/x86_64-unknown-linux-gnu.tgz"
     echo "Using pinned runtime hash from $PIN_FILE: $HASH" >&2
 fi
 

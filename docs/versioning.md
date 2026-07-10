@@ -40,7 +40,7 @@ v2026.5.0
 v2026.5.1
 ```
 
-The release workflows (`.gitea/workflows/release.yml`, `.github/workflows/release.yml`) trigger on `v*` and validate that the tag matches `pyproject.toml`'s `version` field.
+The GitHub release workflow (`.github/workflows/release.yml`) triggers on `v*` and validates that the tag matches `pyproject.toml`'s `version` field.
 
 ## Why CalVer
 

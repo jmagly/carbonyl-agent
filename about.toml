@@ -8,7 +8,7 @@
 # for every redistributable component.
 #
 # Regenerate with: scripts/gen-third-party-licenses.sh
-# CI parity check: same script with --check, wired into .gitea/workflows/check.yml
+# CI parity check: same script with --check, wired into .github/workflows/check.yml
 # (fails CI if THIRD_PARTY_LICENSES.txt drifts from the resolved dep tree).
 
 # Licenses accepted in the dep tree. Anything outside this list causes

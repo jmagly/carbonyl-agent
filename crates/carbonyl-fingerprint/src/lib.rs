@@ -1,6 +1,6 @@
 //! Carbonyl fingerprint registry — owned persona bundles for trusted automation.
 //!
-//! See `roctinam/carbonyl` →
+//! See `jmagly/carbonyl` →
 //! `.aiwg/working/trusted-automation/07-fingerprint-registry-design.md`
 //! for the authoritative spec.
 //!

@@ -60,7 +60,7 @@ clears the third-party license attribution release-blocker.
   project's own crates, `GPL-3.0` for `wreq-util` — GPLv3 §13 makes it compatible
   with the now-AGPL wheel — plus `CDLA-Permissive-2.0` for the Mozilla CA data);
   `THIRD_PARTY_LICENSES.txt` regenerated (48 → ~198 crates, now including
-  `wreq-util 2.2.6`). A `--check` step is wired into `.gitea/workflows/check.yml`
+  `wreq-util 2.2.6`). A `--check` step is wired into `.github/workflows/check.yml`
   to fail CI on attribution drift. (#99)
 
 ### Added
@@ -103,7 +103,7 @@ Cookie/token import from host browsers, plus three-mode QA-runner documentation.
 
 ### Changed
 
-- `.gitea/workflows/ci.yml` typecheck and test jobs now install the `[cookies]` extra so `cryptography` + `secretstorage` stubs are resolvable and the Chromium-decrypt test path runs under all three Python versions.
+- `.github/workflows/ci.yml` typecheck and test jobs now install the `[cookies]` extra so `cryptography` + `secretstorage` stubs are resolvable and the Chromium-decrypt test path runs under all three Python versions.
 
 ### Closed
 
@@ -116,7 +116,7 @@ Runtime pin bump for the M148 release cut on `roctinam/carbonyl`.
 
 ### Changed
 
-- `.carbonyl-runtime-version` pinned to `8f070d2720157bd0`, the M148 (148.0.7778.167) baseline shipped in carbonyl runtime v0.2.0-alpha.5. `carbonyl-agent install` (default `--tag`) and the qa-runner Docker image now consume the M148 runtime tarball. Triggers automatic qa-runner image rebuild via `.gitea/workflows/build-qa-runner.yml`. (roctinam/carbonyl#70)
+- `.carbonyl-runtime-version` pinned to `8f070d2720157bd0`, the M148 (148.0.7778.167) baseline shipped in carbonyl runtime v0.2.0-alpha.5. `carbonyl-agent install` (default `--tag`) and the qa-runner Docker image now consume the M148 runtime tarball. Triggers automatic qa-runner image rebuild via `.github/workflows/build-qa-runner.yml`. (jmagly/carbonyl#70)
 
 ## [2026.5.1] - 2026-05-17
 
@@ -124,7 +124,7 @@ Maintenance release. Real-browser fingerprint refresh (Chrome 147 → 148, Firef
 
 ### Added
 
-- Airgap install via `carbonyl-agent install --from-file <tarball>` and `--dry-run` for offline / sandboxed hosts that can't reach Gitea release assets directly. (#95, #117)
+- Airgap install via `carbonyl-agent install --from-file <tarball>` and `--dry-run` for offline / sandboxed hosts that can't reach GitHub release assets directly. (#95, #117)
 - Size-based rotation for the egress audit log at `~/.local/state/carbonyl-agent/egress-audit.log` — caps file size and rotates to numbered backups so long-running daemons don't accumulate unbounded audit history. (#93, #116)
 - TestPyPI dry-run workflow (`.github/workflows/release-testpypi.yml`) — manual `workflow_dispatch` publish to TestPyPI for first-of-a-line release verification, mirroring the production release build pipeline. (#12 follow-up, #112)
 - `scripts/check-build-env.sh` preflight that surfaces missing Rust prerequisites (clang, cmake, libclang-dev, libssl-dev, pkg-config, python3-dev) before they manifest as opaque BoringSSL/boring-sys2 build failures. Documented in README. (#109)
@@ -142,7 +142,7 @@ Maintenance release. Real-browser fingerprint refresh (Chrome 147 → 148, Firef
 ### Fixed
 
 - Removed stale "TODO; see entry point" comments referring to Rule H (HKDF-Expand deterministic noise-seed derivation) — Rule H is implemented in `seed::derive_canvas_noise` / `seed::derive_audio_noise`. Added Rule H to the enforced-rules list and dropped it from the "deliberately not implemented" set. (#91)
-- Rust-crates CI (`check.yml`) checkout step on `pull_request` events: Gitea sets `GITHUB_REF_NAME` to the PR number (e.g. `109`), not a branch name. Replaced `git clone --branch ${GITHUB_REF_NAME}` with explicit fetch-by-SHA so the workflow works on both push and pull_request events. (#107, #108, #111)
+- Rust-crates CI (`check.yml`) checkout step on `pull_request` events: legacy internal CI set `GITHUB_REF_NAME` to the PR number (e.g. `109`), not a branch name. Replaced `git clone --branch ${GITHUB_REF_NAME}` with explicit fetch-by-SHA so the workflow works on both push and pull_request events. (#107, #108, #111)
 - Documented Rust toolchain prerequisites in the contributor-onboarding section of the README; the build-env preflight script (above) shifts these failures left from "opaque link error after 4 minutes of compilation" to "explicit missing-package report in 2 seconds." (#109)
 
 ### Known issues
@@ -190,7 +190,7 @@ Persona-bound browser + egress. The headline change: a single `Persona` object n
 - `carbonyl_agent.wreq_transport.WreqTransport` — an `httpx.BaseTransport` wrapper that delegates to the optional `carbonyl_wreq` native module. `EgressClient` auto-detects at construction; falls back to httpx silently when the native module isn't built. New audit-row `transport` field disambiguates `wreq` vs `httpx-fallback`. (#83)
 - PyO3 binding in `carbonyl-wreq` — single `send_request` function with an embedded multi-threaded tokio runtime (`OnceLock<Runtime>`, shared across threads, GIL-released during IO). Build with `maturin develop --manifest-path crates/carbonyl-wreq/Cargo.toml --features python`. (#85)
 - New `[wreq]` extra (declares intent; the native module is a developer build until pip-install integration lands). (#83)
-- `.gitea/workflows/conformance.yml` — gates PRs touching fingerprint, wreq, or egress paths on `cargo {clippy,test} --workspace --all-targets --features carbonyl-wreq/python`. (#84)
+- `.github/workflows/conformance.yml` — gates PRs touching fingerprint, wreq, or egress paths on `cargo {clippy,test} --workspace --all-targets --features carbonyl-wreq/python`. (#84)
 - Rust workspace conversion: top-level `Cargo.toml` over both crates; single root `Cargo.lock`. (#80)
 
 ### Added — Operational
@@ -201,7 +201,7 @@ Persona-bound browser + egress. The headline change: a single `Persona` object n
 
 - Carbonyl runtime pin bumped: `runtime-hash=dd69bef0ea4b2512` → `runtime-hash=9b3ba53adcd8d330` (Carbonyl v0.2.0-alpha.4). E2E compatibility matrix rotated so `dd69bef0ea4b2512` now sits in the prior-runtime slot. (#51)
 - ADR-005 marked Accepted. New Phase 1 → Phase 2 transition notes covering the sentinel preservation in the fallback path, the `transport`-tag field, the Layer 1 vs Layer 2 conformance separation, and cross-references to the new artifacts. (#64, #75)
-- `.gitea/workflows/check.yml` runs at workspace root and installs `clang cmake libclang-dev libssl-dev pkg-config python3-dev` before invoking cargo, for the boring-sys2 + PyO3 build path. (#80, #81, #85)
+- `.github/workflows/check.yml` runs at workspace root and installs `clang cmake libclang-dev libssl-dev pkg-config python3-dev` before invoking cargo, for the boring-sys2 + PyO3 build path. (#80, #81, #85)
 - `pyproject.toml` declares `[project.urls]` with GitHub canonical Homepage / Repository / Issues / Changelog for PyPI metadata. Project version bumped to `0.2.0a1`.
 
 ### Fixed
@@ -214,7 +214,7 @@ Persona-bound browser + egress. The headline change: a single `Persona` object n
 
 First test release of carbonyl-agent. The full feature set documented under
 [Unreleased] above is included verbatim — this prerelease tag exists to
-exercise the Gitea release pipeline (sdist + wheel + sha256 + pdoc bundle)
+exercise the GitHub release pipeline (sdist + wheel + sha256 + pdoc bundle)
 end-to-end. The 0.1.0 GA cut, including PyPI publish via OIDC trusted
 publisher (#12), follows once the publisher is configured.
 
@@ -229,7 +229,7 @@ publisher (#12), follows once the publisher is configured.
 - `daemon_status()` includes `input_backend` per session, sourced from the live handshake when the daemon is up or from session metadata when it's stopped (#40)
 - New `carbonyl_agent.UinputEmitter` — emits keyboard and mouse events via `/dev/uinput` so the browser receives them as `event.isTrusted = true`. Required for scripted login on modern SPAs (X, LinkedIn, etc.) where React-controlled inputs reject synthetic events. Companion exceptions: `UinputUnavailableError`, `UnsupportedKeyError` (#36)
 - `CarbonylBrowser(input_backend="uinput")` — opt-in routing of `send()`, `send_key()`, `click()`, `mouse_move()`, `mouse_path()` through the uinput emitter. Default remains `"pty"` for backward compatibility. Uinput backend requires the `carbonyl-agent-qa-runner` container (or equivalent Xorg + uinput environment); see ADR-002 rev 2 for the rationale (#36)
-- CI workflow `.gitea/workflows/build-qa-runner.yml` that builds and publishes `carbonyl-agent-qa-runner` to the Gitea container registry on every push to `main` that touches `docker/qa-runner/**` or `.carbonyl-runtime-version`. Image tags: `runtime-<hash>`, `sha-<short-git-sha>`, plus `latest` on main. Includes a post-build smoke test inside the published image (uinput import + Carbonyl `--version`) (#38)
+- CI workflow `.github/workflows/build-qa-runner.yml` that builds and publishes `carbonyl-agent-qa-runner` to GHCR on every push to `main` that touches `docker/qa-runner/**` or `.carbonyl-runtime-version`. Image tags: `runtime-<hash>`, `sha-<short-git-sha>`, plus `latest` on main. Includes a post-build smoke test inside the published image (uinput import + Carbonyl `--version`) (#38)
 - `.carbonyl-runtime-version` pin file at the repo root — single source of truth for the Carbonyl runtime hash consumed by the SDK installer, the qa-runner Docker image, and CI workflows. New helper module `carbonyl_agent.runtime_pin` exposes `read_pinned_hash()` and `resolve_default_tag()` (#39)
 - `docker/qa-runner/build.sh` — wrapper around `docker build` that reads the pin file and constructs the right `CARBONYL_RUNTIME_URL` build-arg automatically. `CARBONYL_RUNTIME_HASH` / `CARBONYL_RUNTIME_URL` env overrides supported (#39)
 - `CARBONYL_RUNTIME_TAG` env var: explicit override that takes precedence over the pin file when running `carbonyl-agent install` (#39)
@@ -247,7 +247,7 @@ Initial feature inventory referenced verbatim by the v0.1.0a1 release entry abov
 - `SessionManager` — named Chromium user-data-dir session management (create, fork, snapshot, restore)
 - `ScreenInspector` — terminal coordinate visualization and region analysis
 - `DaemonClient` and daemon server — persistent browser instances over Unix domain sockets
-- `carbonyl-agent install` CLI — download Carbonyl runtime binary from Gitea releases
+- `carbonyl-agent install` CLI — download Carbonyl runtime binary from GitHub releases
 - `carbonyl-agent status` CLI — report installed runtime location and version
 - `carbonyl-agent daemon {start,stop,status,attach}` CLI — manage persistent browser daemons
 - `DaemonClient`, `start_daemon`, `stop_daemon` re-exported from top-level `carbonyl_agent` package for direct import
@@ -258,7 +258,7 @@ Initial feature inventory referenced verbatim by the v0.1.0a1 release entry abov
 - Docker fallback opt-in gate (`CARBONYL_ALLOW_DOCKER=1`) with pinned image digest
 - Session name validation (path traversal prevention, length limits)
 - Comprehensive test suite: unit, integration, property tests (hypothesis)
-- CI pipelines for Gitea Actions and GitHub Actions (py3.11/3.12/3.13 matrix)
+- CI pipelines for GitHub Actions (py3.11/3.12/3.13 matrix)
 - Type annotations with `mypy --strict` compliance
 - Dependency pinning with `pip-audit` in CI
 

@@ -4,7 +4,7 @@ version = "0.0.1-alpha.1"
 edition = "2021"
 description = "wreq-backed implementation of the carbonyl-fingerprint HttpClient trait"
 license = "AGPL-3.0-only"
-repository = "https://git.integrolabs.net/roctinam/carbonyl-agent"
+repository = "https://github.com/jmagly/carbonyl-agent"
 
 [lib]
 name = "carbonyl_wreq"
@@ -28,7 +28,7 @@ thiserror = "2"
 
 # wreq + wreq-util provide the browser-emulating HTTP/2 client. wreq
 # pulls boring-sys2 (BoringSSL fork) which requires clang + cmake at
-# build time — the project's `.gitea/workflows/check.yml` installs
+# build time — the project's `.github/workflows/check.yml` installs
 # both before invoking cargo (`Refs: roctinam/carbonyl-agent#81`).
 wreq = "5"
 wreq-util = "2"

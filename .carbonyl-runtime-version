@@ -5,12 +5,12 @@
 #
 # Format: one `key=value` line per setting. Comments and blank lines ignored.
 # `runtime-tag` is the public semantic release used by default. It resolves to
-# GitHub release assets first, with the Gitea release as a fallback mirror.
+# GitHub release assets.
 # `runtime-hash` is retained as the prior internal/source-builder anchor for
-# CI paths that still consume hash-tagged Gitea runtime releases directly.
+# CI paths that still consume hash-tagged internal runtime releases directly.
 runtime-tag=v0.2.0-alpha.17
 
-# Hash refers to a `runtime-<hash>` Gitea release on roctinam/carbonyl.
+# Hash refers to an internal `runtime-<hash>` release.
 # When the X11 ozone variant is needed, the corresponding tarball is
 # `runtime-x11-<hash>` at the same release.
 #

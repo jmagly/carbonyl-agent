@@ -19,7 +19,7 @@ carbonyl-agent install
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
-[![Carbonyl M148](https://img.shields.io/badge/carbonyl-M148-green?style=flat-square)](https://git.integrolabs.net/roctinam/carbonyl)
+[![Carbonyl M148](https://img.shields.io/badge/carbonyl-M148-green?style=flat-square)](https://github.com/jmagly/carbonyl)
 
 [![Built With AIWG](https://aiwg.io/assets/badges/built-with-aiwg-dark.png)](https://aiwg.io)
 
@@ -31,7 +31,7 @@ carbonyl-agent install
 
 ## What carbonyl-agent Is
 
-`carbonyl-agent` is the Python automation SDK for [Carbonyl](https://git.integrolabs.net/roctinam/carbonyl) — a Chromium-based headless browser that renders into terminal text. The SDK spawns Carbonyl via PTY, parses the screen via `pyte`, and exposes a high-level API for navigation, clicking, text extraction, and session persistence. It is designed for agent-driven web interaction: scripted scraping, automated form submission, and LLM-driven browsing loops that need a real browser but not a real display.
+`carbonyl-agent` is the Python automation SDK for [Carbonyl](https://github.com/jmagly/carbonyl) — a Chromium-based headless browser that renders into terminal text. The SDK spawns Carbonyl via PTY, parses the screen via `pyte`, and exposes a high-level API for navigation, clicking, text extraction, and session persistence. It is designed for agent-driven web interaction: scripted scraping, automated form submission, and LLM-driven browsing loops that need a real browser but not a real display.
 
 Unlike Playwright or Selenium, carbonyl-agent returns **terminal text**, not a DOM. This makes it fast (no screenshot decode), cheap (no GPU, no window server), and well-suited for the context windows of LLM-driven agents.
 
@@ -525,11 +525,11 @@ with CarbonylBrowser(
 **Recommended deployment**: run inside the `carbonyl-agent-qa-runner` container, which packages Xorg, the X-Carbonyl runtime, and uinput passthrough so you don't have to assemble the environment yourself:
 
 ```bash
-docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:latest
+docker pull ghcr.io/jmagly/carbonyl-agent-qa-runner:latest
 cd docker/qa-runner && ./run.sh pytest tests/
 ```
 
-See `roctinam/carbonyl/docs/runtime-modes.md` for the full deployment-shape reference (terminal-only / x11+uinput / x11+uinput+X-mirror) and ADR-002 rev 2 for the architecture rationale.
+See [`jmagly/carbonyl/docs/runtime-modes.md`](https://github.com/jmagly/carbonyl/blob/main/docs/runtime-modes.md) for the full deployment-shape reference (terminal-only / x11+uinput / x11+uinput+X-mirror) and ADR-002 rev 2 for the architecture rationale.
 
 ### Composing flags for specific scenarios
 
@@ -582,15 +582,15 @@ Each `carbonyl-agent` release pins a Carbonyl runtime. CI runs the full E2E suit
 | `2026.4.x` and earlier | older `v0.2.0-alpha.*` tags | v0.2.0-alpha.3 (M147) and earlier | **Best-effort** — no longer exercised in CI (#127) |
 | any | older `runtime-*` tags | various | Best-effort; not in CI |
 
-The canonical runtime tag list lives at [github.com/jmagly/carbonyl/releases](https://github.com/jmagly/carbonyl/releases) (mirror: [git.integrolabs.net/roctinam/carbonyl](https://git.integrolabs.net/roctinam/carbonyl)). The current pin for this checkout is in [`.carbonyl-runtime-version`](.carbonyl-runtime-version).
+The canonical runtime tag list lives at [github.com/jmagly/carbonyl/releases](https://github.com/jmagly/carbonyl/releases). The current pin for this checkout is in [`.carbonyl-runtime-version`](.carbonyl-runtime-version).
 
-**Pinning a different runtime**: prefer `runtime-tag=v<version>` in `.carbonyl-runtime-version` for end-user installs. Semantic tags download the public GitHub release asset first, fall back to the Gitea mirror, verify the `.sha256` sidecar, and assert `carbonyl --version` after extraction. `runtime-hash=<hash>` remains supported for internal/source-builder Gitea runtime releases. Override on the command line with `--tag v<version>` or `--tag runtime-<hash>` for a one-off install.
+**Pinning a different runtime**: prefer `runtime-tag=v<version>` in `.carbonyl-runtime-version` for end-user installs. Semantic tags download the public GitHub release asset, verify the `.sha256` sidecar, and assert `carbonyl --version` after extraction. `runtime-hash=<hash>` remains supported only for internal/source-builder releases when `CARBONYL_INTERNAL_RELEASE_BASE` is configured. Override on the command line with `--tag v<version>` for a one-off public install.
 
 **`CARBONYL_BIN` override**: if you set `CARBONYL_BIN=/path/to/carbonyl`, the SDK uses that binary unconditionally — the runtime hash matrix above does not apply. You are responsible for ensuring the binary is a compatible Carbonyl build. See [Binary Search Order](#binary-search-order) for the full precedence chain.
 
 ### Airgap / offline install (#95)
 
-`carbonyl-agent install` downloads a runtime tarball from the GitHub or Gitea release for `roctinam/carbonyl`. Hosts without that network access have three options:
+`carbonyl-agent install` downloads a runtime tarball from the GitHub release for `jmagly/carbonyl`. Hosts without that network access have three options:
 
 **Option 1 — `--from-file`**: download the tarball on a connected host, carry it across, install from the local file.
 
@@ -669,14 +669,14 @@ for attempt in range(3):
 
 ### Related projects
 
-- **[carbonyl](https://git.integrolabs.net/roctinam/carbonyl)** — the Chromium fork that produces the runtime binary
-- **[carbonyl-fleet](https://git.integrolabs.net/roctinam/carbonyl-fleet)** — server for managing N concurrent Carbonyl instances over PTY + Unix socket
+- **[carbonyl](https://github.com/jmagly/carbonyl)** — the Chromium fork that produces the runtime binary
+- **[carbonyl-fleet](https://github.com/jmagly/carbonyl-fleet)** — server for managing N concurrent Carbonyl instances over PTY + Unix socket
 
 ---
 
 ## Contributing
 
-PRs and issues welcome at [git.integrolabs.net/roctinam/carbonyl-agent](https://git.integrolabs.net/roctinam/carbonyl-agent) or [github.com/jmagly/carbonyl-agent](https://github.com/jmagly/carbonyl-agent).
+PRs and issues welcome at [github.com/jmagly/carbonyl-agent](https://github.com/jmagly/carbonyl-agent).
 
 - Run the test suite: `pytest`
 - Type-check: `mypy --strict src/`
@@ -686,7 +686,7 @@ PRs and issues welcome at [git.integrolabs.net/roctinam/carbonyl-agent](https://
 
 ## Community & Support
 
-- **Issues**: [git.integrolabs.net/roctinam/carbonyl-agent/issues](https://git.integrolabs.net/roctinam/carbonyl-agent/issues)
+- **Issues**: [github.com/jmagly/carbonyl-agent/issues](https://github.com/jmagly/carbonyl-agent/issues)
 - **Discussions**: [github.com/jmagly/carbonyl-agent/discussions](https://github.com/jmagly/carbonyl-agent/discussions)
 
 ---

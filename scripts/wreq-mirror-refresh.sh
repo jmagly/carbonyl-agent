@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Refreshes the cold mirror of the wreq source tarball at the SHA
+# Refreshes the cold release asset of the wreq source tarball at the SHA
 # pinned in `.carbonyl-fingerprint-version`. Per ADR-005 §"Bus-factor
 # mitigation plan" item 2.
 #
@@ -9,16 +9,12 @@
 #   2. Skip silently if pin is TBD-#44 (pre-#44 state)
 #   3. Download tarball from upstream at the pinned SHA
 #   4. Compute SHA-256 checksum
-#   5. Upload as a Gitea release asset on roctinam/carbonyl-agent
+#   5. Upload as a GitHub release asset on jmagly/carbonyl-agent
 #      tagged `wreq-mirror-<short-sha>`
 #
 # Requires:
-#   - A Gitea token at one of the standard locations:
-#     ~/.config/gitea/token, $GITEA_TOKEN env var, or
-#     `gh auth token`-style fallback documented in the project's
-#     token-security rule. The token needs release-write scope on
-#     roctinam/carbonyl-agent.
-#   - curl, jq, sha256sum, tar
+#   - GitHub CLI authenticated with release-write access to jmagly/carbonyl-agent
+#   - curl, gh, sha256sum
 #
 # Usage:
 #   scripts/wreq-mirror-refresh.sh                # refresh from pin
@@ -33,8 +29,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PIN_FILE="${REPO_ROOT}/.carbonyl-fingerprint-version"
-GITEA_HOST="${GITEA_HOST:-git.integrolabs.net}"
-MIRROR_REPO="${MIRROR_REPO:-roctinam/carbonyl-agent}"
+MIRROR_REPO="${MIRROR_REPO:-jmagly/carbonyl-agent}"
 
 DRY_RUN=0
 VERIFY_ONLY=0
@@ -107,7 +102,7 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 
 echo "Pinned: ${PINNED_VERSION} @ ${PINNED_SHA}"
 echo "Source: ${TARBALL_URL}"
-echo "Target: ${GITEA_HOST}/${MIRROR_REPO} release ${TAG}"
+echo "Target: github.com/${MIRROR_REPO} release ${TAG}"
 echo
 
 echo "Downloading tarball..."
@@ -130,69 +125,37 @@ fi
 if [[ "${DRY_RUN}" -eq 1 ]]; then
     echo
     echo "Dry-run: tarball downloaded and checksummed; upload skipped."
-    echo "Would upload: ${TARBALL_NAME} → ${TAG} on ${GITEA_HOST}/${MIRROR_REPO}"
+    echo "Would upload: ${TARBALL_NAME} → ${TAG} on github.com/${MIRROR_REPO}"
     exit 0
 fi
 
-# Resolve Gitea token. Follow the project's token-security rule:
-# heredoc-scoped, never echoed.
-TOKEN_FILE="${HOME}/.config/gitea/token"
-if [[ -n "${GITEA_TOKEN:-}" ]]; then
-    : # use env var
-elif [[ -f "${TOKEN_FILE}" ]]; then
-    : # will read inside the upload heredoc
-else
-    echo "ERROR: no Gitea token available." >&2
-    echo "       Set GITEA_TOKEN env var, or place token at ${TOKEN_FILE} (mode 600)." >&2
+if ! command -v gh >/dev/null 2>&1; then
+    echo "ERROR: gh CLI is required for GitHub release uploads." >&2
     exit 1
 fi
 
-# Upload — wrapped in heredoc so the token has the smallest possible
-# scratch surface.
-bash <<EOF
-set -euo pipefail
-TOKEN="\${GITEA_TOKEN:-}"
-if [[ -z "\${TOKEN}" ]]; then
-    TOKEN="\$(cat "${TOKEN_FILE}")"
+if ! gh auth status >/dev/null 2>&1; then
+    echo "ERROR: gh is not authenticated for GitHub release uploads." >&2
+    exit 1
 fi
 
-# 1. Ensure the release exists. Create if not present.
-RELEASE_BODY="\$(jq -nc --arg tag "${TAG}" --arg name "wreq mirror @${SHORT_SHA}" --arg body "Cold mirror of wreq @${PINNED_SHA} (semver ${PINNED_VERSION}). Per ADR-005 § bus-factor mitigation #2." '{ tag_name: \$tag, name: \$name, body: \$body, prerelease: false, draft: false }')"
-
-RELEASE_ID="\$(curl -fsSL -H "Authorization: token \${TOKEN}" \
-    "https://${GITEA_HOST}/api/v1/repos/${MIRROR_REPO}/releases/tags/${TAG}" \
-    2>/dev/null \
-    | jq -r '.id // empty')"
-
-if [[ -z "\${RELEASE_ID}" ]]; then
+if ! gh release view "${TAG}" --repo "${MIRROR_REPO}" >/dev/null 2>&1; then
     echo "Creating release ${TAG}..."
-    RELEASE_ID="\$(curl -fsSL -X POST \
-        -H "Authorization: token \${TOKEN}" \
-        -H "Content-Type: application/json" \
-        --data "\${RELEASE_BODY}" \
-        "https://${GITEA_HOST}/api/v1/repos/${MIRROR_REPO}/releases" \
-        | jq -r '.id')"
-    echo "  release id=\${RELEASE_ID}"
+    gh release create "${TAG}" \
+        --repo "${MIRROR_REPO}" \
+        --title "wreq mirror @${SHORT_SHA}" \
+        --notes "Cold mirror of wreq @${PINNED_SHA} (semver ${PINNED_VERSION}). Per ADR-005 bus-factor mitigation item 2."
 else
-    echo "Release ${TAG} already exists (id=\${RELEASE_ID})"
+    echo "Release ${TAG} already exists"
 fi
 
-# 2. Upload the tarball as an asset.
 echo "Uploading ${TARBALL_NAME}..."
-curl -fsSL -X POST \
-    -H "Authorization: token \${TOKEN}" \
-    -F "attachment=@${WORK_DIR}/${TARBALL_NAME}" \
-    "https://${GITEA_HOST}/api/v1/repos/${MIRROR_REPO}/releases/\${RELEASE_ID}/assets?name=${TARBALL_NAME}" \
-    | jq -r '"  asset id=" + (.id | tostring) + " size=" + (.size | tostring)'
-
-# 3. Upload the checksum as a sidecar.
 echo "${CHECKSUM}  ${TARBALL_NAME}" > "${WORK_DIR}/${TARBALL_NAME}.sha256"
-curl -fsSL -X POST \
-    -H "Authorization: token \${TOKEN}" \
-    -F "attachment=@${WORK_DIR}/${TARBALL_NAME}.sha256" \
-    "https://${GITEA_HOST}/api/v1/repos/${MIRROR_REPO}/releases/\${RELEASE_ID}/assets?name=${TARBALL_NAME}.sha256" \
-    | jq -r '"  checksum asset id=" + (.id | tostring)'
-EOF
+gh release upload "${TAG}" \
+    "${WORK_DIR}/${TARBALL_NAME}" \
+    "${WORK_DIR}/${TARBALL_NAME}.sha256" \
+    --repo "${MIRROR_REPO}" \
+    --clobber
 
 echo
-echo "Mirror refreshed: ${TAG} on https://${GITEA_HOST}/${MIRROR_REPO}/releases/tag/${TAG}"
+echo "Mirror refreshed: ${TAG} on https://github.com/${MIRROR_REPO}/releases/tag/${TAG}"

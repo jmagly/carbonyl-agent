@@ -170,7 +170,8 @@ def test_fetch_sha256sums_parse():
     body = _sha256sums_body()
 
     resp = _FakeResponse(body)
-    with patch("carbonyl_agent.install.urllib.request.urlopen", return_value=resp):
+    with patch("carbonyl_agent.install.INTERNAL_RELEASE_BASE", "https://internal.example"), \
+            patch("carbonyl_agent.install.urllib.request.urlopen", return_value=resp):
         result = _fetch_sha256sums("runtime-abc", TRIPLE)
 
     assert result == FAKE_SHA256
@@ -180,7 +181,8 @@ def test_fetch_sha256sums_404():
     exc = urllib.error.HTTPError(
         url="", code=404, msg="Not Found", hdrs=None, fp=None,  # type: ignore[arg-type]
     )
-    with patch("carbonyl_agent.install.urllib.request.urlopen", side_effect=exc):
+    with patch("carbonyl_agent.install.INTERNAL_RELEASE_BASE", "https://internal.example"), \
+            patch("carbonyl_agent.install.urllib.request.urlopen", side_effect=exc):
         result = _fetch_sha256sums("runtime-abc", TRIPLE)
 
     assert result is None
@@ -189,7 +191,8 @@ def test_fetch_sha256sums_404():
 def test_fetch_sha256sums_no_match():
     body = b"abcdef1234567890  other-file.tgz\n"
     resp = _FakeResponse(body)
-    with patch("carbonyl_agent.install.urllib.request.urlopen", return_value=resp):
+    with patch("carbonyl_agent.install.INTERNAL_RELEASE_BASE", "https://internal.example"), \
+            patch("carbonyl_agent.install.urllib.request.urlopen", return_value=resp):
         result = _fetch_sha256sums("runtime-abc", TRIPLE)
 
     assert result is None
@@ -207,7 +210,7 @@ def test_fetch_checksum_url_parse_sidecar_filename():
 def test_download_candidates_semantic_tag_prefers_github():
     candidates = _download_candidates("v0.2.0-alpha.15", TRIPLE)
 
-    assert len(candidates) == 2
+    assert len(candidates) == 1
     assert candidates[0].label == "GitHub public release"
     assert "github.com/jmagly/carbonyl/releases/download/v0.2.0-alpha.15" in candidates[0].url
     assert candidates[0].asset_name == "carbonyl-0.2.0-alpha.15-x86_64-unknown-linux-gnu.tgz"
@@ -216,11 +219,18 @@ def test_download_candidates_semantic_tag_prefers_github():
     assert candidates[0].expected_version == "0.2.0-alpha.15"
 
 
-def test_download_candidates_runtime_hash_keeps_gitea_asset_shape():
+def test_download_candidates_runtime_hash_requires_internal_release_base():
     candidates = _download_candidates("runtime-deadbeef", TRIPLE)
 
+    assert candidates == []
+
+
+def test_download_candidates_runtime_hash_keeps_internal_asset_shape():
+    with patch("carbonyl_agent.install.INTERNAL_RELEASE_BASE", "https://internal.example"):
+        candidates = _download_candidates("runtime-deadbeef", TRIPLE)
+
     assert len(candidates) == 1
-    assert candidates[0].label == "Gitea runtime release"
+    assert candidates[0].label == "Internal runtime release"
     assert candidates[0].asset_name == f"{TRIPLE}.tgz"
     assert candidates[0].checksum_url and candidates[0].checksum_url.endswith("/SHA256SUMS")
     assert candidates[0].require_checksum is False
@@ -254,10 +264,7 @@ def test_semantic_tag_resolution_per_triple(triple: str):
     assert _asset_name_for_tag(tag, triple) == f"carbonyl-0.2.0-alpha.17-{triple}.tgz"
 
     candidates = _download_candidates(tag, triple)
-    assert [c.label for c in candidates] == [
-        "GitHub public release",
-        "Gitea release mirror",
-    ]
+    assert [c.label for c in candidates] == ["GitHub public release"]
     for c in candidates:
         assert c.asset_name == f"carbonyl-0.2.0-alpha.17-{triple}.tgz"
         assert f"/download/{tag}/carbonyl-0.2.0-alpha.17-{triple}.tgz" in c.url
@@ -268,9 +275,12 @@ def test_semantic_tag_resolution_per_triple(triple: str):
 
 @pytest.mark.parametrize("triple", CONSUMER_TRIPLES)
 def test_runtime_hash_resolution_per_triple(triple: str):
-    """A runtime-hash tag resolves to the bare-triple Gitea asset for every
-    consumer arch."""
-    candidates = _download_candidates("runtime-099874f855c74a61", triple)
+    """A runtime-hash tag resolves only when an internal mirror is configured."""
+    assert _download_candidates("runtime-099874f855c74a61", triple) == []
+
+    with patch("carbonyl_agent.install.INTERNAL_RELEASE_BASE", "https://internal.example"):
+        candidates = _download_candidates("runtime-099874f855c74a61", triple)
+
     assert len(candidates) == 1
     assert candidates[0].asset_name == f"{triple}.tgz"
     assert candidates[0].expected_version is None
@@ -327,14 +337,13 @@ def test_cmd_install_dry_run_prints_github_first_for_semantic_tag(tmp_path: Path
         assert cmd_install(args) == 0
 
     out = capsys.readouterr().out
-    github_pos = out.index("GitHub public release")
-    gitea_pos = out.index("Gitea release mirror")
-    assert github_pos < gitea_pos
+    assert "GitHub public release" in out
+    assert "Internal release mirror" not in out
     assert "carbonyl-0.2.0-alpha.15-x86_64-unknown-linux-gnu.tgz.sha256" in out
     assert "carbonyl --version == Carbonyl 0.2.0-alpha.15" in out
 
 
-def test_cmd_install_falls_back_to_gitea_when_github_unreachable(tmp_path: Path):
+def test_cmd_install_falls_back_to_internal_mirror_when_configured(tmp_path: Path):
     tarball = tmp_path / "runtime.tgz"
     payload = tmp_path / "payload" / TRIPLE
     payload.mkdir(parents=True)
@@ -373,11 +382,12 @@ def test_cmd_install_falls_back_to_gitea_when_github_unreachable(tmp_path: Path)
     )
 
     with patch("carbonyl_agent.install._platform_triple", return_value=TRIPLE), \
+            patch("carbonyl_agent.install.INTERNAL_RELEASE_BASE", "https://internal.example"), \
             patch("carbonyl_agent.install.urllib.request.urlopen", side_effect=fake_urlopen):
         assert cmd_install(args) == 0
 
     assert any("github.com" in url for url in calls)
-    assert any("git.integrolabs.net" in url and url.endswith(".tgz") for url in calls)
+    assert any("internal.example" in url and url.endswith(".tgz") for url in calls)
     installed = tmp_path / "dest" / TRIPLE / "carbonyl"
     result = subprocess.run([str(installed), "--version"], capture_output=True, text=True)
     assert result.stdout.strip() == "Carbonyl 0.2.0-alpha.15"

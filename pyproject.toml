@@ -29,10 +29,7 @@ dependencies = [
 ]
 
 [project.urls]
-# GitHub is the canonical public-facing remote (the mirror PyPI users
-# will hit). Gitea is the dev-primary remote per the project's CLAUDE.md
-# convention; declared here for completeness so issue links work for
-# both audiences.
+# GitHub is the canonical public-facing remote.
 Homepage = "https://github.com/jmagly/carbonyl-agent"
 Repository = "https://github.com/jmagly/carbonyl-agent"
 Issues = "https://github.com/jmagly/carbonyl-agent/issues"

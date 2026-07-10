@@ -1,9 +1,9 @@
-# Building against the wreq cold mirror
+# Building against the wreq cold release asset
 
 Per ADR-005 §"Bus-factor mitigation plan" item 2, the wreq source
-tarball at the pinned SHA is mirrored to a Gitea release on
-`roctinam/carbonyl-agent`. Air-gapped builds (or any environment that
-cannot reach `crates.io` / GitHub) resolve from this mirror instead.
+tarball at the pinned SHA is mirrored to a GitHub release on
+`jmagly/carbonyl-agent`. Air-gapped builds (or any environment that cannot
+reach `crates.io`) resolve from this release asset instead.
 
 **Refs**: ADR-005; roctinam/carbonyl-agent#60.
 
@@ -11,8 +11,8 @@ cannot reach `crates.io` / GitHub) resolve from this mirror instead.
 
 | Field | Value |
 |---|---|
-| Host | `git.integrolabs.net` |
-| Repo | `roctinam/carbonyl-agent` |
+| Host | `github.com` |
+| Repo | `jmagly/carbonyl-agent` |
 | Tag scheme | `wreq-mirror-<short-sha>` (12 hex chars) |
 | Asset 1 | `wreq-<semver>-<short-sha>.tar.gz` (the source tarball) |
 | Asset 2 | `wreq-<semver>-<short-sha>.tar.gz.sha256` (sidecar checksum) |
@@ -51,10 +51,10 @@ TARBALL="wreq-${VER}-${SHORT}.tar.gz"
 
 mkdir -p vendor
 curl -fsSL \
-    "https://git.integrolabs.net/roctinam/carbonyl-agent/releases/download/${TAG}/${TARBALL}" \
+    "https://github.com/jmagly/carbonyl-agent/releases/download/${TAG}/${TARBALL}" \
     -o "vendor/${TARBALL}"
 curl -fsSL \
-    "https://git.integrolabs.net/roctinam/carbonyl-agent/releases/download/${TAG}/${TARBALL}.sha256" \
+    "https://github.com/jmagly/carbonyl-agent/releases/download/${TAG}/${TARBALL}.sha256" \
     -o "vendor/${TARBALL}.sha256"
 
 # Verify checksum before extracting.
@@ -82,9 +82,9 @@ setup but covers all transitive deps in one shot.
 To prove the build works without `crates.io`/GitHub access:
 
 ```bash
-# Block all outbound traffic except git.integrolabs.net.
+# Block all outbound traffic except github.com.
 # (Example: iptables on Linux; adapt to your network sandbox.)
-sudo iptables -A OUTPUT -d git.integrolabs.net -j ACCEPT
+sudo iptables -A OUTPUT -d github.com -j ACCEPT
 sudo iptables -A OUTPUT -d 127.0.0.1            -j ACCEPT
 sudo iptables -P OUTPUT DROP
 
@@ -105,7 +105,7 @@ this verification path is exercised.
 
 Manual: `scripts/wreq-mirror-refresh.sh` (see `--help`).
 
-Automatic: `.gitea/workflows/wreq-mirror.yml` runs on every push that
+Automatic: `.github/workflows/wreq-mirror.yml` runs on every push that
 touches `.carbonyl-fingerprint-version`. Bumping the pin triggers a
 mirror refresh in the same CI cycle that runs `check.yml`'s pin/lock
 alignment job.

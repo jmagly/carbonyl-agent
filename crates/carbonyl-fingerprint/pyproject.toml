@@ -38,7 +38,7 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://git.integrolabs.net/roctinam/carbonyl-agent"
+Repository = "https://github.com/jmagly/carbonyl-agent"
 
 [tool.maturin]
 # `python` feature gate enables the pyo3 dependency + src/python.rs.

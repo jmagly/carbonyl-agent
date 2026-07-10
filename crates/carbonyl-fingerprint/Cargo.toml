@@ -4,7 +4,7 @@ version = "0.0.1-alpha.1"
 edition = "2021"
 description = "Owned fingerprint registry for Carbonyl trusted-automation personas: schema, sampler, validator, applier"
 license = "AGPL-3.0-only"
-repository = "https://git.integrolabs.net/roctinam/carbonyl-agent"
+repository = "https://github.com/jmagly/carbonyl-agent"
 
 [lib]
 name = "carbonyl_fingerprint"

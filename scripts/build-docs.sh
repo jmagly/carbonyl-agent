@@ -7,7 +7,7 @@
 #   ./scripts/build-docs.sh --serve   # local preview at http://localhost:8080
 #
 # CI uses --output-directory to publish into the gh-pages or release-asset
-# bundle path; that lives in .gitea/workflows/ci.yml's docs job.
+# bundle path; that lives in .github/workflows/ci.yml's docs job.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

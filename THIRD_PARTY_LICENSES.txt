@@ -31,9 +31,9 @@ the repository root.
 
 Used by:
   - carbonyl-fingerprint 0.0.1-alpha.1
-    https://git.integrolabs.net/roctinam/carbonyl-agent
+    https://github.com/jmagly/carbonyl-agent
   - carbonyl-wreq 0.0.1-alpha.1
-    https://git.integrolabs.net/roctinam/carbonyl-agent
+    https://github.com/jmagly/carbonyl-agent
 
 License text:
 

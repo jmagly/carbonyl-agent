@@ -17,7 +17,7 @@ Trusted-input browser QA against carbonyl supports three runtimes. They are all 
 - "I want a quick sandboxed smoke test of carbonyl rendering / non-trusted paths" → **Docker**
 - "I'm iterating on `UinputEmitter` or `CarbonylBrowser` code" → **Bare metal**
 
-The rest of this README covers the Docker mode. For VM, see [`agentic-sandbox` `browser-qa` loadout](https://git.integrolabs.net/roctinam/agentic-sandbox/src/branch/main/images/qemu/loadouts/profiles/browser-qa.yaml) and [`scripts/validate-browser-qa.sh`](https://git.integrolabs.net/roctinam/agentic-sandbox/src/branch/main/scripts/validate-browser-qa.sh). For bare metal, run the SDK directly with `carbonyl-agent install` and a host-side Xorg (no special setup beyond the host `99-uinput.rules` rule documented below).
+The rest of this README covers the Docker mode. For VM, see [`agentic-sandbox` `browser-qa` loadout](https://github.com/jmagly/agentic-sandbox/blob/main/images/qemu/loadouts/profiles/browser-qa.yaml) and [`scripts/validate-browser-qa.sh`](https://github.com/jmagly/agentic-sandbox/blob/main/scripts/validate-browser-qa.sh). For bare metal, run the SDK directly with `carbonyl-agent install` and a host-side Xorg (no special setup beyond the host `99-uinput.rules` rule documented below).
 
 ## What's inside
 
@@ -25,21 +25,20 @@ The rest of this README covers the Docker mode. For VM, see [`agentic-sandbox` `
 - **evdev + libinput** input drivers wired via `/etc/X11/xorg.conf.d/20-evdev-input.conf` — reads any `/dev/input/event*` including uinput virtual devices
 - **Capture tools**: `scrot` (single frames), `ffmpeg` (streams), `x11vnc` (remote display)
 - **Python 3 + `python-uinput`**: enough to drive the agent SDK from inside the container
-- **Carbonyl x11 runtime** at `/opt/carbonyl/carbonyl` — fetched at image build time via `--build-arg CARBONYL_RUNTIME_URL=...`. The runtime ships as `runtime-x11-<hash>` Gitea releases (e.g. `runtime-x11-9b3ba53adcd8d330` for current main); a stub is left in place if no URL is passed so the image builds standalone
+- **Carbonyl x11 runtime** at `/opt/carbonyl/carbonyl` — fetched at image build time via `--build-arg CARBONYL_RUNTIME_URL=...`. Use a public GitHub release asset URL when available, or pass an explicitly managed internal URL for private x11 runtime cuts; a stub is left in place if no URL is passed so the image builds standalone
 
 ## Pull (preferred)
 
-The image is published to the Gitea container registry by `.gitea/workflows/build-qa-runner.yml` (issue #38) on every push to `main` that touches `docker/qa-runner/**` or `.carbonyl-runtime-version`.
+The image is published to GHCR by `.github/workflows/build-qa-runner.yml` (issue #38) on every push to `main` that touches `docker/qa-runner/**` or `.carbonyl-runtime-version`.
 
 ```bash
-docker login git.integrolabs.net   # one-time, with a Gitea PAT
-docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:latest
+docker pull ghcr.io/jmagly/carbonyl-agent-qa-runner:latest
 
-# Or pin to a specific runtime hash (matches .carbonyl-runtime-version):
-docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:runtime-9b3ba53adcd8d330
+# Or pin to a specific runtime tag (matches .carbonyl-runtime-version):
+docker pull ghcr.io/jmagly/carbonyl-agent-qa-runner:runtime-v0.2.0-alpha.17
 
 # Or pin to a specific repo commit:
-docker pull git.integrolabs.net/roctinam/carbonyl-agent/qa-runner:sha-<short-sha>
+docker pull ghcr.io/jmagly/carbonyl-agent-qa-runner:sha-<short-sha>
 ```
 
 Use the published image unless you're iterating on the Dockerfile itself or a network egress to the registry isn't available.
@@ -66,7 +65,7 @@ docker/qa-runner/build.sh my-tag:dev
 
 # Manual fallback (equivalent to what build.sh does):
 docker build -t carbonyl-agent-qa-runner:local \
-  --build-arg CARBONYL_RUNTIME_URL=https://git.integrolabs.net/roctinam/carbonyl/releases/download/runtime-x11-9b3ba53adcd8d330/x86_64-unknown-linux-gnu.tgz \
+  --build-arg CARBONYL_RUNTIME_URL=https://github.com/jmagly/carbonyl/releases/download/<tag>/<asset>.tgz \
   docker/qa-runner/
 
 # Stub runtime — useful for smoke-testing the entrypoint / Xorg without the heavy tarball.
@@ -185,7 +184,7 @@ docker run --rm --device=/dev/uinput --group-add input \
 
 ## CI wiring
 
-Image is published to the Gitea container registry at `git.integrolabs.net/roctinam/carbonyl-agent-qa-runner:sha-<7>` by a `build-builder.yml` workflow (to be added; mirrors the `carbonyl-builder` pattern in `roctinam/carbonyl/docs/ci-cd-plan.md`). Downstream workflows pin to the SHA tag, never `latest`.
+Image is published to GHCR at `ghcr.io/jmagly/carbonyl-agent-qa-runner:sha-<7>` by a `build-builder.yml` workflow (to be added; mirrors the `carbonyl-builder` pattern in `jmagly/carbonyl/docs/ci-cd-plan.md`). Downstream workflows pin to the SHA tag, never `latest`.
 
 ## Troubleshooting
 
@@ -194,7 +193,7 @@ Image is published to the Gitea container registry at `git.integrolabs.net/rocti
 | `Xorg socket did not appear` | Missing xkb data or evdev driver conflict | `tail /tmp/xorg.log`; often a permissions issue on shared host |
 | `/dev/uinput: Permission denied` | Host udev doesn't group the device correctly; `--group-add input` alone isn't enough | See §"Host uinput setup" below — needs a host udev rule **and** aligned GIDs, OR `--user 0` |
 | `CARBONYL_GPU_MODE=gpu but /dev/dri/card0 absent` | GPU mode requested but no passthrough | Add `--device=/dev/dri --gpus all` to `docker run` |
-| `carbonyl stub: no x11 runtime installed` | Image built without `CARBONYL_RUNTIME_URL` | Rebuild with `--build-arg CARBONYL_RUNTIME_URL=https://git.integrolabs.net/roctinam/carbonyl/releases/download/runtime-x11-<hash>/x86_64-unknown-linux-gnu.tgz` |
+| `carbonyl stub: no x11 runtime installed` | Image built without `CARBONYL_RUNTIME_URL` | Rebuild with `--build-arg CARBONYL_RUNTIME_URL=https://github.com/jmagly/carbonyl/releases/download/<tag>/<asset>.tgz` |
 
 ## Host uinput setup — OPTIONAL (only for non-root operator mode)
 
@@ -239,11 +238,11 @@ The `run.sh` wrapper hides this distinction: it picks whichever mode the host is
 ## Status (2026-05-20)
 
 - ✅ **Three runtime modes supported.** Bare metal, Docker (this repo), and VM (`agentic-sandbox` `browser-qa` loadout, shipped in v2026.5.5). Pick per the chooser above.
-- ✅ **Carbonyl x11 runtime ships.** `roctinam/carbonyl#57` and `#63` (X-mirror) closed in `v0.2.0-alpha.3`. Use `runtime-x11-<hash>` Gitea releases as `CARBONYL_RUNTIME_URL`. With `CARBONYL_X_MIRROR=1` set, the runtime mirrors compositor frames into a real X window so `scrot`/`ffmpeg`/`x11vnc` capture works alongside the terminal render.
+- ✅ **Carbonyl x11 runtime ships.** `jmagly/carbonyl#57` and `#63` (X-mirror) closed in `v0.2.0-alpha.3`. Use the matching GitHub release asset as `CARBONYL_RUNTIME_URL`. With `CARBONYL_X_MIRROR=1` set, the runtime mirrors compositor frames into a real X window so `scrot`/`ffmpeg`/`x11vnc` capture works alongside the terminal render.
 - ✅ **Mount-namespace fix shipped (`#120` first half).** `sync-virtual-input` mknod helper (commit `5b3fa6e`) populates `/dev/input/event*` for runtime-created uinput devices in the container. Host hardware is filtered out — only `/sys/devices/virtual/input/`-rooted devices are exposed.
 - ⚠️ **Xorg-binding limitation in Docker (`#121`).** systemd-udevd in the container netns does not spawn workers on this Docker/kernel combination, so Xorg never sees the new devices. Documented as a Docker-mode constraint; the VM mode covers the same workload without the constraint. Probing for the minimum capability set that fixes the worker spawn was abandoned after the privileged-flag probe destabilized the host kernel.
-- ✅ **End-to-end validation runs in CI.** `roctinam/carbonyl/scripts/test-x-mirror.sh` exercises both pipelines (terminal SGR stream + X framebuffer pixel histogram) inside this image on every `build-runtime.yml` x11 build. See commit `eee943d`.
-- 🔵 **Image-publish workflow** is the remaining piece — `roctinam/carbonyl-agent#35` CI track. Today the image is built locally / inline by `build-runtime.yml`'s validation step.
+- ✅ **End-to-end validation runs in CI.** `jmagly/carbonyl/scripts/test-x-mirror.sh` exercises both pipelines (terminal SGR stream + X framebuffer pixel histogram) inside this image on every `build-runtime.yml` x11 build. See commit `eee943d`.
+- 🔵 **Image-publish workflow** is the remaining piece — `jmagly/carbonyl-agent#35` CI track. Today the image is built locally / inline by `build-runtime.yml`'s validation step.
 - **Image size**: ~1.5 GB with the real x11 runtime included.
 
 ## Reference

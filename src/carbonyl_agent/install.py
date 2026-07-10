@@ -2,10 +2,10 @@
 """
 carbonyl-agent install — Download and install the Carbonyl runtime binary.
 
-Hash-pinned runtimes are hosted on the Gitea releases for roctinam/carbonyl,
-tagged as `runtime-<hash>` where the hash encodes the Chromium version +
-patches. Semantic `v*` runtime tags use public GitHub release assets first,
-with the Gitea release as a fallback mirror.
+Runtime binaries are hosted on the public GitHub releases for
+jmagly/carbonyl. Semantic `v*` runtime tags are the supported public install
+path. Legacy `runtime-<hash>` tags are internal/source-builder anchors and
+require an explicit internal mirror URL.
 
 Usage:
     carbonyl-agent install [--tag runtime-<hash>] [--dest ~/.local/share/carbonyl/bin]
@@ -16,8 +16,7 @@ Usage:
 
 # Airgap / offline install (#95)
 
-Hosts without GitHub or Gitea access can still install the runtime in
-two steps:
+Hosts without GitHub access can still install the runtime in two steps:
 
 1. On a connected host, run `carbonyl-agent install --dry-run` to get
    the resolved download URL for your platform triple. Download
@@ -68,12 +67,16 @@ from pathlib import Path
 
 from carbonyl_agent import runtime_pin
 
-GITEA_BASE = os.environ.get("GITEA_BASE", "https://git.integrolabs.net")
-GITEA_REPO = "roctinam/carbonyl"
 GITHUB_RELEASE_BASE = os.environ.get(
     "CARBONYL_GITHUB_RELEASE_BASE",
     "https://github.com/jmagly/carbonyl",
 )
+GITHUB_API_BASE = os.environ.get(
+    "CARBONYL_GITHUB_API_BASE",
+    "https://api.github.com/repos/jmagly/carbonyl",
+)
+INTERNAL_RELEASE_BASE = os.environ.get("CARBONYL_INTERNAL_RELEASE_BASE")
+INTERNAL_RELEASE_REPO = os.environ.get("CARBONYL_INTERNAL_RELEASE_REPO", "roctinam/carbonyl")
 
 # Default install directory (same location _local_binary() checks)
 DEFAULT_DEST = Path.home() / ".local" / "share" / "carbonyl" / "bin"
@@ -107,7 +110,7 @@ def _resolve_tag(tag: str) -> str:
     """Resolve 'runtime-latest' to the actual latest release tag."""
     if tag != "runtime-latest":
         return tag
-    url = f"{GITEA_BASE}/api/v1/repos/{GITEA_REPO}/releases/latest"
+    url = f"{GITHUB_API_BASE}/releases/latest"
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -141,7 +144,7 @@ def _download_candidates(tag: str, triple: str) -> list[RuntimeDownload]:
     asset_name = _asset_name_for_tag(tag, triple)
     version = _semantic_version(tag)
     if version:
-        return [
+        candidates = [
             RuntimeDownload(
                 label="GitHub public release",
                 url=f"{GITHUB_RELEASE_BASE}/releases/download/{tag}/{asset_name}",
@@ -149,22 +152,38 @@ def _download_candidates(tag: str, triple: str) -> list[RuntimeDownload]:
                 checksum_url=f"{GITHUB_RELEASE_BASE}/releases/download/{tag}/{asset_name}.sha256",
                 require_checksum=True,
                 expected_version=version,
-            ),
-            RuntimeDownload(
-                label="Gitea release mirror",
-                url=f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/{asset_name}",
-                asset_name=asset_name,
-                checksum_url=f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/{asset_name}.sha256",
-                require_checksum=True,
-                expected_version=version,
-            ),
+            )
         ]
+        if INTERNAL_RELEASE_BASE:
+            candidates.append(
+                RuntimeDownload(
+                    label="Internal release mirror",
+                    url=(
+                        f"{INTERNAL_RELEASE_BASE}/{INTERNAL_RELEASE_REPO}/releases/download/"
+                        f"{tag}/{asset_name}"
+                    ),
+                    asset_name=asset_name,
+                    checksum_url=(
+                        f"{INTERNAL_RELEASE_BASE}/{INTERNAL_RELEASE_REPO}/releases/download/"
+                        f"{tag}/{asset_name}.sha256"
+                    ),
+                    require_checksum=True,
+                    expected_version=version,
+                )
+            )
+        return candidates
+
+    if not INTERNAL_RELEASE_BASE:
+        return []
     return [
         RuntimeDownload(
-            label="Gitea runtime release",
-            url=f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/{asset_name}",
+            label="Internal runtime release",
+            url=f"{INTERNAL_RELEASE_BASE}/{INTERNAL_RELEASE_REPO}/releases/download/{tag}/{asset_name}",
             asset_name=asset_name,
-            checksum_url=f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/SHA256SUMS",
+            checksum_url=(
+                f"{INTERNAL_RELEASE_BASE}/{INTERNAL_RELEASE_REPO}/releases/download/"
+                f"{tag}/SHA256SUMS"
+            ),
             require_checksum=False,
             expected_version=None,
         )
@@ -183,7 +202,9 @@ def _sha256_file(path: Path) -> str:
 def _fetch_sha256sums(tag: str, triple: str) -> str | None:
     """Download SHA256SUMS from a release and return the expected hex digest
     for ``{triple}.tgz``, or *None* if the file is missing (404)."""
-    url = f"{GITEA_BASE}/{GITEA_REPO}/releases/download/{tag}/SHA256SUMS"
+    if not INTERNAL_RELEASE_BASE:
+        return None
+    url = f"{INTERNAL_RELEASE_BASE}/{INTERNAL_RELEASE_REPO}/releases/download/{tag}/SHA256SUMS"
     req = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -338,8 +359,8 @@ def cmd_install(args: argparse.Namespace) -> int:
     dry_run = bool(getattr(args, "dry_run", False))
 
     # --from-file: install from a pre-downloaded tarball, no network. This
-    # is the airgap path (#95) — operators on networks without GitHub /
-    # Gitea access download {triple}.tgz manually on a connected host,
+    # is the airgap path (#95) — operators on networks without GitHub
+    # access download {triple}.tgz manually on a connected host,
     # carry it over, and run install --from-file <path>.
     if from_file is not None:
         src = Path(from_file).expanduser()
@@ -406,6 +427,14 @@ def cmd_install(args: argparse.Namespace) -> int:
     tag = _resolve_tag(tag_input) if not dry_run else tag_input
 
     candidates = _download_candidates(tag, triple)
+    if not candidates:
+        print(
+            f"ERROR: tag {tag!r} is not a public semantic runtime tag. "
+            "Use a v* release tag, or set CARBONYL_INTERNAL_RELEASE_BASE for "
+            "legacy internal runtime-* releases.",
+            file=sys.stderr,
+        )
+        return 1
 
     if binary.exists() and not args.force:
         print(f"Already installed: {binary}")

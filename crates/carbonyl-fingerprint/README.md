@@ -2,8 +2,8 @@
 
 Rust crate implementing the persona registry for the Carbonyl Trusted Automation Initiative.
 
-**Spec**: `roctinam/carbonyl` → `.aiwg/working/trusted-automation/07-fingerprint-registry-design.md`
-**Corpus**: `roctinam/carbonyl-fingerprint-corpus`
+**Spec**: [`jmagly/carbonyl`](https://github.com/jmagly/carbonyl) → `.aiwg/working/trusted-automation/07-fingerprint-registry-design.md`
+**Corpus**: [`jmagly/carbonyl-fingerprint-corpus`](https://github.com/jmagly/carbonyl-fingerprint-corpus)
 
 ## Status
 

@@ -68,8 +68,8 @@ table.)
 scripts/wreq-mirror-refresh.sh --sha <new-sha>
 ```
 
-The mirror tag scheme is `wreq-mirror-<sha>` on the appropriate Gitea
-release. Air-gapped builds resolve from this mirror; if you bump the
+The mirror tag scheme is `wreq-mirror-<sha>` on the GitHub release.
+Air-gapped builds resolve from this release asset; if you bump the
 pin without refreshing the mirror, those builds break.
 
 ### 5. Run the conformance suite (#62)
@@ -104,7 +104,7 @@ Push and let CI verify the pin/lock alignment.
 
 ## What CI checks
 
-`.gitea/workflows/check.yml` runs (after wreq is a real dep):
+`.github/workflows/check.yml` runs (after wreq is a real dep):
 
 1. Read pinned SHA from `.carbonyl-fingerprint-version`.
 2. Read resolved SHA from `Cargo.lock` (`[[package]] name = "wreq"` →

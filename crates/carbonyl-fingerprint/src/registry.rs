@@ -9,7 +9,7 @@
 //! before #68 landed for callers that haven't checked out the corpus
 //! repo.
 //!
-//! [corpus]: https://git.integrolabs.net/roctinam/carbonyl-fingerprint-corpus
+//! [corpus]: https://github.com/jmagly/carbonyl-fingerprint-corpus
 //!
 //! # Quick start
 //!

@@ -6,7 +6,7 @@
 
 ```bash
 # Clone the repository
-git clone https://git.integrolabs.net/roctinam/carbonyl-agent.git
+git clone https://github.com/jmagly/carbonyl-agent.git
 cd carbonyl-agent
 
 # Create virtual environment
@@ -56,7 +56,7 @@ gcc's sysroot in `.cargo/config.toml` or your shell env:
 export BINDGEN_EXTRA_CLANG_ARGS="-I$(gcc -print-file-name=include)"
 ```
 
-The CI workflow (`.gitea/workflows/check.yml`) installs the same set on the
+The CI workflow (`.github/workflows/check.yml`) installs the same set on the
 `rust:latest` container before every clippy / test job, so green CI is the
 authoritative reference for a known-good environment.
 
@@ -135,7 +135,7 @@ Key design decisions are documented as ADRs in `.aiwg/architecture/`:
 - ADR-001: PTY + pyte terminal emulation
 - ADR-002: Unix socket daemon
 - ADR-003: Runtime binary discovery order
-- ADR-004: Gitea release runtime distribution
+- ADR-004: GitHub release runtime distribution
 
 ## Release Process
 
@@ -143,10 +143,9 @@ See the [release runbook](.aiwg/deployment/release-runbook.md) for the full rele
 
 Quick summary:
 1. Ensure CI is green, CHANGELOG updated, version bumped
-2. Tag on Gitea (origin): `git tag v0.X.Y && git push origin v0.X.Y`
-3. Push tag to GitHub mirror: `git push github v0.X.Y`
-4. GitHub Actions publishes to PyPI via trusted publisher
-5. Verify: `pip install carbonyl-agent==0.X.Y` in clean venv
+2. Tag and push to GitHub: `git tag v0.X.Y && git push origin v0.X.Y`
+3. GitHub Actions publishes to PyPI via trusted publisher
+4. Verify: `pip install carbonyl-agent==0.X.Y` in clean venv
 
 ## Links
 
